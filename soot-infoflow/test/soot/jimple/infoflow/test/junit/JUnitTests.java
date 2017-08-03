@@ -62,7 +62,8 @@ public abstract class JUnitTests {
 	@BeforeClass
 	public static void setUp() throws IOException {
 		final String sep = System.getProperty("path.separator");
-		File f = new File(".");
+//		File f = new File(".");
+		File f = new File("./soot-infoflow/");
 		File testSrc1 = new File(f, "bin");
 		File testSrc2 = new File(f, "build" + File.separator + "classes");
 		File testSrc3 = new File(f, "build" + File.separator + "testclasses");
