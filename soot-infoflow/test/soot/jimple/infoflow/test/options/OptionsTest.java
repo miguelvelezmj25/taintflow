@@ -14,9 +14,7 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 public class OptionsTest {
 
@@ -55,14 +53,14 @@ public class OptionsTest {
         OptionsTest.sinks.add("<soot.jimple.infoflow.test.options.Options: boolean getDecision(boolean)>");
     }
 
-    protected void checkInfoflow(Infoflow infoflow, int resultCount){
-        if(infoflow.isResultAvailable()){
+    protected void checkInfoflow(Infoflow infoflow, int resultCount) {
+        if(infoflow.isResultAvailable()) {
             InfoflowResults map = infoflow.getResults();
             boolean containsSink = false;
             List<String> actualSinkStrings = new LinkedList<String>();
             assertEquals(resultCount, map.size());
-            for(String sink : OptionsTest.sinks){
-                if(map.containsSinkMethod(sink)){
+            for(String sink : OptionsTest.sinks) {
+                if(map.containsSinkMethod(sink)) {
                     containsSink = true;
                     actualSinkStrings.add(sink);
                 }
@@ -70,35 +68,37 @@ public class OptionsTest {
 
             assertTrue(containsSink);
             boolean onePathFound = false;
-            for(String sink : actualSinkStrings){
+            for(String sink : actualSinkStrings) {
                 boolean hasPath = false;
-                for(String source : OptionsTest.sources){
-                    if(map.isPathBetweenMethods(sink, source)){
+                for(String source : OptionsTest.sources) {
+                    if(map.isPathBetweenMethods(sink, source)) {
                         hasPath = true;
                         break;
                     }
                 }
-                if(hasPath){
+                if(hasPath) {
                     onePathFound = true;
                 }
             }
             assertTrue(onePathFound);
 
-        }else{
+        }
+        else {
             fail("result is not available");
         }
     }
 
-    protected void negativeCheckInfoflow(Infoflow infoflow){
-        if(infoflow.isResultAvailable()){
+    protected void negativeCheckInfoflow(Infoflow infoflow) {
+        if(infoflow.isResultAvailable()) {
             InfoflowResults map = infoflow.getResults();
-            for(String sink : OptionsTest.sinks){
-                if(map.containsSinkMethod(sink)){
-                    fail("sink is reached: " +sink);
+            for(String sink : OptionsTest.sinks) {
+                if(map.containsSinkMethod(sink)) {
+                    fail("sink is reached: " + sink);
                 }
             }
             assertEquals(0, map.size());
-        }else{
+        }
+        else {
             fail("result is not available");
         }
     }
@@ -128,6 +128,21 @@ public class OptionsTest {
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add("<soot.jimple.infoflow.test.options.code.Sleep1: void main(java.lang.String[])>");
+
+        infoflow.computeInfoflow(OptionsTest.appPath, OptionsTest.libPath, entryPoints, OptionsTest.sources, OptionsTest.sinks);
+        checkInfoflow(infoflow, 2);
+    }
+
+    @Test
+    public void sleep2Test() throws IOException {
+        Infoflow infoflow = new Infoflow();
+        infoflow.setConfig(OptionsTest.infoflowConfiguration);
+
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        List<String> entryPoints = new ArrayList<>();
+        entryPoints.add("<soot.jimple.infoflow.test.options.code.Sleep2: void main(java.lang.String[])>");
 
         infoflow.computeInfoflow(OptionsTest.appPath, OptionsTest.libPath, entryPoints, OptionsTest.sources, OptionsTest.sinks);
         checkInfoflow(infoflow, 2);
