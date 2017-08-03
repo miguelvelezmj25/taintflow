@@ -178,4 +178,19 @@ public class OptionsTest {
         checkInfoflow(infoflow, 1);
     }
 
+    @Test
+    public void sleep5Test() throws IOException {
+        Infoflow infoflow = new Infoflow();
+        infoflow.setConfig(OptionsTest.infoflowConfiguration);
+
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        List<String> entryPoints = new ArrayList<>();
+        entryPoints.add("<soot.jimple.infoflow.test.options.code.Basic5: void main(java.lang.String[])>");
+
+        infoflow.computeInfoflow(OptionsTest.appPath, OptionsTest.libPath, entryPoints, OptionsTest.sources, OptionsTest.sinks);
+        checkInfoflow(infoflow, 1);
+    }
+
 }
