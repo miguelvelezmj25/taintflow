@@ -974,13 +974,13 @@ public class Infoflow extends AbstractInfoflow {
 					forwardProblem.addInitialSeeds(u, Collections.singleton(forwardProblem.zeroValue()));
 					if (getConfig().getLogSourcesAndSinks())
 						collectedSources.add(s);
-					logger.debug("Source found: {}", u);
+					logger.info("Source found: {}", u);
 				}
 				if (sourcesSinks.isSink(s, manager, null)) {
 					sinkCount++;
 					if (getConfig().getLogSourcesAndSinks())
 						collectedSinks.add(s);
-					logger.debug("Sink found: {}", u);
+					logger.info("Sink found: {}", u);
 				}
 			}
 
