@@ -112,7 +112,7 @@ public class OptionsTest {
         infoflow.setTaintWrapper(easyWrapper);
 
         List<String> entryPoints = new ArrayList<>();
-        entryPoints.add("<soot.jimple.infoflow.test.options.code.Sleep0: void main(java.lang.String[])>");
+        entryPoints.add("<soot.jimple.infoflow.test.options.code.Basic0: void main(java.lang.String[])>");
 
         infoflow.computeInfoflow(OptionsTest.appPath, OptionsTest.libPath, entryPoints, OptionsTest.sources, OptionsTest.sinks);
         checkInfoflow(infoflow, 1);
@@ -127,7 +127,7 @@ public class OptionsTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         List<String> entryPoints = new ArrayList<>();
-        entryPoints.add("<soot.jimple.infoflow.test.options.code.Sleep1: void main(java.lang.String[])>");
+        entryPoints.add("<soot.jimple.infoflow.test.options.code.Basic1: void main(java.lang.String[])>");
 
         infoflow.computeInfoflow(OptionsTest.appPath, OptionsTest.libPath, entryPoints, OptionsTest.sources, OptionsTest.sinks);
         checkInfoflow(infoflow, 2);
@@ -142,7 +142,7 @@ public class OptionsTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         List<String> entryPoints = new ArrayList<>();
-        entryPoints.add("<soot.jimple.infoflow.test.options.code.Sleep2: void main(java.lang.String[])>");
+        entryPoints.add("<soot.jimple.infoflow.test.options.code.Basic2: void main(java.lang.String[])>");
 
         infoflow.computeInfoflow(OptionsTest.appPath, OptionsTest.libPath, entryPoints, OptionsTest.sources, OptionsTest.sinks);
         checkInfoflow(infoflow, 2);

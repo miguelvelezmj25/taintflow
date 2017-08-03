@@ -2,7 +2,7 @@ package soot.jimple.infoflow.test.options.code;
 
 import soot.jimple.infoflow.test.options.Options;
 
-public class Sleep1 {
+public class Basic1 {
 
     public static void main(String[] args) throws InterruptedException {
         Options options = new Options();

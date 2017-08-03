@@ -2,18 +2,24 @@ package soot.jimple.infoflow.test.options.code;
 
 import soot.jimple.infoflow.test.options.Options;
 
-public class Sleep0 {
+public class Basic2 {
 
     public static void main(String[] args) throws InterruptedException {
         Options options = new Options();
         boolean A = options.getOption();
-        int x;
+        boolean B = false;
+        int x = 0;
 
         if(options.getDecision(A)) {
-            x = 0;
+            x++;
         }
-        else {
-            x = 1;
+
+        if(options.getDecision(B)) {
+            x++;
+        }
+
+        if(options.getDecision(x > 0)) {
+            x = -1;
         }
     }
 
