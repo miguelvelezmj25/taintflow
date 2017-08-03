@@ -1,0 +1,36 @@
+package soot.jimple.infoflow.test.options.code.todo;
+
+/**
+ * Created by mvelezce on 4/21/17.
+ */
+public class Sleep26 {
+
+    public static boolean A = false;
+
+    public static void main(String[] args) throws InterruptedException {
+        A = Boolean.valueOf(args[0]);
+
+        Thread.sleep(200);
+        Sleep26.method1(true);
+        Thread.sleep(200);
+        Sleep26.method1(false);
+        Thread.sleep(100);
+
+        if(A) {
+            Thread.sleep(200);
+        }
+    }
+
+    public static void method1(boolean a) throws InterruptedException {
+        Thread.sleep(200);
+
+        // Region A start
+        if(a || A) { // 16
+            Thread.sleep(600);
+        }
+        // Region A end
+
+        Thread.sleep(100);
+    }
+
+}
