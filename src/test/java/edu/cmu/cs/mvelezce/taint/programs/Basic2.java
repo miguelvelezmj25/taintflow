@@ -9,7 +9,7 @@ public class Basic2 {
         Source source = new Source();
         Sink sink = new Sink();
 
-        boolean A = source.getOption();
+        boolean A = source.getOptionA();
         boolean B = false;
         int x = 0;
 

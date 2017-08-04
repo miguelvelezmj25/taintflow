@@ -1,13 +1,15 @@
 package edu.cmu.cs.mvelezce.taint.programs.todo;
 
+import edu.cmu.cs.mvelezce.taint.programs.Sleep0;
+
 /**
  * Created by mvelezce on 4/21/17.
  */
 public class Sleep18 {
 
-    public static final String FILENAME = Sleep3.class.getCanonicalName();
-    public static final String PACKAGE = Sleep3.class.getPackage().getName();
-    public static final String CLASS = Sleep3.class.getSimpleName();
+    public static final String FILENAME = Sleep0.class.getCanonicalName();
+    public static final String PACKAGE = Sleep0.class.getPackage().getName();
+    public static final String CLASS = Sleep0.class.getSimpleName();
     public static final String MAIN_METHOD = "main";
     public static boolean A = false;
     public static boolean B = false;

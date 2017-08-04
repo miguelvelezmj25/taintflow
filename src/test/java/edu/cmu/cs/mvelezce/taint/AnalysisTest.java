@@ -63,7 +63,8 @@ public class AnalysisTest {
     @Before
     public void beforeTest() {
         AnalysisTest.sources = new ArrayList<>();
-        AnalysisTest.sources.add("<edu.cmu.cs.mvelezce.analysis.Source: boolean getOption()>");
+        AnalysisTest.sources.add("<edu.cmu.cs.mvelezce.analysis.Source: boolean getOptionA()>");
+        AnalysisTest.sources.add("<edu.cmu.cs.mvelezce.analysis.Source: boolean getOptionB()>");
 
         AnalysisTest.sinks = new ArrayList<>();
         AnalysisTest.sinks.add("<edu.cmu.cs.mvelezce.analysis.Sink: boolean getDecision(boolean)>");
@@ -127,6 +128,7 @@ public class AnalysisTest {
 
         for(ResultSinkInfo resultSinkInfo : map.getResults().keySet()) {
             this.printSinkResult(infoflow, resultSinkInfo.getSink());
+            System.out.println("");
         }
     }
 
@@ -146,30 +148,6 @@ public class AnalysisTest {
         List<Integer> bytecodeIndexes = new ArrayList<>();
 
         for(Tag tag : sink.getTags()) {
-            if(tag instanceof BytecodeOffsetTag) {
-                int bytecodeIndex = ((BytecodeOffsetTag) tag).getBytecodeOffset();
-                bytecodeIndexes.add(bytecodeIndex);
-            }
-        }
-
-        if(bytecodeIndexes.isEmpty()) {
-            bytecodeIndexes.add(-1);
-        }
-
-        System.out.println("Bytecode indexes: " + bytecodeIndexes);
-    }
-
-    protected void printSinkResult(ResultSinkInfo resultSinkInfo) {
-        System.out.println("Result sink info: " + resultSinkInfo);
-
-        Stmt sink = resultSinkInfo.getSink();
-        System.out.println("Sink: " + sink);
-        System.out.println("Sink: " + sink);
-
-
-        List<Integer> bytecodeIndexes = new ArrayList<>();
-
-        for(Tag tag : resultSinkInfo.getSink().getTags()) {
             if(tag instanceof BytecodeOffsetTag) {
                 int bytecodeIndex = ((BytecodeOffsetTag) tag).getBytecodeOffset();
                 bytecodeIndexes.add(bytecodeIndex);
@@ -332,6 +310,23 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
         this.negativeCheckInfoflow(infoflow);
+    }
+
+    @Test
+    public void Sleep0Test() throws IOException {
+        TaintInfoflow infoflow = new TaintInfoflow();
+        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
+        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
+
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        List<String> entryPoints = new ArrayList<>();
+        entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Sleep0: void main(java.lang.String[])>");
+
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
+        this.checkInfoflow(infoflow, 6);
+        this.checkResults(infoflow);
     }
 
 }

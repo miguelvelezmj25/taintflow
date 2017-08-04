@@ -8,7 +8,7 @@ public class Basic1 {
     public static void main(String[] args) throws InterruptedException {
         Source source = new Source();
         Sink sink = new Sink();
-        boolean A = source.getOption();
+        boolean A = source.getOptionA();
         int x = 0;
 
         if(sink.getDecision(x == 0)) {

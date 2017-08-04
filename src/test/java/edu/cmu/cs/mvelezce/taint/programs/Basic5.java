@@ -9,7 +9,7 @@ public class Basic5 {
     private static Sink sink = new Sink();
 
     public static void main(String[] args) throws InterruptedException {
-        boolean A = Basic5.source.getOption();
+        boolean A = Basic5.source.getOptionA();
         Basic5.foo(A);
 
         boolean B = A;
