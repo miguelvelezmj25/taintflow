@@ -5,8 +5,12 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import soot.jimple.infoflow.Infoflow;
 import soot.jimple.infoflow.InfoflowConfiguration;
+import soot.jimple.infoflow.config.IInfoflowConfig;
 import soot.jimple.infoflow.results.InfoflowResults;
+import soot.jimple.infoflow.results.ResultSinkInfo;
 import soot.jimple.infoflow.taintWrappers.EasyTaintWrapper;
+import soot.tagkit.BytecodeOffsetTag;
+import soot.tagkit.Tag;
 
 import java.io.File;
 import java.io.IOException;
@@ -23,6 +27,7 @@ public class OptionsTest {
     protected static List<String> sources;
     protected static List<String> sinks;
     protected static InfoflowConfiguration infoflowConfiguration;
+    protected static IInfoflowConfig sootConfiguration;
 
     @BeforeClass
     public static void setUp() throws IOException {
@@ -42,6 +47,9 @@ public class OptionsTest {
         OptionsTest.infoflowConfiguration.setEnableImplicitFlows(true);
         OptionsTest.infoflowConfiguration.setCodeEliminationMode(InfoflowConfiguration.CodeEliminationMode.NoCodeElimination);
         OptionsTest.infoflowConfiguration.setInspectSinks(true);
+
+        // Config soot
+        OptionsTest.sootConfiguration = new OptionsConfig();
     }
 
     @Before
@@ -82,6 +90,10 @@ public class OptionsTest {
             }
             assertTrue(onePathFound);
 
+            for(ResultSinkInfo resultSinkInfo : map.getResults().keySet()) {
+                this.printSinkResult(resultSinkInfo);
+            }
+
         }
         else {
             fail("result is not available");
@@ -103,25 +115,47 @@ public class OptionsTest {
         }
     }
 
+    protected void printSinkResult(ResultSinkInfo resultSinkInfo) {
+        System.out.println("Result sink info: " + resultSinkInfo);
+        System.out.println("Sink: " + resultSinkInfo.getSink());
+
+        List<Integer> bytecodeIndexes = new ArrayList<>();
+
+        for(Tag tag : resultSinkInfo.getSink().getTags()) {
+            if(tag instanceof BytecodeOffsetTag) {
+                int bytecodeIndex = ((BytecodeOffsetTag) tag).getBytecodeOffset();
+                bytecodeIndexes.add(bytecodeIndex);
+            }
+        }
+
+        if(bytecodeIndexes.isEmpty()) {
+            bytecodeIndexes.add(-1);
+        }
+
+        System.out.println("Bytecode indexes: " + bytecodeIndexes);
+    }
+
     @Test
-    public void sleep0Test() throws IOException {
+    public void basic0Test() throws IOException {
         Infoflow infoflow = new Infoflow();
         infoflow.setConfig(OptionsTest.infoflowConfiguration);
+        infoflow.setSootConfig(OptionsTest.sootConfiguration);
 
-        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
-        infoflow.setTaintWrapper(easyWrapper);
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add("<soot.jimple.infoflow.test.options.code.Basic0: void main(java.lang.String[])>");
 
         infoflow.computeInfoflow(OptionsTest.appPath, OptionsTest.libPath, entryPoints, OptionsTest.sources, OptionsTest.sinks);
-        checkInfoflow(infoflow, 1);
+        this.checkInfoflow(infoflow, 1);
     }
 
     @Test
-    public void sleep1Test() throws IOException {
+    public void basic1Test() throws IOException {
         Infoflow infoflow = new Infoflow();
         infoflow.setConfig(OptionsTest.infoflowConfiguration);
+        infoflow.setSootConfig(OptionsTest.sootConfiguration);
 
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);
@@ -130,13 +164,14 @@ public class OptionsTest {
         entryPoints.add("<soot.jimple.infoflow.test.options.code.Basic1: void main(java.lang.String[])>");
 
         infoflow.computeInfoflow(OptionsTest.appPath, OptionsTest.libPath, entryPoints, OptionsTest.sources, OptionsTest.sinks);
-        checkInfoflow(infoflow, 2);
+        this.checkInfoflow(infoflow, 2);
     }
 
     @Test
-    public void sleep2Test() throws IOException {
+    public void basic2Test() throws IOException {
         Infoflow infoflow = new Infoflow();
         infoflow.setConfig(OptionsTest.infoflowConfiguration);
+        infoflow.setSootConfig(OptionsTest.sootConfiguration);
 
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);
@@ -145,13 +180,14 @@ public class OptionsTest {
         entryPoints.add("<soot.jimple.infoflow.test.options.code.Basic2: void main(java.lang.String[])>");
 
         infoflow.computeInfoflow(OptionsTest.appPath, OptionsTest.libPath, entryPoints, OptionsTest.sources, OptionsTest.sinks);
-        checkInfoflow(infoflow, 2);
+        this.checkInfoflow(infoflow, 2);
     }
 
     @Test
-    public void sleep3Test() throws IOException {
+    public void basic3Test() throws IOException {
         Infoflow infoflow = new Infoflow();
         infoflow.setConfig(OptionsTest.infoflowConfiguration);
+        infoflow.setSootConfig(OptionsTest.sootConfiguration);
 
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);
@@ -160,13 +196,14 @@ public class OptionsTest {
         entryPoints.add("<soot.jimple.infoflow.test.options.code.Basic3: void main(java.lang.String[])>");
 
         infoflow.computeInfoflow(OptionsTest.appPath, OptionsTest.libPath, entryPoints, OptionsTest.sources, OptionsTest.sinks);
-        checkInfoflow(infoflow, 2);
+        this.checkInfoflow(infoflow, 2);
     }
 
     @Test
-    public void sleep4Test() throws IOException {
+    public void basic4Test() throws IOException {
         Infoflow infoflow = new Infoflow();
         infoflow.setConfig(OptionsTest.infoflowConfiguration);
+        infoflow.setSootConfig(OptionsTest.sootConfiguration);
 
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);
@@ -175,13 +212,14 @@ public class OptionsTest {
         entryPoints.add("<soot.jimple.infoflow.test.options.code.Basic4: void main(java.lang.String[])>");
 
         infoflow.computeInfoflow(OptionsTest.appPath, OptionsTest.libPath, entryPoints, OptionsTest.sources, OptionsTest.sinks);
-        checkInfoflow(infoflow, 1);
+        this.checkInfoflow(infoflow, 1);
     }
 
     @Test
-    public void sleep5Test() throws IOException {
+    public void basic5Test() throws IOException {
         Infoflow infoflow = new Infoflow();
         infoflow.setConfig(OptionsTest.infoflowConfiguration);
+        infoflow.setSootConfig(OptionsTest.sootConfiguration);
 
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);
@@ -190,13 +228,14 @@ public class OptionsTest {
         entryPoints.add("<soot.jimple.infoflow.test.options.code.Basic5: void main(java.lang.String[])>");
 
         infoflow.computeInfoflow(OptionsTest.appPath, OptionsTest.libPath, entryPoints, OptionsTest.sources, OptionsTest.sinks);
-        checkInfoflow(infoflow, 1);
+        this.checkInfoflow(infoflow, 1);
     }
 
     @Test
-    public void sleep6Test() throws IOException {
+    public void basic6Test() throws IOException {
         Infoflow infoflow = new Infoflow();
         infoflow.setConfig(OptionsTest.infoflowConfiguration);
+        infoflow.setSootConfig(OptionsTest.sootConfiguration);
 
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);
@@ -205,13 +244,14 @@ public class OptionsTest {
         entryPoints.add("<soot.jimple.infoflow.test.options.code.Basic6: void main(java.lang.String[])>");
 
         infoflow.computeInfoflow(OptionsTest.appPath, OptionsTest.libPath, entryPoints, OptionsTest.sources, OptionsTest.sinks);
-        checkInfoflow(infoflow, 1);
+        this.checkInfoflow(infoflow, 1);
     }
 
     @Test
-    public void sleep7Test() throws IOException {
+    public void basic7Test() throws IOException {
         Infoflow infoflow = new Infoflow();
         infoflow.setConfig(OptionsTest.infoflowConfiguration);
+        infoflow.setSootConfig(OptionsTest.sootConfiguration);
 
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);
@@ -220,7 +260,7 @@ public class OptionsTest {
         entryPoints.add("<soot.jimple.infoflow.test.options.code.Basic7: void main(java.lang.String[])>");
 
         infoflow.computeInfoflow(OptionsTest.appPath, OptionsTest.libPath, entryPoints, OptionsTest.sources, OptionsTest.sinks);
-        checkInfoflow(infoflow, 3);
+        this.checkInfoflow(infoflow, 3);
     }
 
 }
