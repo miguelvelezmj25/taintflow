@@ -1,20 +1,18 @@
 package edu.cmu.cs.mvelezce.taint.programs;
 
-import edu.cmu.cs.mvelezce.analysis.Options;
+import edu.cmu.cs.mvelezce.analysis.Sink;
+import edu.cmu.cs.mvelezce.analysis.Source;
 
 public class Basic0 {
 
     public static void main(String[] args) throws InterruptedException {
-        Options options = new Options();
-        boolean A = options.getOption();
-        int x;
+        Source source = new Source();
+        Sink sink = new Sink();
 
-        if(options.getDecision(A)) {
-            x = 0;
-        }
-        else {
-            x = 1;
-        }
+        boolean A = source.getOption();
+
+        sink.getDecision(true);
+        sink.getDecision(false);
     }
 
 }

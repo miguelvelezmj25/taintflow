@@ -40,10 +40,13 @@ public class AnalysisTest {
         File testSrc1 = new File(f, "target" + File.separator + "classes");
         File testSrc2 = new File(f, "target" + File.separator + "test-classes");
 
-        if (!(testSrc1.exists() || testSrc2.exists())) {
+        f = new File("./soot-infoflow/");
+        File testSrc3 = new File(f, "bin");
+
+        if(!(testSrc1.exists() || testSrc2.exists() || testSrc3.exists())) {
             fail("Test aborted - none of the test sources are available");
         }
-        AnalysisTest.appPath = testSrc1.getCanonicalPath() + sep + testSrc2.getCanonicalPath();
+        AnalysisTest.appPath = testSrc1.getCanonicalPath() + sep + testSrc2.getCanonicalPath() + sep + testSrc3.getCanonicalPath();
         AnalysisTest.libPath = System.getProperty("java.home") + File.separator + "lib" + File.separator + "rt.jar";
 
         // Config information flow
@@ -60,13 +63,13 @@ public class AnalysisTest {
     @Before
     public void beforeTest() {
         AnalysisTest.sources = new ArrayList<>();
-        AnalysisTest.sources.add("<edu.cmu.cs.mvelezce.analysis.Options: boolean getOption()>");
+        AnalysisTest.sources.add("<edu.cmu.cs.mvelezce.analysis.Source: boolean getOption()>");
 
         AnalysisTest.sinks = new ArrayList<>();
-        AnalysisTest.sinks.add("<edu.cmu.cs.mvelezce.analysis.Options: boolean getDecision(boolean)>");
+        AnalysisTest.sinks.add("<edu.cmu.cs.mvelezce.analysis.Sink: boolean getDecision(boolean)>");
     }
 
-    protected void checkInfoflow(TaintInfoflow infoflow, int resultCount) {
+    protected void checkInfoflow(Infoflow infoflow, int resultCount) {
         if(infoflow.isResultAvailable()) {
             InfoflowResults map = infoflow.getResults();
             boolean containsSink = false;
@@ -139,7 +142,7 @@ public class AnalysisTest {
         System.out.println("sink at method sub signature: " + sinkAtMethod.getSubSignature());
         System.out.println("sink at class: " + sinkAtClass.getShortName());
         System.out.println("sink at package: " + sinkAtPackage);
-        
+
         List<Integer> bytecodeIndexes = new ArrayList<>();
 
         for(Tag tag : sink.getTags()) {
@@ -193,8 +196,7 @@ public class AnalysisTest {
         entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Basic0: void main(java.lang.String[])>");
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
-        this.checkInfoflow(infoflow, 1);
-        this.checkResults(infoflow);
+        this.negativeCheckInfoflow(infoflow);
     }
 
     @Test
@@ -314,6 +316,22 @@ public class AnalysisTest {
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
         this.checkInfoflow(infoflow, 3);
         this.checkResults(infoflow);
+    }
+
+    @Test
+    public void basic8Test() throws IOException {
+        TaintInfoflow infoflow = new TaintInfoflow();
+        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
+        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
+
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        List<String> entryPoints = new ArrayList<>();
+        entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Basic8: void main(java.lang.String[])>");
+
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
+        this.negativeCheckInfoflow(infoflow);
     }
 
 }

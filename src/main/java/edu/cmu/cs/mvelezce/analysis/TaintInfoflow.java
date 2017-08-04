@@ -5,5 +5,7 @@ import soot.jimple.infoflow.solver.cfg.IInfoflowCFG;
 
 public class TaintInfoflow extends Infoflow {
 
-    public IInfoflowCFG getiCfg() { return this.iCfg; }
+    public IInfoflowCFG getiCfg() {
+        return this.iCfg;
+    }
 }

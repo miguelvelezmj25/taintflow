@@ -1,15 +1,17 @@
 package edu.cmu.cs.mvelezce.taint.programs;
 
-import edu.cmu.cs.mvelezce.analysis.Options;
+import edu.cmu.cs.mvelezce.analysis.Sink;
+import edu.cmu.cs.mvelezce.analysis.Source;
 
 public class Basic3 {
 
-    private static Options options = new Options();
+    private static Source source = new Source();
+    private static Sink sink = new Sink();
 
     public static void main(String[] args) throws InterruptedException {
-        boolean A = Basic3.options.getOption();
+        boolean A = Basic3.source.getOption();
 
-        if(options.getDecision(A)) {
+        if(sink.getDecision(A)) {
             Basic3.foo();
         }
     }
@@ -17,7 +19,7 @@ public class Basic3 {
     public static void foo() {
         int x = 0;
 
-        if(Basic3.options.getDecision(0 > 2)) {
+        if(Basic3.sink.getDecision(0 > 2)) {
             x++;
         }
     }
