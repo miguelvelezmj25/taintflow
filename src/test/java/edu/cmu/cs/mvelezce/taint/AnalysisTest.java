@@ -13,6 +13,7 @@ import soot.jimple.infoflow.InfoflowConfiguration;
 import soot.jimple.infoflow.config.IInfoflowConfig;
 import soot.jimple.infoflow.results.InfoflowResults;
 import soot.jimple.infoflow.results.ResultSinkInfo;
+import soot.jimple.infoflow.results.ResultSourceInfo;
 import soot.tagkit.BytecodeOffsetTag;
 import soot.tagkit.Tag;
 
@@ -21,6 +22,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.Assert.*;
 
@@ -127,12 +129,13 @@ public class AnalysisTest {
         InfoflowResults map = infoflow.getResults();
 
         for(ResultSinkInfo resultSinkInfo : map.getResults().keySet()) {
-            this.printSinkResult(infoflow, resultSinkInfo.getSink());
+            Set<ResultSourceInfo> resultSources = map.getResults().get(resultSinkInfo);
+            this.printSinkResult(infoflow, resultSinkInfo.getSink(), resultSources);
             System.out.println("");
         }
     }
 
-    protected void printSinkResult(TaintInfoflow infoflow, Stmt sink) {
+    protected void printSinkResult(TaintInfoflow infoflow, Stmt sink, Set<ResultSourceInfo> sources) {
         System.out.println("Sink: " + sink);
 
         SootMethod sinkAtMethod = infoflow.getiCfg().getMethodOf(sink);
@@ -159,6 +162,11 @@ public class AnalysisTest {
         }
 
         System.out.println("Bytecode indexes: " + bytecodeIndexes);
+
+        for(ResultSourceInfo resultSourceInfo : sources) {
+            Stmt source = resultSourceInfo.getSource();
+            System.out.println("Source: " + source);
+        }
     }
 
     @Test
