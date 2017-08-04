@@ -106,6 +106,7 @@ public class Infoflow extends AbstractInfoflow {
 	private Set<Stmt> collectedSinks = null;
 
 	protected SootMethod dummyMainMethod = null;
+	protected IInfoflowCFG iCfg = null;
 
 	/**
 	 * Creates a new instance of the InfoFlow class for analyzing plain Java
@@ -289,7 +290,7 @@ public class Infoflow extends AbstractInfoflow {
 				return;
 
 			logger.info("Starting Taint Analysis");
-			IInfoflowCFG iCfg = icfgFactory.buildBiDirICFG(config.getCallgraphAlgorithm(),
+			this.iCfg = icfgFactory.buildBiDirICFG(config.getCallgraphAlgorithm(),
 					config.getEnableExceptionTracking());
 
 			// Check whether we need to run with one source at a time

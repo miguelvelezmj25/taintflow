@@ -1,9 +1,12 @@
 package edu.cmu.cs.mvelezce.taint;
 
+import edu.cmu.cs.mvelezce.analysis.TaintInfoflow;
 import edu.cmu.cs.mvelezce.soot.SootConfig;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import soot.SootClass;
+import soot.SootMethod;
 import soot.jimple.Stmt;
 import soot.jimple.infoflow.Infoflow;
 import soot.jimple.infoflow.InfoflowConfiguration;
@@ -63,7 +66,7 @@ public class AnalysisTest {
         AnalysisTest.sinks.add("<edu.cmu.cs.mvelezce.analysis.Options: boolean getDecision(boolean)>");
     }
 
-    protected void checkInfoflow(Infoflow infoflow, int resultCount) {
+    protected void checkInfoflow(TaintInfoflow infoflow, int resultCount) {
         if(infoflow.isResultAvailable()) {
             InfoflowResults map = infoflow.getResults();
             boolean containsSink = false;
@@ -91,18 +94,13 @@ public class AnalysisTest {
                 }
             }
             assertTrue(onePathFound);
-
-            for(ResultSinkInfo resultSinkInfo : map.getResults().keySet()) {
-                this.printSinkResult(resultSinkInfo);
-            }
-
         }
         else {
             fail("result is not available");
         }
     }
 
-    protected void negativeCheckInfoflow(Infoflow infoflow) {
+    protected void negativeCheckInfoflow(TaintInfoflow infoflow) {
         if(infoflow.isResultAvailable()) {
             InfoflowResults map = infoflow.getResults();
             for(String sink : AnalysisTest.sinks) {
@@ -115,6 +113,47 @@ public class AnalysisTest {
         else {
             fail("result is not available");
         }
+    }
+
+    protected void checkResults(TaintInfoflow infoflow) {
+        if(!infoflow.isResultAvailable()) {
+            return;
+        }
+
+        InfoflowResults map = infoflow.getResults();
+
+        for(ResultSinkInfo resultSinkInfo : map.getResults().keySet()) {
+            this.printSinkResult(infoflow, resultSinkInfo.getSink());
+        }
+    }
+
+    protected void printSinkResult(TaintInfoflow infoflow, Stmt sink) {
+        System.out.println("Sink: " + sink);
+
+        SootMethod sinkAtMethod = infoflow.getiCfg().getMethodOf(sink);
+        SootClass sinkAtClass = sinkAtMethod.getDeclaringClass();
+        String sinkAtPackage = sinkAtClass.getPackageName();
+        System.out.println("sink at method: " + sinkAtMethod.getName());
+        System.out.println("sink at method bytecode signature: " + sinkAtMethod.getBytecodeSignature());
+        System.out.println("sink at method signature: " + sinkAtMethod.getSignature());
+        System.out.println("sink at method sub signature: " + sinkAtMethod.getSubSignature());
+        System.out.println("sink at class: " + sinkAtClass.getShortName());
+        System.out.println("sink at package: " + sinkAtPackage);
+        
+        List<Integer> bytecodeIndexes = new ArrayList<>();
+
+        for(Tag tag : sink.getTags()) {
+            if(tag instanceof BytecodeOffsetTag) {
+                int bytecodeIndex = ((BytecodeOffsetTag) tag).getBytecodeOffset();
+                bytecodeIndexes.add(bytecodeIndex);
+            }
+        }
+
+        if(bytecodeIndexes.isEmpty()) {
+            bytecodeIndexes.add(-1);
+        }
+
+        System.out.println("Bytecode indexes: " + bytecodeIndexes);
     }
 
     protected void printSinkResult(ResultSinkInfo resultSinkInfo) {
@@ -143,7 +182,7 @@ public class AnalysisTest {
 
     @Test
     public void basic0Test() throws IOException {
-        Infoflow infoflow = new Infoflow();
+        TaintInfoflow infoflow = new TaintInfoflow();
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -155,11 +194,12 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
         this.checkInfoflow(infoflow, 1);
+        this.checkResults(infoflow);
     }
 
     @Test
     public void basic1Test() throws IOException {
-        Infoflow infoflow = new Infoflow();
+        TaintInfoflow infoflow = new TaintInfoflow();
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -171,11 +211,12 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
         this.checkInfoflow(infoflow, 2);
+        this.checkResults(infoflow);
     }
 
     @Test
     public void basic2Test() throws IOException {
-        Infoflow infoflow = new Infoflow();
+        TaintInfoflow infoflow = new TaintInfoflow();
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -187,11 +228,12 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
         this.checkInfoflow(infoflow, 2);
+        this.checkResults(infoflow);
     }
 
     @Test
     public void basic3Test() throws IOException {
-        Infoflow infoflow = new Infoflow();
+        TaintInfoflow infoflow = new TaintInfoflow();
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -203,11 +245,12 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
         this.checkInfoflow(infoflow, 2);
+        this.checkResults(infoflow);
     }
 
     @Test
     public void basic4Test() throws IOException {
-        Infoflow infoflow = new Infoflow();
+        TaintInfoflow infoflow = new TaintInfoflow();
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -219,11 +262,12 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
         this.checkInfoflow(infoflow, 1);
+        this.checkResults(infoflow);
     }
 
     @Test
     public void basic5Test() throws IOException {
-        Infoflow infoflow = new Infoflow();
+        TaintInfoflow infoflow = new TaintInfoflow();
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -235,11 +279,12 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
         this.checkInfoflow(infoflow, 1);
+        this.checkResults(infoflow);
     }
 
     @Test
     public void basic6Test() throws IOException {
-        Infoflow infoflow = new Infoflow();
+        TaintInfoflow infoflow = new TaintInfoflow();
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -251,11 +296,12 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
         this.checkInfoflow(infoflow, 1);
+        this.checkResults(infoflow);
     }
 
     @Test
     public void basic7Test() throws IOException {
-        Infoflow infoflow = new Infoflow();
+        TaintInfoflow infoflow = new TaintInfoflow();
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -267,6 +313,7 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
         this.checkInfoflow(infoflow, 3);
+        this.checkResults(infoflow);
     }
 
 }
