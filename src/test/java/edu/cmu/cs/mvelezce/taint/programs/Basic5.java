@@ -5,11 +5,8 @@ import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 public class Basic5 {
 
-    private static Source source = new Source();
-    private static Sink sink = new Sink();
-
     public static void main(String[] args) throws InterruptedException {
-        boolean A = Basic5.source.getOptionA();
+        boolean A = Source.getOptionA();
         Basic5.foo(A);
 
         boolean B = A;
@@ -20,7 +17,7 @@ public class Basic5 {
     public static void foo(boolean x) {
         int i = 0;
 
-        if(Basic5.sink.getDecision(x)) {
+        if(Sink.getDecision(x)) {
             i++;
         }
     }

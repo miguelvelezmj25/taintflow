@@ -6,20 +6,18 @@ import edu.cmu.cs.mvelezce.analysis.option.Source;
 public class Basic1 {
 
     public static void main(String[] args) throws InterruptedException {
-        Source source = new Source();
-        Sink sink = new Sink();
-        boolean A = source.getOptionA();
+        boolean A = Source.getOptionA();
         int x = 0;
 
-        if(sink.getDecision(x == 0)) {
+        if(Sink.getDecision(x == 0)) {
             x++;
         }
 
-        if(sink.getDecision(A)) {
+        if(Sink.getDecision(A)) {
             x++;
         }
 
-        if(sink.getDecision(x == 0)) {
+        if(Sink.getDecision(x == 0)) {
             x++;
         }
 

@@ -2,11 +2,15 @@ package edu.cmu.cs.mvelezce.analysis.option;
 
 public class Source {
 
-    public boolean getOptionA() {
+    public static boolean getOptionA() {
         return true;
     }
 
-    public boolean getOptionB() {
+    public static boolean getOptionB() {
+        return true;
+    }
+
+    public static boolean getOptionC() {
         return true;
     }
 }

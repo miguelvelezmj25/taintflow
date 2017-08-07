@@ -1,4 +1,4 @@
-package edu.cmu.cs.mvelezce.analysis.option;
+package edu.cmu.cs.mvelezce.analysis.option.json;
 
 public class Option {
 
