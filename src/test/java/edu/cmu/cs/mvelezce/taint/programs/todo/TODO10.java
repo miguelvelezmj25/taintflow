@@ -1,5 +1,7 @@
 package edu.cmu.cs.mvelezce.taint.programs.todo;
 
+import edu.cmu.cs.mvelezce.analysis.option.Source;
+
 /**
  * Created by mvelezce on 7/8/17.
  */
@@ -9,8 +11,8 @@ public class TODO10 {
     public static boolean B = false;
 
     public static void main(String[] args) {
-        A = Boolean.valueOf(args[0]);
-        B = Boolean.valueOf(args[1]);
+        A = Source.getOptionA(Boolean.valueOf(args[0]));
+        B = Source.getOptionB(Boolean.valueOf(args[1]));
 
         A = foo(A);
         B = foo(B);

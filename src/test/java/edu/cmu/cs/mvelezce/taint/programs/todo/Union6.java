@@ -1,5 +1,7 @@
 package edu.cmu.cs.mvelezce.taint.programs.todo;
 
+import edu.cmu.cs.mvelezce.analysis.option.Source;
+
 /**
  * Created by mvelezce on 4/21/17.
  */
@@ -13,7 +15,7 @@ public class Union6 {
 
     public static void main(String[] args) throws InterruptedException {
         Thread.sleep(1);
-        C = Boolean.valueOf(args[2]);
+        C = Source.getOptionC(Boolean.valueOf(args[2]));
 
         boolean c;
 

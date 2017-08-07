@@ -1,5 +1,6 @@
 package edu.cmu.cs.mvelezce.taint.programs.todo;
 
+import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 public class Sleep31 {
 
@@ -17,8 +18,8 @@ public class Sleep31 {
     }
 
     private static void start(String[] args) throws InterruptedException {
-        A = Boolean.valueOf(args[0]);
-        B = Boolean.valueOf(args[1]);
+        A = Source.getOptionA(Boolean.valueOf(args[0]));
+        B = Source.getOptionB(Boolean.valueOf(args[1]));
 
         boolean a;
         boolean b;
@@ -90,8 +91,8 @@ public class Sleep31 {
     }
 
     private static void start(String[] args) throws InterruptedException {
-        A = Boolean.valueOf(args[0]);
-        B = Boolean.valueOf(args[1]);
+A = Source.getOptionA(Boolean.valueOf(args[0]));
+B = Source.getOptionB(Boolean.valueOf(args[1]));
 
         boolean a;
 //        boolean b;

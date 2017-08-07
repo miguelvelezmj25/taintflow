@@ -1,5 +1,7 @@
 package edu.cmu.cs.mvelezce.taint.programs.todo;
 
+import edu.cmu.cs.mvelezce.analysis.option.Source;
+
 /**
  * Created by mvelezce on 6/16/17.
  */
@@ -16,12 +18,12 @@ public class Sleep14 {
     public static void main(String[] args) throws InterruptedException {
         System.out.println("main");
 
-//        boolean a = Boolean.valueOf(args[0]);
-//        int ia = Boolean.valueOf(args[4]);
-//        double da = Boolean.valueOf(args[5]);
-        A = Boolean.valueOf(args[0]);
-        B = Boolean.valueOf(args[4]);
-        C = Boolean.valueOf(args[5]);
+//        boolean a = Source.getOption//        boolean a(Boolean.valueOf(args[0]));
+//        int ia = Source.getOption//        int ia(Boolean.valueOf(args[4]));
+//        double da = Source.getOption//        double da(Boolean.valueOf(args[5]));
+        A = Source.getOptionA(Boolean.valueOf(args[0]));
+        B = Source.getOptionB(Boolean.valueOf(args[4]));
+        C = Source.getOptionC(Boolean.valueOf(args[5]));
 
         boolean a;
         int b;

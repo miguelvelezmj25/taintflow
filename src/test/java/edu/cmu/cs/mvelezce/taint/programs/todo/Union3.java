@@ -1,5 +1,6 @@
 package edu.cmu.cs.mvelezce.taint.programs.todo;
 
+import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 public class Union3 {
 
@@ -7,8 +8,8 @@ public class Union3 {
     public static boolean B = false;
 
     public static void main(String[] args) throws InterruptedException {
-        A = Boolean.valueOf(args[0]);
-        B = Boolean.valueOf(args[1]);
+        A = Source.getOptionA(Boolean.valueOf(args[0]));
+        B = Source.getOptionB(Boolean.valueOf(args[1]));
 
         boolean a;
         boolean b;

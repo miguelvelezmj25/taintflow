@@ -1,5 +1,6 @@
 package edu.cmu.cs.mvelezce.taint.programs.todo;
 
+import edu.cmu.cs.mvelezce.analysis.option.Source;
 import edu.cmu.cs.mvelezce.taint.programs.Basic1;
 
 /**
@@ -17,8 +18,8 @@ public class TODO1 {
         // Region program start
         System.out.println("main");
 
-//        boolean a = Boolean.valueOf(args[0]);
-        A = Boolean.valueOf(args[0]);
+//        boolean a = Source.getOption//        boolean a(Boolean.valueOf(args[0]));
+        A = Source.getOptionA(Boolean.valueOf(args[0]));
 
         boolean a;
 

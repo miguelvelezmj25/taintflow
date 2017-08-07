@@ -1,5 +1,6 @@
 package edu.cmu.cs.mvelezce.taint.programs.todo;
 
+import edu.cmu.cs.mvelezce.analysis.option.Source;
 import edu.cmu.cs.mvelezce.taint.programs.Sleep0;
 
 /**
@@ -16,9 +17,9 @@ public class Sleep18 {
     public static boolean C = false;
 
     public static void main(String[] args) throws InterruptedException {
-        A = Boolean.valueOf(args[0]);
-        B = Boolean.valueOf(args[1]);
-        C = Boolean.valueOf(args[2]);
+        A = Source.getOptionA(Boolean.valueOf(args[0]));
+        B = Source.getOptionB(Boolean.valueOf(args[1]));
+        C = Source.getOptionC(Boolean.valueOf(args[2]));
 
         Thread.sleep(100);
 

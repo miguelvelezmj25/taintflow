@@ -1,5 +1,7 @@
 package edu.cmu.cs.mvelezce.taint.programs.todo;
 
+import edu.cmu.cs.mvelezce.analysis.option.Source;
+
 /**
  * Created by mvelezce on 4/21/17.
  */
@@ -11,10 +13,10 @@ public class Sleep28 {
     public static boolean D;
 
     public static void main(String[] args) throws InterruptedException {
-        A = Boolean.valueOf(args[0]);
-        B = Boolean.valueOf(args[1]);
-        C = Boolean.valueOf(args[2]);
-        D = Boolean.valueOf(args[3]);
+        A = Source.getOptionA(Boolean.valueOf(args[0]));
+        B = Source.getOptionB(Boolean.valueOf(args[1]));
+        C = Source.getOptionC(Boolean.valueOf(args[2]));
+        D = Source.getOptionD(Boolean.valueOf(args[3]));
 
         int a;
         int b;

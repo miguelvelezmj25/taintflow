@@ -1,5 +1,7 @@
 package edu.cmu.cs.mvelezce.taint.programs.todo;
 
+import edu.cmu.cs.mvelezce.analysis.option.Source;
+
 /**
  * Created by mvelezce on 4/21/17.
  */
@@ -18,10 +20,10 @@ public class Sleep10 {
         // Region program start
         System.out.println("main");
 
-//        boolean a = Boolean.valueOf(args[0]);
-//        boolean b = Boolean.valueOf(args[1]);
-        A = Boolean.valueOf(args[0]);
-        B = Boolean.valueOf(args[1]);
+//        boolean a = Source.getOption//        boolean a(Boolean.valueOf(args[0]));
+//        boolean b = Source.getOption//        boolean b(Boolean.valueOf(args[1]));
+        A = Source.getOptionA(Boolean.valueOf(args[0]));
+        B = Source.getOptionB(Boolean.valueOf(args[1]));
 
         boolean a;
 
