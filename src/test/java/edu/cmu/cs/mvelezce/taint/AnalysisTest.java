@@ -120,54 +120,6 @@ public class AnalysisTest {
         }
     }
 
-    protected void checkResults(TaintInfoflow infoflow) {
-        if(!infoflow.isResultAvailable()) {
-            return;
-        }
-
-        InfoflowResults map = infoflow.getResults();
-
-        for(ResultSinkInfo resultSinkInfo : map.getResults().keySet()) {
-            Set<ResultSourceInfo> resultSources = map.getResults().get(resultSinkInfo);
-            this.printSinkResult(infoflow, resultSinkInfo.getSink(), resultSources);
-            System.out.println("");
-        }
-    }
-
-    protected void printSinkResult(TaintInfoflow infoflow, Stmt sink, Set<ResultSourceInfo> sources) {
-        System.out.println("Sink: " + sink);
-
-        SootMethod sinkAtMethod = infoflow.getiCfg().getMethodOf(sink);
-        SootClass sinkAtClass = sinkAtMethod.getDeclaringClass();
-        String sinkAtPackage = sinkAtClass.getPackageName();
-        System.out.println("sink at method: " + sinkAtMethod.getName());
-        System.out.println("sink at method bytecode signature: " + sinkAtMethod.getBytecodeSignature());
-        System.out.println("sink at method signature: " + sinkAtMethod.getSignature());
-        System.out.println("sink at method sub signature: " + sinkAtMethod.getSubSignature());
-        System.out.println("sink at class: " + sinkAtClass.getShortName());
-        System.out.println("sink at package: " + sinkAtPackage);
-
-        List<Integer> bytecodeIndexes = new ArrayList<>();
-
-        for(Tag tag : sink.getTags()) {
-            if(tag instanceof BytecodeOffsetTag) {
-                int bytecodeIndex = ((BytecodeOffsetTag) tag).getBytecodeOffset();
-                bytecodeIndexes.add(bytecodeIndex);
-            }
-        }
-
-        if(bytecodeIndexes.isEmpty()) {
-            bytecodeIndexes.add(-1);
-        }
-
-        System.out.println("Bytecode indexes: " + bytecodeIndexes);
-
-        for(ResultSourceInfo resultSourceInfo : sources) {
-            Stmt source = resultSourceInfo.getSource();
-            System.out.println("Source: " + source);
-        }
-    }
-
     @Test
     public void basic0Test() throws IOException {
         TaintInfoflow infoflow = new TaintInfoflow("basic0");
@@ -198,7 +150,7 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 2);
-        this.checkResults(infoflow);
+        infoflow.checkResults();
     }
 
     @Test
@@ -215,7 +167,7 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 2);
-        this.checkResults(infoflow);
+        infoflow.checkResults();
     }
 
     @Test
@@ -232,7 +184,7 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 2);
-        this.checkResults(infoflow);
+        infoflow.checkResults();
     }
 
     @Test
@@ -249,7 +201,7 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 1);
-        this.checkResults(infoflow);
+        infoflow.checkResults();
     }
 
     @Test
@@ -266,7 +218,7 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 1);
-        this.checkResults(infoflow);
+        infoflow.checkResults();
     }
 
     @Test
@@ -283,7 +235,7 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 1);
-        this.checkResults(infoflow);
+        infoflow.checkResults();
     }
 
     @Test
@@ -300,7 +252,7 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 3);
-        this.checkResults(infoflow);
+        infoflow.checkResults();
     }
 
     @Test
@@ -333,7 +285,7 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 6);
-        this.checkResults(infoflow);
+        infoflow.checkResults();
     }
 
 }
