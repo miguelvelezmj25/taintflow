@@ -2,7 +2,6 @@ package edu.cmu.cs.mvelezce.taint;
 
 import edu.cmu.cs.mvelezce.analysis.TaintInfoflow;
 import edu.cmu.cs.mvelezce.soot.SootConfig;
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import soot.SootClass;
@@ -30,8 +29,8 @@ public class AnalysisTest {
 
     protected static String appPath;
     protected static String libPath;
-    protected static List<String> sources;
-    protected static List<String> sinks;
+    //    protected static List<String> sources;
+//    protected static List<String> sinks;
     protected static InfoflowConfiguration infoflowConfiguration;
     protected static IInfoflowConfig sootConfiguration;
 
@@ -62,23 +61,23 @@ public class AnalysisTest {
         AnalysisTest.sootConfiguration = new SootConfig();
     }
 
-    @Before
-    public void beforeTest() {
-        AnalysisTest.sources = new ArrayList<>();
-        AnalysisTest.sources.add("<edu.cmu.cs.mvelezce.analysis.Source: boolean getOptionA()>");
-        AnalysisTest.sources.add("<edu.cmu.cs.mvelezce.analysis.Source: boolean getOptionB()>");
+//    @Before
+//    public void beforeTest() {
+//        infoflow.getSources() = new ArrayList<>();
+//        infoflow.getSources().add("<edu.cmu.cs.mvelezce.analysis.Source: boolean getOptionA()>");
+//        infoflow.getSources().add("<edu.cmu.cs.mvelezce.analysis.Source: boolean getOptionB()>");
+//
+//        infoflow.getSinks() = new ArrayList<>();
+//        infoflow.getSinks().add("<edu.cmu.cs.mvelezce.analysis.Sink: boolean getDecision(boolean)>");
+//    }
 
-        AnalysisTest.sinks = new ArrayList<>();
-        AnalysisTest.sinks.add("<edu.cmu.cs.mvelezce.analysis.Sink: boolean getDecision(boolean)>");
-    }
-
-    protected void checkInfoflow(Infoflow infoflow, int resultCount) {
+    protected void checkInfoflow(TaintInfoflow infoflow, int resultCount) {
         if(infoflow.isResultAvailable()) {
             InfoflowResults map = infoflow.getResults();
             boolean containsSink = false;
             List<String> actualSinkStrings = new LinkedList<String>();
             assertEquals(resultCount, map.size());
-            for(String sink : AnalysisTest.sinks) {
+            for(String sink : infoflow.getSinks()) {
                 if(map.containsSinkMethod(sink)) {
                     containsSink = true;
                     actualSinkStrings.add(sink);
@@ -89,7 +88,7 @@ public class AnalysisTest {
             boolean onePathFound = false;
             for(String sink : actualSinkStrings) {
                 boolean hasPath = false;
-                for(String source : AnalysisTest.sources) {
+                for(String source : infoflow.getSources()) {
                     if(map.isPathBetweenMethods(sink, source)) {
                         hasPath = true;
                         break;
@@ -109,7 +108,7 @@ public class AnalysisTest {
     protected void negativeCheckInfoflow(TaintInfoflow infoflow) {
         if(infoflow.isResultAvailable()) {
             InfoflowResults map = infoflow.getResults();
-            for(String sink : AnalysisTest.sinks) {
+            for(String sink : infoflow.getSinks()) {
                 if(map.containsSinkMethod(sink)) {
                     fail("sink is reached: " + sink);
                 }
@@ -171,23 +170,23 @@ public class AnalysisTest {
 
     @Test
     public void basic0Test() throws IOException {
-        TaintInfoflow infoflow = new TaintInfoflow();
+        TaintInfoflow infoflow = new TaintInfoflow("basic0");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
-
-//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
-//        infoflow.setTaintWrapper(easyWrapper);
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Basic0: void main(java.lang.String[])>");
 
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.negativeCheckInfoflow(infoflow);
     }
 
     @Test
     public void basic1Test() throws IOException {
-        TaintInfoflow infoflow = new TaintInfoflow();
+        TaintInfoflow infoflow = new TaintInfoflow("basic1");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -197,14 +196,14 @@ public class AnalysisTest {
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Basic1: void main(java.lang.String[])>");
 
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 2);
         this.checkResults(infoflow);
     }
 
     @Test
     public void basic2Test() throws IOException {
-        TaintInfoflow infoflow = new TaintInfoflow();
+        TaintInfoflow infoflow = new TaintInfoflow("basic2");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -214,14 +213,14 @@ public class AnalysisTest {
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Basic2: void main(java.lang.String[])>");
 
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 2);
         this.checkResults(infoflow);
     }
 
     @Test
     public void basic3Test() throws IOException {
-        TaintInfoflow infoflow = new TaintInfoflow();
+        TaintInfoflow infoflow = new TaintInfoflow("basic3");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -231,14 +230,14 @@ public class AnalysisTest {
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Basic3: void main(java.lang.String[])>");
 
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 2);
         this.checkResults(infoflow);
     }
 
     @Test
     public void basic4Test() throws IOException {
-        TaintInfoflow infoflow = new TaintInfoflow();
+        TaintInfoflow infoflow = new TaintInfoflow("basic4");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -248,14 +247,14 @@ public class AnalysisTest {
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Basic4: void main(java.lang.String[])>");
 
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 1);
         this.checkResults(infoflow);
     }
 
     @Test
     public void basic5Test() throws IOException {
-        TaintInfoflow infoflow = new TaintInfoflow();
+        TaintInfoflow infoflow = new TaintInfoflow("basic5");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -265,14 +264,14 @@ public class AnalysisTest {
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Basic5: void main(java.lang.String[])>");
 
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 1);
         this.checkResults(infoflow);
     }
 
     @Test
     public void basic6Test() throws IOException {
-        TaintInfoflow infoflow = new TaintInfoflow();
+        TaintInfoflow infoflow = new TaintInfoflow("basic6");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -282,14 +281,14 @@ public class AnalysisTest {
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Basic6: void main(java.lang.String[])>");
 
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 1);
         this.checkResults(infoflow);
     }
 
     @Test
     public void basic7Test() throws IOException {
-        TaintInfoflow infoflow = new TaintInfoflow();
+        TaintInfoflow infoflow = new TaintInfoflow("basic7");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -299,14 +298,14 @@ public class AnalysisTest {
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Basic7: void main(java.lang.String[])>");
 
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 3);
         this.checkResults(infoflow);
     }
 
     @Test
     public void basic8Test() throws IOException {
-        TaintInfoflow infoflow = new TaintInfoflow();
+        TaintInfoflow infoflow = new TaintInfoflow("basic8");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -316,13 +315,13 @@ public class AnalysisTest {
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Basic8: void main(java.lang.String[])>");
 
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.negativeCheckInfoflow(infoflow);
     }
 
     @Test
     public void Sleep0Test() throws IOException {
-        TaintInfoflow infoflow = new TaintInfoflow();
+        TaintInfoflow infoflow = new TaintInfoflow("sleep0");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -332,7 +331,7 @@ public class AnalysisTest {
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Sleep0: void main(java.lang.String[])>");
 
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, AnalysisTest.sources, AnalysisTest.sinks);
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 6);
         this.checkResults(infoflow);
     }

@@ -1,4 +1,4 @@
-package edu.cmu.cs.mvelezce.analysis;
+package edu.cmu.cs.mvelezce.analysis.option;
 
 public class Sink {
 
