@@ -47,6 +47,7 @@ public class AnalysisTest {
         AnalysisTest.infoflowConfiguration.setEnableImplicitFlows(true);
         AnalysisTest.infoflowConfiguration.setCodeEliminationMode(InfoflowConfiguration.CodeEliminationMode.NoCodeElimination);
         AnalysisTest.infoflowConfiguration.setInspectSinks(true);
+        AnalysisTest.infoflowConfiguration.setAccessPathLength(1_000_000);
 
         // Config soot
         AnalysisTest.sootConfiguration = new SootConfig();
