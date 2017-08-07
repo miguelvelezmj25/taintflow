@@ -10,8 +10,8 @@ public class Union0 {
     public static boolean B;
 
     public static void main(String[] args) throws InterruptedException {
-        A = Source.getOptionA();
-        B = Source.getOptionB();
+        A = Source.getOptionA(Boolean.valueOf(args[0]));
+        B = Source.getOptionB(Boolean.valueOf(args[1]));
 
         boolean a;
         boolean b;

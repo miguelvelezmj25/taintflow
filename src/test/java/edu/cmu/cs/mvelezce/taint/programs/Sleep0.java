@@ -8,9 +8,12 @@ import edu.cmu.cs.mvelezce.analysis.option.Source;
  */
 public class Sleep0 {
 
+    public static boolean A;
+    public static boolean B;
+
     public static void main(String[] args) throws InterruptedException {
-        boolean A = Source.getOptionA();
-        boolean B = Source.getOptionB();
+        A = Source.getOptionA(Boolean.valueOf(args[0]));
+        B = Source.getOptionB(Boolean.valueOf(args[0]));
 
 //        boolean a = Boolean.valueOf(args[0]);
 //        boolean b = Boolean.valueOf(args[1]);

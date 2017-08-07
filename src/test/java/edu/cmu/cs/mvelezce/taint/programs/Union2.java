@@ -11,9 +11,9 @@ public class Union2 {
     public static boolean C;
 
     public static void main(String[] args) throws InterruptedException {
-        A = Source.getOptionA();
-        B = Source.getOptionB();
-        C = Source.getOptionC();
+        A = Source.getOptionA(Boolean.valueOf(args[0]));
+        B = Source.getOptionB(Boolean.valueOf(args[1]));
+        C = Source.getOptionC(Boolean.valueOf(args[2]));
 
         boolean a;
         boolean b;

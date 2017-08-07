@@ -6,7 +6,7 @@ import edu.cmu.cs.mvelezce.analysis.option.Source;
 public class Basic5 {
 
     public static void main(String[] args) throws InterruptedException {
-        boolean A = Source.getOptionA();
+        boolean A = Source.getOptionA(Boolean.valueOf(args[0]));
         Basic5.foo(A);
 
         boolean B = A;

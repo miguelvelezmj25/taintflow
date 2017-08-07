@@ -1,6 +1,8 @@
 package edu.cmu.cs.mvelezce.taint.programs.todo;
 
 
+import edu.cmu.cs.mvelezce.analysis.option.Sink;
+
 public class Union1 {
 
     public static boolean A = false;
@@ -11,9 +13,9 @@ public class Union1 {
         B = Boolean.valueOf(args[1]);
 
         boolean a;
-        boolean b;
+        boolean b =false;
 
-        if(A) {
+        if(Sink.getDecision(A || b)) {
             a = true;
         }
         else {
