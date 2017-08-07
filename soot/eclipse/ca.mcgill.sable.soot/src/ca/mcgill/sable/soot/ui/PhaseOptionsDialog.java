@@ -11826,7 +11826,7 @@ Composite dbdb_force_recompileChild = dbdb_force_recompileCreate(getPageContaine
 			
 		}
 
-		setProcessing_Optionsignore_resolution_errors_widget(new BooleanOptionWidget(editGroupProcessing_Options, SWT.NONE, new OptionData("Ignore reolution errors", "", "","ire", "\nSome edu.cmu.cs.mvelezce.taint.programs may contain dead code that references fields or \nmethods that do not exist. By default, Soot exists with an \nexception when this happens. If this option is enabled, Soot \nonly prints a warning but does not exit. ", defaultBool)));
+		setProcessing_Optionsignore_resolution_errors_widget(new BooleanOptionWidget(editGroupProcessing_Options, SWT.NONE, new OptionData("Ignore reolution errors", "", "","ire", "\nSome programs may contain dead code that references fields or \nmethods that do not exist. By default, Soot exists with an \nexception when this happens. If this option is enabled, Soot \nonly prints a warning but does not exit. ", defaultBool)));
 		
 		
 		
@@ -18164,7 +18164,7 @@ Composite dbdb_force_recompileChild = dbdb_force_recompileCreate(getPageContaine
 		
 		new OptionData("Medium",
 		"medium",
-		"\nUnsafe in multi-threaded edu.cmu.cs.mvelezce.taint.programs, as it may reuse the values \nread from field accesses. ",
+		"\nUnsafe in multi-threaded programs, as it may reuse the values \nread from field accesses. ",
 		
 		false),
 		
@@ -21071,7 +21071,7 @@ Composite dbdb_force_recompileChild = dbdb_force_recompileCreate(getPageContaine
 			
 		}
 
-		setApplication_Mode_Optionsdynamic_class_widget(new ListOptionWidget(editGroupApplication_Mode_Options, SWT.NONE, new OptionData("Dynamic Classes",  "", "","dynamic-class", "\nMark CLASS as a class which the application may load \ndynamically. Soot will read it as a library class even if it is \nnot referenced from the argument classes. This permits whole \nprogram optimizations on edu.cmu.cs.mvelezce.taint.programs which load classes dynamically \nif the set of classes that can be loaded is known at compile \ntime. You can use the dynamic class option multiple times to \nspecify more than one dynamic class.", defaultString)));
+		setApplication_Mode_Optionsdynamic_class_widget(new ListOptionWidget(editGroupApplication_Mode_Options, SWT.NONE, new OptionData("Dynamic Classes",  "", "","dynamic-class", "\nMark CLASS as a class which the application may load \ndynamically. Soot will read it as a library class even if it is \nnot referenced from the argument classes. This permits whole \nprogram optimizations on programs which load classes dynamically \nif the set of classes that can be loaded is known at compile \ntime. You can use the dynamic class option multiple times to \nspecify more than one dynamic class.", defaultString)));
 		
 
 		defKey = ""+" "+""+" "+"dynamic-dir";

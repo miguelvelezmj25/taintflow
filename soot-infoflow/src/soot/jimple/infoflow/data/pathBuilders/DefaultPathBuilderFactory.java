@@ -28,7 +28,7 @@ public class DefaultPathBuilderFactory implements IPathBuilderFactory {
 		Recursive,
 		/**
 		 * Highly precise context-sensitive path reconstruction approach. For
-		 * a large number of paths or complex edu.cmu.cs.mvelezce.taint.programs, it may be slow.
+		 * a large number of paths or complex programs, it may be slow.
 		 */
 		ContextSensitive,
 		/**

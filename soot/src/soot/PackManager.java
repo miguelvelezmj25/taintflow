@@ -716,7 +716,7 @@ public class PackManager {
 
 			/*
 			 * Nomair A. Naeem 5-Jun-2005 Added to remove the *final* bug in
-			 * Dava (often seen in AspectJ edu.cmu.cs.mvelezce.taint.programs)
+			 * Dava (often seen in AspectJ programs)
 			 */
 			DavaStaticBlockCleaner.v().staticBlockInlining(s);
 

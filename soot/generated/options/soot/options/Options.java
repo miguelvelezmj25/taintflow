@@ -2573,7 +2573,7 @@ public class Options extends OptionsBase {
     
         if( phaseName.equals( "wjtp.tn" ) )
             return "Phase "+phaseName+":\n"+
-                "\nThe Lock Allocator finds critical sections (synchronized \nregions) in Java edu.cmu.cs.mvelezce.taint.programs and assigns locks for execution on \nboth optimistic and pessimistic JVMs. It can also be used to \nanalyze the existing locks. "
+                "\nThe Lock Allocator finds critical sections (synchronized \nregions) in Java programs and assigns locks for execution on \nboth optimistic and pessimistic JVMs. It can also be used to \nanalyze the existing locks. "
                 +"\n\nRecognized options (with default values):\n"
                 +padOpt( "enabled (false)", "" )
                 +padOpt( "locking-scheme", "Selects the granularity of the generated lock allocation" )
