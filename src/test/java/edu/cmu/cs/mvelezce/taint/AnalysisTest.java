@@ -280,6 +280,23 @@ public class AnalysisTest {
     }
 
     @Test
+    public void Union0Test() throws IOException {
+        TaintInfoflow infoflow = new TaintInfoflow("union0");
+        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
+        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
+
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        List<String> entryPoints = new ArrayList<>();
+        entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Union0: void main(java.lang.String[])>");
+
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
+        this.checkInfoflow(infoflow, 4);
+        infoflow.checkResults();
+    }
+
+    @Test
     public void Union2Test() throws IOException {
         TaintInfoflow infoflow = new TaintInfoflow("union2");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
@@ -295,5 +312,4 @@ public class AnalysisTest {
         this.checkInfoflow(infoflow, 5);
         infoflow.checkResults();
     }
-
 }

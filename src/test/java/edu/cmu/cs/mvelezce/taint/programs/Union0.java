@@ -1,26 +1,29 @@
-package edu.cmu.cs.mvelezce.taint.programs.todo;
+package edu.cmu.cs.mvelezce.taint.programs;
 
+
+import edu.cmu.cs.mvelezce.analysis.option.Sink;
+import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 public class Union0 {
 
-    public static boolean A = false;
-    public static boolean B = false;
+    public static boolean A;
+    public static boolean B;
 
     public static void main(String[] args) throws InterruptedException {
-        A = Boolean.valueOf(args[0]);
-        B = Boolean.valueOf(args[1]);
+        A = Source.getOptionA();
+        B = Source.getOptionB();
 
         boolean a;
         boolean b;
 
-        if(A) {
+        if(Sink.getDecision(A)) {
             a = true;
         }
         else {
             a = false;
         }
 
-        if(B) {
+        if(Sink.getDecision(B)) {
             b = true;
         }
         else {
@@ -29,12 +32,12 @@ public class Union0 {
 
         Thread.sleep(1);
 
-        if(a) {
+        if(Sink.getDecision(a)) {
             Thread.sleep(2);
             m1();
         }
 
-        if(b) {
+        if(Sink.getDecision(b)) {
             Thread.sleep(3);
             m1();
         }
