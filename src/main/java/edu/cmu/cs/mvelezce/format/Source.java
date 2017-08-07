@@ -2,7 +2,7 @@ package edu.cmu.cs.mvelezce.format;
 
 import java.io.*;
 
-public class Formatter {
+public class Source {
 
     private static final String SOURCE_IMPORT = "import edu.cmu.cs.mvelezce.analysis.option.Source;";
     private static final String SOURCE_METHOD_PREFIX = "Source.getOption";
@@ -40,12 +40,12 @@ public class Formatter {
         while ((strLine = br.readLine()) != null) {
             String newLine = strLine;
 
-            if(strLine.contains(Formatter.OPTION_PREFIX)){
+            if(strLine.contains(Source.OPTION_PREFIX)){
                 String option = strLine.substring(0, strLine.indexOf("=")).trim();
                 StringBuilder sourceLine = new StringBuilder();
                 sourceLine.append(option);
                 sourceLine.append(" = ");
-                sourceLine.append(Formatter.SOURCE_METHOD_PREFIX);
+                sourceLine.append(Source.SOURCE_METHOD_PREFIX);
                 sourceLine.append(option);
                 sourceLine.append("(");
 
@@ -60,7 +60,7 @@ public class Formatter {
             formattedFile.append("\n");
 
             if(strLine.startsWith("package ")) {
-                formattedFile.append(Formatter.SOURCE_IMPORT);
+                formattedFile.append(Source.SOURCE_IMPORT);
             }
         }
 
