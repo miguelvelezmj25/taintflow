@@ -91,8 +91,8 @@ public class Sleep31 {
     }
 
     private static void start(String[] args) throws InterruptedException {
-A = Source.getOptionA(Boolean.valueOf(args[0]));
-B = Source.getOptionB(Boolean.valueOf(args[1]));
+A = SourceFormatter.getOptionA(Boolean.valueOf(args[0]));
+B = SourceFormatter.getOptionB(Boolean.valueOf(args[1]));
 
         boolean a;
 //        boolean b;

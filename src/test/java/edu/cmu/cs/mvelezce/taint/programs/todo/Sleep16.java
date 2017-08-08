@@ -19,8 +19,8 @@ public class Sleep16 {
         // Region program start
         System.out.println("main");
 
-//        boolean a = Source.getOption//        boolean a(Boolean.valueOf(args[0]));
-//        boolean b = Source.getOption//        boolean b(Boolean.valueOf(args[1]));
+//        boolean a = SourceFormatter.getOption//        boolean a(Boolean.valueOf(args[0]));
+//        boolean b = SourceFormatter.getOption//        boolean b(Boolean.valueOf(args[1]));
         A = Source.getOptionA(Boolean.valueOf(args[0]));
 
         boolean a;

@@ -2,15 +2,15 @@ package edu.cmu.cs.mvelezce.format;
 
 import java.io.*;
 
-public class Source {
+public class SourceFormatter {
 
-    private static final String SOURCE_IMPORT = "import edu.cmu.cs.mvelezce.analysis.option.Source;";
-    private static final String SOURCE_METHOD_PREFIX = "Source.getOption";
+    private static final String SOURCE_IMPORT = "import edu.cmu.cs.mvelezce.analysis.option.SourceFormatter;";
+    private static final String SOURCE_METHOD_PREFIX = "SourceFormatter.getOption";
     private static final String OPTION_PREFIX = "Boolean.valueOf(args";
 
     public static void format(String fileName, String classDir) throws IOException, InterruptedException {
-        Source.formatSources(fileName);
-        Source.compile(fileName, classDir);
+        SourceFormatter.formatSources(fileName);
+        SourceFormatter.compile(fileName, classDir);
     }
 
     public static void formatSources(String filePath) throws IOException {
@@ -45,12 +45,12 @@ public class Source {
         while ((strLine = br.readLine()) != null) {
             String newLine = strLine;
 
-            if(strLine.contains(Source.OPTION_PREFIX)){
+            if(strLine.contains(SourceFormatter.OPTION_PREFIX)){
                 String option = strLine.substring(0, strLine.indexOf("=")).trim();
                 StringBuilder sourceLine = new StringBuilder();
                 sourceLine.append(option);
                 sourceLine.append(" = ");
-                sourceLine.append(Source.SOURCE_METHOD_PREFIX);
+                sourceLine.append(SourceFormatter.SOURCE_METHOD_PREFIX);
                 sourceLine.append(option);
                 sourceLine.append("(");
 
@@ -65,7 +65,7 @@ public class Source {
             formattedFile.append("\n");
 
             if(strLine.startsWith("package ")) {
-                formattedFile.append(Source.SOURCE_IMPORT);
+                formattedFile.append(SourceFormatter.SOURCE_IMPORT);
             }
         }
 

@@ -18,9 +18,9 @@ public class Sleep15 {
     public static void main(String[] args) throws InterruptedException {
 //        System.out.println("main");
 //
-////        boolean a = Source.getOption////        boolean a(Boolean.valueOf(args[0]));
-////        boolean b = Source.getOption////        boolean b(Boolean.valueOf(args[1]));
-////        boolean c = Source.getOption////        boolean c(Boolean.valueOf(args[2]));
+////        boolean a = SourceFormatter.getOption////        boolean a(Boolean.valueOf(args[0]));
+////        boolean b = SourceFormatter.getOption////        boolean b(Boolean.valueOf(args[1]));
+////        boolean c = SourceFormatter.getOption////        boolean c(Boolean.valueOf(args[2]));
         A = Source.getOptionA(Boolean.valueOf(args[0]));
         B = Source.getOptionB(Boolean.valueOf(args[1]));
         C = Source.getOptionC(Boolean.valueOf(args[2]));
