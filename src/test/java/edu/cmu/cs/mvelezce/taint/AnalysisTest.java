@@ -318,7 +318,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic10: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
+        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
 
@@ -412,7 +412,7 @@ public class AnalysisTest {
         String entryPoint = "<com.googlecode.pngtastic.PngtasticColorCounter: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 1);
+        this.checkInfoflow(infoflow, 10);
         infoflow.checkResults();
     }
 }
