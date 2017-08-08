@@ -264,6 +264,23 @@ public class AnalysisTest {
     }
 
     @Test
+    public void basic9Test() throws IOException {
+        TaintInfoflow infoflow = new TaintInfoflow("basic9");
+        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
+        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
+
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        List<String> entryPoints = new ArrayList<>();
+        entryPoints.add("<edu.cmu.cs.mvelezce.taint.programs.Basic9: void main(java.lang.String[])>");
+
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
+        this.checkInfoflow(infoflow, 3);
+        infoflow.checkResults();
+    }
+
+    @Test
     public void Sleep0Test() throws IOException {
         TaintInfoflow infoflow = new TaintInfoflow("sleep0");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
