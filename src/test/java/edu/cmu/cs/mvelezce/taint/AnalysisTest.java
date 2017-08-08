@@ -18,6 +18,7 @@ import static org.junit.Assert.*;
 
 public class AnalysisTest {
 
+    protected static final String sep = System.getProperty("path.separator");
     protected static String appPath;
     protected static String libPath;
     //    protected static List<String> sources;
@@ -27,7 +28,6 @@ public class AnalysisTest {
 
     @BeforeClass
     public static void setUp() throws IOException {
-        final String sep = System.getProperty("path.separator");
         File f = new File(".");
         File testSrc1 = new File(f, "target" + File.separator + "classes");
         File testSrc2 = new File(f, "target" + File.separator + "test-classes");
@@ -38,7 +38,8 @@ public class AnalysisTest {
         if(!(testSrc1.exists() || testSrc2.exists() || testSrc3.exists())) {
             fail("Test aborted - none of the test sources are available");
         }
-        AnalysisTest.appPath = testSrc1.getCanonicalPath() + sep + testSrc2.getCanonicalPath() + sep + testSrc3.getCanonicalPath();
+
+        AnalysisTest.appPath = testSrc1.getCanonicalPath() + AnalysisTest.sep + testSrc2.getCanonicalPath() + AnalysisTest.sep + testSrc3.getCanonicalPath();
         AnalysisTest.libPath = System.getProperty("java.home") + File.separator + "lib" + File.separator + "rt.jar";
 
         // Config information flow
@@ -328,6 +329,26 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 5);
+        infoflow.checkResults();
+    }
+
+    @Test
+    public void pngtasticTest() throws IOException {
+        File pngtastic = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic/target/classes");
+        AnalysisTest.appPath += AnalysisTest.sep + pngtastic;
+
+        TaintInfoflow infoflow = new TaintInfoflow("pngtastic");
+        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
+        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
+
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        List<String> entryPoints = new ArrayList<>();
+        entryPoints.add("<com.googlecode.pngtastic.PngtasticColorCounter: void main(java.lang.String[])>");
+
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
+        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 }
