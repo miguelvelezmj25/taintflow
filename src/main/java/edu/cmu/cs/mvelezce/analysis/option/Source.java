@@ -14,6 +14,7 @@ public class Source {
         return option;
     }
 
-    public static boolean getOptionD(boolean option) { return option;
+    public static boolean getOptionD(boolean option) {
+        return option;
     }
 }

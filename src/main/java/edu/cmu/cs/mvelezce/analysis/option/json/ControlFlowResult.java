@@ -8,14 +8,24 @@ public class ControlFlowResult {
     private String className;
     private String methodSignature;
     private int bytecodeIndex;
+    private int javaLine;
     private Set<String> options;
 
-    public ControlFlowResult(String packageName, String className, String methodSignature, int bytecodeIndex, Set<String> options) {
+    public ControlFlowResult(String packageName, String className, String methodSignature, int bytecodeIndex, int javaLine, Set<String> options) {
         this.packageName = packageName;
         this.className = className;
         this.methodSignature = methodSignature;
         this.bytecodeIndex = bytecodeIndex;
+        this.javaLine = javaLine;
         this.options = options;
+    }
+
+    public int getJavaLine() {
+        return javaLine;
+    }
+
+    public void setJavaLine(int javaLine) {
+        this.javaLine = javaLine;
     }
 
     public String getPackageName() {

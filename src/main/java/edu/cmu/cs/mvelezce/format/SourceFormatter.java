@@ -23,7 +23,7 @@ public class SourceFormatter {
         String strLine;
 
         while ((strLine = br.readLine()) != null) {
-            if(strLine.contains("Boolean.valueOf(")){
+            if(strLine.contains("Boolean.valueOf(")) {
                 formatted = true;
                 break;
             }
@@ -33,7 +33,7 @@ public class SourceFormatter {
 
         if(!formatted) {
             System.out.println(filePath + " was not formatted");
-            return ;
+            return;
         }
 
         file = new File(filePath);
@@ -45,7 +45,7 @@ public class SourceFormatter {
         while ((strLine = br.readLine()) != null) {
             String newLine = strLine;
 
-            if(strLine.contains(SourceFormatter.OPTION_PREFIX)){
+            if(strLine.contains(SourceFormatter.OPTION_PREFIX)) {
                 String option = strLine.substring(0, strLine.indexOf("=")).trim();
                 StringBuilder sourceLine = new StringBuilder();
                 sourceLine.append(option);

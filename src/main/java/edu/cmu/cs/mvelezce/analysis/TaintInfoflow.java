@@ -13,6 +13,7 @@ import soot.jimple.infoflow.results.ResultSinkInfo;
 import soot.jimple.infoflow.results.ResultSourceInfo;
 import soot.jimple.infoflow.solver.cfg.IInfoflowCFG;
 import soot.tagkit.BytecodeOffsetTag;
+import soot.tagkit.LineNumberTag;
 import soot.tagkit.Tag;
 
 import java.io.File;
@@ -43,7 +44,7 @@ public class TaintInfoflow extends Infoflow {
 
         for(ResultSinkInfo resultSinkInfo : map.getResults().keySet()) {
             Set<ResultSourceInfo> resultSources = map.getResults().get(resultSinkInfo);
-            this.printSinkResult(resultSinkInfo.getSink(), resultSources);
+//            this.printSinkResult(resultSinkInfo.getSink(), resultSources);
             System.out.println("");
         }
 
@@ -87,6 +88,27 @@ public class TaintInfoflow extends Infoflow {
                 bytecodeIndex = bytecodeIndexes.indexOf(Collections.min(bytecodeIndexes));
             }
 
+            List<Integer> javaLines = new ArrayList<>();
+
+            for(Tag tag : sink.getTags()) {
+                if(tag instanceof LineNumberTag) {
+                    int javaLine = ((LineNumberTag) tag).getLineNumber();
+                    javaLines.add(javaLine);
+                }
+            }
+
+            if(javaLines.isEmpty()) {
+                javaLines.add(-1);
+            }
+
+            int javaLine = -1;
+
+            if(javaLines.size() == 1) {
+                javaLine = javaLines.get(0);
+            }
+            else {
+                javaLine = javaLines.indexOf(Collections.min(javaLines));
+            }
 
             // Source
             Set<String> sources = new HashSet<>();
@@ -111,7 +133,7 @@ public class TaintInfoflow extends Infoflow {
 
             // Saving
             ControlFlowResult controlFlowResult = new ControlFlowResult(packageName, className, methodSignature,
-                    bytecodeIndex, sources);
+                    bytecodeIndex, javaLine, sources);
 
             controlFlowResults.add(controlFlowResult);
         }
