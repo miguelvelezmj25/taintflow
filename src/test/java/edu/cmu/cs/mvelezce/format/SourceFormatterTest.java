@@ -22,7 +22,7 @@ public class SourceFormatterTest {
 
     @Test
     public void testFormatSources3() throws IOException {
-        String fileName = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/zipme/src/edu/cmu/cs/mvelezce/zip/ZipMain.java";
+        String fileName = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic/src/main/java/com/googlecode/pngtastic/PngtasticOptimizer.java";
         SourceFormatter.formatSources(fileName);
     }
 

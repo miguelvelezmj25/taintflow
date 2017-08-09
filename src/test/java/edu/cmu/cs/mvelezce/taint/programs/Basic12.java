@@ -34,8 +34,7 @@ public class Basic12 {
 
         try {
             throw new RuntimeException();
-        }
-        catch (RuntimeException re) {
+        } catch (RuntimeException re) {
             if(Sink.getDecision(a > 10)) {
                 System.out.println(";");
             }
@@ -43,8 +42,7 @@ public class Basic12 {
             if(Sink.getDecision(b > 10)) {
                 System.out.println(";");
             }
-        }
-        finally {
+        } finally {
             if(Sink.getDecision(a > 10)) {
                 System.out.println(";");
             }

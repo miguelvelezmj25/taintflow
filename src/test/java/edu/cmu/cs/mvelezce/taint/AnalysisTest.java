@@ -478,6 +478,26 @@ public class AnalysisTest {
     }
 
     @Test
+    public void pngtasticOptimizerTest() throws IOException {
+        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic/target/classes");
+        AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
+
+        TaintInfoflow infoflow = new TaintInfoflow("pngtasticOptimizer");
+        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
+        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        String entryPoint = "<com.googlecode.pngtastic.PngtasticOptimizer: void main(java.lang.String[])>";
+
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+        this.checkInfoflow(infoflow, 13);
+        infoflow.checkResults();
+    }
+
+    @Test
     public void elevatorTest() throws IOException {
         File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/elevator/out/production/elevator");
         AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
