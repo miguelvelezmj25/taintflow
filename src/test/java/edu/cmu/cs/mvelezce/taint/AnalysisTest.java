@@ -57,7 +57,6 @@ public class AnalysisTest {
         AnalysisTest.infoflowConfiguration.setEnableExceptionTracking(true);
         AnalysisTest.infoflowConfiguration.setSequentialPathProcessing(true);
 
-
 //        InfoflowConfiguration.setPathAgnosticResults(true);
 
 
@@ -534,6 +533,26 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 9);
+        infoflow.checkResults();
+    }
+
+    @Test
+    public void findTest() throws IOException {
+        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/unix4j/out/production/unix4j");
+        AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
+
+        TaintInfoflow infoflow = new TaintInfoflow("find");
+        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
+        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        String entryPoint = "<edu.cmu.cs.mvelezce.FindMain: void main(java.lang.String[])>";
+
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+//        this.checkInfoflow(infoflow, 9);
         infoflow.checkResults();
     }
 }
