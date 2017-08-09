@@ -208,7 +208,8 @@ public class Infoflow extends AbstractInfoflow {
 		ipcManager.updateJimpleForICC();
 
 		// Run the analysis
-		runAnalysis(sourcesSinks, seeds);
+//		runAnalysis(sourcesSinks, seeds);
+		runAnalysis(sourcesSinks, null);
 	}
 
 	/**

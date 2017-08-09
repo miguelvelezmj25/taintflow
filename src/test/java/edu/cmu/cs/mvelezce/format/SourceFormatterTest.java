@@ -21,6 +21,12 @@ public class SourceFormatterTest {
     }
 
     @Test
+    public void testFormatSources3() throws IOException {
+        String fileName = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/zipme/src/edu/cmu/cs/mvelezce/zip/ZipMain.java";
+        SourceFormatter.formatSources(fileName);
+    }
+
+    @Test
     public void testFormatSources2() throws IOException {
         String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs/todo/";
         Collection<File> files = FileUtils.listFiles(new File(root), new String[]{"java"}, true);

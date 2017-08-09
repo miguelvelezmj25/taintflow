@@ -52,6 +52,7 @@ public class TaintInfoflow extends Infoflow {
     }
 
     private void saveResults(InfoflowResults map) {
+        int maxSourceSize = -1;
         List<ControlFlowResult> controlFlowResults = new ArrayList<>();
 
         for(ResultSinkInfo resultSinkInfo : map.getResults().keySet()) {
@@ -79,7 +80,7 @@ public class TaintInfoflow extends Infoflow {
                 bytecodeIndexes.add(-1);
             }
 
-            int bytecodeIndex = -1;
+            int bytecodeIndex;
 
             if(bytecodeIndexes.size() == 1) {
                 bytecodeIndex = bytecodeIndexes.get(0);
@@ -101,7 +102,7 @@ public class TaintInfoflow extends Infoflow {
                 javaLines.add(-1);
             }
 
-            int javaLine = -1;
+            int javaLine;
 
             if(javaLines.size() == 1) {
                 javaLine = javaLines.get(0);
@@ -131,6 +132,8 @@ public class TaintInfoflow extends Infoflow {
                 sources.add(option);
             }
 
+            maxSourceSize = Math.max(maxSourceSize, sources.size());
+
             // Saving
             ControlFlowResult controlFlowResult = new ControlFlowResult(packageName, className, methodSignature,
                     bytecodeIndex, javaLine, sources);
@@ -138,6 +141,7 @@ public class TaintInfoflow extends Infoflow {
             controlFlowResults.add(controlFlowResult);
         }
 
+        System.out.println("Max option interaction: " + maxSourceSize);
 
         ObjectMapper mapper = new ObjectMapper();
         File outputFile = new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/main/resources/" + this.systemName + ".json");
