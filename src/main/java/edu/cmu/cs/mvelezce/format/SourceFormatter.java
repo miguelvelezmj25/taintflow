@@ -4,8 +4,8 @@ import java.io.*;
 
 public class SourceFormatter {
 
-    private static final String SOURCE_IMPORT = "import edu.cmu.cs.mvelezce.analysis.option.SourceFormatter;";
-    private static final String SOURCE_METHOD_PREFIX = "SourceFormatter.getOption";
+    private static final String SOURCE_IMPORT = "import edu.cmu.cs.mvelezce.analysis.option.Source;";
+    private static final String SOURCE_METHOD_PREFIX = "Source.getOption";
     private static final String OPTION_PREFIX = "Boolean.valueOf(args";
 
     public static void format(String fileName, String classDir) throws IOException, InterruptedException {

@@ -37,4 +37,11 @@ public class SourceFormatterTest {
         SourceFormatter.format(fileName, srcDir);
     }
 
+    @Test
+    public void format1() throws IOException, InterruptedException {
+        String fileName = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/elevator/src/edu/cmu/cs/mvelezce/PL_Interface_impl.java";
+        String srcDir = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/elevator/out/production/elevator";
+        SourceFormatter.format(fileName, srcDir);
+    }
+
 }
