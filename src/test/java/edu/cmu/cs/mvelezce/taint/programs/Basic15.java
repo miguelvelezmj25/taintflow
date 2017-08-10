@@ -3,10 +3,13 @@ package edu.cmu.cs.mvelezce.taint.programs;
 import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.Source;
 
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Created by mvelezce on 4/21/17.
  */
-public class Basic13 {
+public class Basic15 {
 
     public static boolean A;
     public static boolean B;
@@ -21,7 +24,7 @@ public class Basic13 {
         boolean b;
         boolean c;
 
-        if(A)  {
+        if(A) {
             a = true;
         }
         else {
@@ -42,79 +45,72 @@ public class Basic13 {
             c = false;
         }
 
-        new Basic13(a, b, c);
+        new Basic15(a, b, c);
     }
 
 
-    public Basic13(boolean a, boolean b, boolean c) {
-        // Object w is tainted with all 3 sources
-        W w = new W(a, b, c);
+    public Basic15(boolean a, boolean b, boolean c) {
+        W w = new W();
+
+        w.addOption(a);
+        w.addOption(b);
+        w.addOption(c);
 
         if(Sink.getDecision(w == null)) {
             System.out.println(";");
         }
 
-        if(Sink.getDecision(w.isA())) {
+
+        if(Sink.getDecision(w.getOptions().isEmpty())) {
             System.out.println(";");
         }
 
-        if(Sink.getDecision(w.isB())) {
+
+        if(Sink.getDecision(w.getOptions().iterator().next())) {
             System.out.println(";");
         }
 
-        if(Sink.getDecision(w.isC())) {
-            System.out.println(";");
-        }
 
         w.analyze();
     }
 
     public class W {
-        private boolean a;
-        private boolean b;
-        private boolean c;
+        private Set<Boolean> options = new HashSet<>();
 
-        public W(boolean a, boolean b, boolean c) {
-            this.a = a;
-            this.b = b;
-            this.c = c;
+        public W() {
+            ;
         }
 
-        public void setA(boolean a) {
-            this.a = a;
+        public Set<Boolean> getOptions() {
+            return options;
         }
 
-        public void setB(boolean b) {
-            this.b = b;
+        public void setOptions(Set<Boolean> options) {
+            this.options = options;
         }
 
-        public void setC(boolean c) {
-            this.c = c;
-        }
+        public void addOption(boolean option) {
+            if(Sink.getDecision(option)) {
+                System.out.println(":");
+            }
 
-        public boolean isA() {
-            return a;
-        }
+            this.options.add(option);
 
-        public boolean isB() {
-            return b;
-        }
-
-        public boolean isC() {
-            return c;
+            if(Sink.getDecision(this.options.isEmpty())) {
+                System.out.println(":");
+            }
         }
 
         public void analyze() {
-            if(Sink.getDecision(this.a)) {
+            if(Sink.getDecision(this.options.isEmpty())) {
                 System.out.println(":");
             }
 
-            if(Sink.getDecision(this.b)) {
-                System.out.println(":");
-            }
 
-            if(Sink.getDecision(this.c)) {
-                System.out.println(":");
+            for(Boolean b : this.options) {
+                if(Sink.getDecision(b)) {
+                    System.out.println(":");
+                }
             }
         }
     }

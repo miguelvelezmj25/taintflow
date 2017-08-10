@@ -47,6 +47,7 @@ public class Basic14 {
 
 
     public Basic14(boolean a, boolean b, boolean c) {
+        // Object w is tainted by all 3 sources
         W w = new W();
 
         w.setA(a);
@@ -76,12 +77,6 @@ public class Basic14 {
         private boolean a = false;
         private boolean b = false;
         private boolean c = false;
-
-        public W(boolean a, boolean b, boolean c) {
-            this.a = a;
-            this.b = b;
-            this.c = c;
-        }
 
         public W() {
             ;
