@@ -773,4 +773,24 @@ public class AnalysisTest {
 //        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
+
+    @Test
+    public void kanziTest() throws IOException {
+        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/kanzi/out/production/kanzi");
+        AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
+
+        TaintInfoflow infoflow = new TaintInfoflow("kanzi");
+        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
+        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        String entryPoint = "<edu.cmu.cs.mvelezce.Kanzi: void main(java.lang.String[])>";
+
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+//        this.checkInfoflow(infoflow, 4);
+        infoflow.checkResults();
+    }
 }
