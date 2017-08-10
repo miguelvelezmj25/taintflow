@@ -16,16 +16,19 @@ public class SootConfig implements IInfoflowConfig {
         includeList.add("java.util.*");
         includeList.add("java.io.*");
 
+		includeList.add("java.security.*");
+		includeList.add("javax.crypto.*");
+
         Options.v().set_no_bodies_for_excluded(true);
         Options.v().set_allow_phantom_refs(true);
 
-//        options.set_include(includeList);
+        options.set_include(includeList);
 
         options.set_output_format(Options.output_format_none);
         Options.v().setPhaseOption("jb", "use-original-names:true");
         Options.v().set_keep_line_number(true);
         Options.v().set_keep_offset(true);
-        Options.v().set_coffi(true);
+//        Options.v().set_coffi(true);
         Options.v().set_ignore_classpath_errors(true);
     }
 
