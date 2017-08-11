@@ -17,7 +17,9 @@ import soot.tagkit.LineNumberTag;
 import soot.tagkit.Tag;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.*;
 
 public class TaintInfoflow extends Infoflow {
@@ -320,5 +322,40 @@ public class TaintInfoflow extends Infoflow {
 
     public Map<String, String> getSourcesToOptions() {
         return this.sourcesToOptions;
+    }
+
+    public void saveJimpleFiles() throws FileNotFoundException {
+        List<SootMethod> methods = new ArrayList<>(this.getMethodsForSeeds(this.iCfg));
+
+        Map<String, StringBuilder> classesToMethods = new HashMap<>();
+
+        for(SootMethod method : methods) {
+            if(!method.hasActiveBody()) {
+                continue;
+            }
+
+            if(method.getName().contains("main")) {
+                System.out.println(this.iCfg.getCallersOf(method));
+            }
+
+            String className = method.getDeclaringClass().getName();
+
+            if(!classesToMethods.containsKey(className)) {
+                classesToMethods.put(className, new StringBuilder());
+            }
+
+            StringBuilder classBody = classesToMethods.get(className);
+            classBody.append(method.getActiveBody().toString());
+            classBody.append("\n");
+        }
+
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/sootOutput/";
+
+        for(Map.Entry<String, StringBuilder> classToMethods : classesToMethods.entrySet()) {
+            PrintWriter out = new PrintWriter(root + classToMethods.getKey());
+            out.println(classToMethods.getValue());
+            out.close();
+            out.flush();
+        }
     }
 }

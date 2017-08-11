@@ -208,8 +208,8 @@ public class Infoflow extends AbstractInfoflow {
 		ipcManager.updateJimpleForICC();
 
 		// Run the analysis
-//		runAnalysis(sourcesSinks, seeds);
-		runAnalysis(sourcesSinks, null);
+		runAnalysis(sourcesSinks, seeds);
+//		runAnalysis(sourcesSinks, null);
 	}
 
 	/**
@@ -878,7 +878,8 @@ public class Infoflow extends AbstractInfoflow {
 		}
 	}
 
-	private Collection<SootMethod> getMethodsForSeeds(IInfoflowCFG icfg) {
+//	private Collection<SootMethod> getMethodsForSeeds(IInfoflowCFG icfg) {
+	protected Collection<SootMethod> getMethodsForSeeds(IInfoflowCFG icfg) {
 		List<SootMethod> seeds = new LinkedList<SootMethod>();
 		// If we have a callgraph, we retrieve the reachable methods. Otherwise,
 		// we have no choice but take all application methods as an

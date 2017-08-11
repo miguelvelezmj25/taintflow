@@ -59,7 +59,8 @@ public class AnalysisTest {
         AnalysisTest.infoflowConfiguration.setStopAfterFirstFlow(false);
         AnalysisTest.infoflowConfiguration.setEnableStaticFieldTracking(true);
         AnalysisTest.infoflowConfiguration.setEnableExceptionTracking(true);
-//        AnalysisTest.infoflowConfiguration.setSequentialPathProcessing(true);
+
+//        AnalysisTest.infoflowConfiguration.setWriteOutputFiles(true);
 
 
 
@@ -174,7 +175,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic1: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 2);
+        this.checkInfoflow(infoflow, 2);
         infoflow.checkResults();
     }
 
@@ -192,7 +193,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic2: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 2);
+        this.checkInfoflow(infoflow, 2);
         infoflow.checkResults();
     }
 
@@ -210,7 +211,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic3: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 2);
+        this.checkInfoflow(infoflow, 2);
         infoflow.checkResults();
     }
 
@@ -228,7 +229,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic4: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 1);
+        this.checkInfoflow(infoflow, 1);
         infoflow.checkResults();
     }
 
@@ -246,7 +247,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic5: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 1);
+        this.checkInfoflow(infoflow, 1);
         infoflow.checkResults();
     }
 
@@ -264,7 +265,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic6: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 1);
+        this.checkInfoflow(infoflow, 1);
         infoflow.checkResults();
     }
 
@@ -282,7 +283,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic7: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
+        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -317,7 +318,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic9: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
+        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -335,7 +336,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic10: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 4);
+        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
 
@@ -352,7 +353,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic11: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 4);
+        this.checkInfoflow(infoflow, 4);
         this.printResultCount(infoflow);
         infoflow.checkResults();
     }
@@ -370,7 +371,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic12: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 10);
+        this.checkInfoflow(infoflow, 10);
         this.printResultCount(infoflow);
         infoflow.checkResults();
     }
@@ -391,7 +392,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic12: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 2);
+        this.checkInfoflow(infoflow, 2);
         this.printResultCount(infoflow);
         infoflow.checkResults();
     }
@@ -409,7 +410,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic13: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 7);
+        this.checkInfoflow(infoflow, 7);
         infoflow.checkResults();
     }
 
@@ -426,7 +427,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic14: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 7);
+        this.checkInfoflow(infoflow, 7);
         infoflow.checkResults();
     }
 
@@ -443,7 +444,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic15: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 1);
+        this.checkInfoflow(infoflow, 1);
         infoflow.checkResults();
     }
 
@@ -460,7 +461,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic16: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 2);
+        this.checkInfoflow(infoflow, 2);
         infoflow.checkResults();
     }
 
@@ -477,7 +478,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic17: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
+        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -494,7 +495,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic18: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
+        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -511,7 +512,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic19: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
+        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -528,7 +529,8 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Problem1: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
+        infoflow.saveJimpleFiles();
+        this.checkInfoflow(infoflow, 3);
         this.printResultCount(infoflow);
         infoflow.checkResults();
     }
@@ -548,7 +550,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Problem2: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
+        this.checkInfoflow(infoflow, 3);
         this.printResultCount(infoflow);
         infoflow.checkResults();
     }
@@ -568,15 +570,13 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Problem3: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
+        this.checkInfoflow(infoflow, 3);
         this.printResultCount(infoflow);
         infoflow.checkResults();
     }
 
     @Test
     public void problem4Test() throws IOException {
-        AnalysisTest.infoflowConfiguration.setEnableExceptionTracking(false);
-
         TaintInfoflow infoflow = new TaintInfoflow("problem4");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
@@ -588,7 +588,26 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Problem4: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
+        this.checkInfoflow(infoflow, 3);
+        this.printResultCount(infoflow);
+        infoflow.checkResults();
+    }
+
+    @Test
+    public void problem5Test() throws IOException {
+        TaintInfoflow infoflow = new TaintInfoflow("problem5");
+        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
+        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, true));
+
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Problem5: void main(java.lang.String[])>";
+
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+        this.checkInfoflow(infoflow, 3);
         this.printResultCount(infoflow);
         infoflow.checkResults();
     }
@@ -607,7 +626,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Sleep0: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 6);
+        this.checkInfoflow(infoflow, 6);
         infoflow.checkResults();
     }
 
@@ -625,7 +644,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Sleep1: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 6);
+        this.checkInfoflow(infoflow, 6);
         infoflow.checkResults();
     }
 
@@ -643,7 +662,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Union0: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 4);
+        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
 
@@ -663,7 +682,7 @@ public class AnalysisTest {
 //        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Union2: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 5);
+        this.checkInfoflow(infoflow, 5);
         infoflow.checkResults();
     }
 
@@ -675,7 +694,7 @@ public class AnalysisTest {
         TaintInfoflow infoflow = new TaintInfoflow("pngtasticColorCounter");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
         infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, true));
 
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
@@ -684,7 +703,7 @@ public class AnalysisTest {
         String entryPoint = "<com.googlecode.pngtastic.PngtasticColorCounter: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-////        this.checkInfoflow(infoflow, 19);
+        this.checkInfoflow(infoflow, 19);
         infoflow.checkResults();
     }
 
@@ -696,7 +715,8 @@ public class AnalysisTest {
         TaintInfoflow infoflow = new TaintInfoflow("pngtasticOptimizer");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, true));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, true));
 
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);
@@ -704,8 +724,9 @@ public class AnalysisTest {
         String entryPoint = "<com.googlecode.pngtastic.PngtasticOptimizer: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 13);
+        this.checkInfoflow(infoflow, 13);
         infoflow.checkResults();
+        infoflow.saveJimpleFiles();
     }
 
     @Test
@@ -724,7 +745,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.PL_Interface_impl: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 45);
+        this.checkInfoflow(infoflow, 45);
         infoflow.checkResults();
     }
 
@@ -744,7 +765,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.zip.ZipMain: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 9);
+        this.checkInfoflow(infoflow, 9);
         infoflow.checkResults();
     }
 
@@ -764,7 +785,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.FindMain: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 9);
+        this.checkInfoflow(infoflow, 9);
         infoflow.checkResults();
     }
 
@@ -785,7 +806,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.Example: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
+        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -812,7 +833,7 @@ public class AnalysisTest {
         String entryPoint = "<org.prevayler.demos.demo1.PrimeNumbers: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-////        this.checkInfoflow(infoflow, 4);
+        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
 
@@ -832,7 +853,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.EncryptionMain: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-////        this.checkInfoflow(infoflow, 4);
+        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
 
@@ -852,7 +873,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.Jarchivelib: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-////        this.checkInfoflow(infoflow, 4);
+        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
 
@@ -872,7 +893,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.Lame: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-////        this.checkInfoflow(infoflow, 4);
+        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
 
@@ -892,7 +913,7 @@ public class AnalysisTest {
         String entryPoint = "<edu.cmu.cs.mvelezce.Kanzi: void main(java.lang.String[])>";
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-////        this.checkInfoflow(infoflow, 4);
+        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
 }
