@@ -56,7 +56,6 @@ public class TaintInfoflow extends Infoflow {
         List<ControlFlowResult> controlFlowResults = new ArrayList<>();
 
         for(ResultSinkInfo resultSinkInfo : map.getResults().keySet()) {
-            Set<ResultSourceInfo> resultSources = map.getResults().get(resultSinkInfo);
             Stmt sink = resultSinkInfo.getSink();
 
             // Sink
@@ -114,7 +113,7 @@ public class TaintInfoflow extends Infoflow {
             // Source
             Set<String> sources = new HashSet<>();
 
-            for(ResultSourceInfo resultSourceInfo : resultSources) {
+            for(ResultSourceInfo resultSourceInfo : map.getResults().get(resultSinkInfo)) {
                 Stmt source = resultSourceInfo.getSource();
 
                 if(!source.containsInvokeExpr()) {
@@ -142,6 +141,18 @@ public class TaintInfoflow extends Infoflow {
         }
 
         System.out.println("Max option interaction: " + maxSourceSize);
+
+        int entriesWithMaxInteraction = 0;
+
+        for(ResultSinkInfo resultSinkInfo : map.getResults().keySet()) {
+
+            if(map.getResults().get(resultSinkInfo).size() == maxSourceSize) {
+                entriesWithMaxInteraction++;
+            }
+
+        }
+
+        System.out.println("Entries with max interaction: " + entriesWithMaxInteraction);
 
         ObjectMapper mapper = new ObjectMapper();
         File outputFile = new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/main/resources/" + this.systemName + ".json");
