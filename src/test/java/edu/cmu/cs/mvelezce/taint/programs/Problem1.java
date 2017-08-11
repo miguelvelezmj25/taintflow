@@ -14,16 +14,6 @@ public class Problem1 {
         A = Source.getOptionA(true);
 
         int a = 0;
-
-        try {
-            a = 1;
-        } catch (Exception e) {
-            throw new RuntimeException();
-        }
-
-        // Not tainted
-        Sink.getDecision(a == 0);
-
         int b = 0;
 
         if(A) {

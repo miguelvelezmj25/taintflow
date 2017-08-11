@@ -105,7 +105,7 @@ public class InfoflowConfiguration {
 	private int stopAfterFirstKFlows = 0;
 	private boolean enableImplicitFlows = false;
 	private boolean enableStaticFields = true;
-	private boolean enableExceptions = true;
+	private boolean enableExceptions = false;
 	private boolean enableArraySizeTainting = true;
 	private boolean flowSensitiveAliasing = true;
 	private boolean enableTypeChecking = true;
