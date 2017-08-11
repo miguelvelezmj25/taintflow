@@ -7,7 +7,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 /**
- * System libraries are not tainted.
+ * Attempted to see if the incorrect taints in systems were due to recursive calls to the entry method
  */
 public class Problem5 {
 
