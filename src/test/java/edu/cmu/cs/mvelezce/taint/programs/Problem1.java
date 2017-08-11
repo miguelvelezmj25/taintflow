@@ -9,9 +9,8 @@ import edu.cmu.cs.mvelezce.analysis.option.Source;
 public class Problem1 {
 
     public static boolean A;
-    public static boolean B;
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) {
         A = Source.getOptionA(true);
 
         int a = 0;
