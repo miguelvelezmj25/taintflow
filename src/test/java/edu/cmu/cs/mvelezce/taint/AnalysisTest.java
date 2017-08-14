@@ -46,8 +46,8 @@ public class AnalysisTest {
 
         // Config information flow
         AnalysisTest.infoflowConfiguration = new InfoflowConfiguration();
-//        AnalysisTest.infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.CHA);
-        AnalysisTest.infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.SPARK);
+        AnalysisTest.infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.CHA);
+//        AnalysisTest.infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.SPARK);
         AnalysisTest.infoflowConfiguration.setEnableImplicitFlows(true);
         AnalysisTest.infoflowConfiguration.setCodeEliminationMode(InfoflowConfiguration.CodeEliminationMode.NoCodeElimination);
         AnalysisTest.infoflowConfiguration.setInspectSinks(true);
@@ -58,12 +58,13 @@ public class AnalysisTest {
 //        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
 //        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(false);
 
-        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
-        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(true);
+        // Use this one
+//        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
+//        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(true);
 
         // WRONG colorcounter
-//        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
-//        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(true);
+        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
+        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(true);
 
         // WRONG colorcounter
 //        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
@@ -757,7 +758,7 @@ public class AnalysisTest {
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, true));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
 
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);

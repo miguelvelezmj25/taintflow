@@ -35,8 +35,8 @@ public class Problem7 {
             }
         }
 
-//        Sink.getDecision(a);
-//        Sink.getDecision(b);
+        Sink.getDecision(a);
+        Sink.getDecision(b);
 
     }
 
