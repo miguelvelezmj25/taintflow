@@ -4,7 +4,7 @@ import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 /**
- * Result changes with enableExceptions. If enabled, taints are propagated. If disabled, analysis stops at try catch in throw
+ *
  */
 public class Problem8 {
 
