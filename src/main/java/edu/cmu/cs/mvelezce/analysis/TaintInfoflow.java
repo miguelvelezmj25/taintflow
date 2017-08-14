@@ -54,7 +54,6 @@ public class TaintInfoflow extends Infoflow {
     }
 
     private void saveResults(InfoflowResults map) {
-        int maxSourceSize = -1;
         List<ControlFlowResult> controlFlowResults = new ArrayList<>();
 
         for(ResultSinkInfo resultSinkInfo : map.getResults().keySet()) {
@@ -133,8 +132,6 @@ public class TaintInfoflow extends Infoflow {
                 sources.add(option);
             }
 
-            maxSourceSize = Math.max(maxSourceSize, sources.size());
-
             // Saving
             ControlFlowResult controlFlowResult = new ControlFlowResult(packageName, className, methodSignature,
                     bytecodeIndex, javaLine, sources);
@@ -142,19 +139,22 @@ public class TaintInfoflow extends Infoflow {
             controlFlowResults.add(controlFlowResult);
         }
 
-        System.out.println("Max option interaction: " + maxSourceSize);
-
-        int entriesWithMaxInteraction = 0;
+        Map<Integer, Integer> interactionCountsToEntryCount = new TreeMap<>();
 
         for(ResultSinkInfo resultSinkInfo : map.getResults().keySet()) {
+            int sourceCount = map.getResults().get(resultSinkInfo).size();
 
-            if(map.getResults().get(resultSinkInfo).size() == maxSourceSize) {
-                entriesWithMaxInteraction++;
+            if(!interactionCountsToEntryCount.containsKey(sourceCount)) {
+                interactionCountsToEntryCount.put(sourceCount, 0);
             }
 
+            int currentEntryCount = interactionCountsToEntryCount.get(sourceCount);
+            interactionCountsToEntryCount.put(sourceCount, currentEntryCount + 1);
         }
 
-        System.out.println("Entries with max interaction: " + entriesWithMaxInteraction);
+        for(Map.Entry<Integer, Integer> interactionCountToEntryCount : interactionCountsToEntryCount.entrySet()) {
+            System.out.println("Interaction order= " + interactionCountToEntryCount.getKey() + " entries= " + interactionCountToEntryCount.getValue());
+        }
 
         ObjectMapper mapper = new ObjectMapper();
         File outputFile = new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/main/resources/" + this.systemName + ".json");
@@ -334,9 +334,9 @@ public class TaintInfoflow extends Infoflow {
                 continue;
             }
 
-            if(method.getName().contains("main")) {
-                System.out.println(this.iCfg.getCallersOf(method));
-            }
+//            if(method.getName().contains("main")) {
+//                System.out.println(this.iCfg.getCallersOf(method));
+//            }
 
             String className = method.getDeclaringClass().getName();
 
