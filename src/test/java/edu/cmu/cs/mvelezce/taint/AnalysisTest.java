@@ -55,16 +55,16 @@ public class AnalysisTest {
 //        AnalysisTest.infoflowConfiguration.setAccessPathLength(1);
         AnalysisTest.infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.ContextFlowSensitive);
 
-//        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
-//        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(false);
+        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
+        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(false);
 
         // Use this one
 //        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
 //        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(true);
 
         // WRONG colorcounter
-        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
-        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(true);
+//        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
+//        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(true);
 
         // WRONG colorcounter
 //        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
@@ -938,8 +938,8 @@ public class AnalysisTest {
         TaintInfoflow infoflow = new TaintInfoflow("pngtasticColorCounter");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
-//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
 
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);
