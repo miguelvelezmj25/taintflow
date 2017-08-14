@@ -608,7 +608,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         infoflow.saveJimpleFiles();
-        this.checkInfoflow(infoflow, 3);
+        this.checkInfoflow(infoflow, 2);
         this.printResultCount(infoflow);
         infoflow.checkResults();
     }
@@ -678,7 +678,7 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 3);
+        this.negativeCheckInfoflow(infoflow);
         this.printResultCount(infoflow);
         infoflow.checkResults();
     }
@@ -701,7 +701,7 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 3);
+        this.checkInfoflow(infoflow, 2);
         this.printResultCount(infoflow);
         infoflow.checkResults();
     }
