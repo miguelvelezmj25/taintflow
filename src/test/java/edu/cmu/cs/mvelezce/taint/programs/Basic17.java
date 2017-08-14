@@ -32,6 +32,9 @@ public class Basic17 {
             j = 0;
         }
 
+        Sink.getDecision(i == 0);
+        Sink.getDecision(j == 0);
+
         int[] x = new int[] {i, j};
 
         Sink.getDecision(x == null);

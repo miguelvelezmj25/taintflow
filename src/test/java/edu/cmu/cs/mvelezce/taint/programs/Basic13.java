@@ -42,6 +42,10 @@ public class Basic13 {
             c = false;
         }
 
+        Sink.getDecision(a);
+        Sink.getDecision(b);
+        Sink.getDecision(c);
+
         new Basic13(a, b, c);
     }
 
