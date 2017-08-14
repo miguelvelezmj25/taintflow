@@ -50,7 +50,7 @@ public class AnalysisTest {
 //        AnalysisTest.infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.SPARK);
         AnalysisTest.infoflowConfiguration.setEnableImplicitFlows(true);
         AnalysisTest.infoflowConfiguration.setCodeEliminationMode(InfoflowConfiguration.CodeEliminationMode.NoCodeElimination);
-        AnalysisTest.infoflowConfiguration.setInspectSinks(true);
+        AnalysisTest.infoflowConfiguration.setInspectSinks(false);
         AnalysisTest.infoflowConfiguration.setAccessPathLength(10_000);
 //        AnalysisTest.infoflowConfiguration.setAccessPathLength(1);
         AnalysisTest.infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.ContextFlowSensitive);
@@ -180,6 +180,7 @@ public class AnalysisTest {
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         this.checkInfoflow(infoflow, 2);
         infoflow.checkResults();
+        infoflow.saveJimpleFiles();
     }
 
     @Test
@@ -842,13 +843,14 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 19);
+//        this.checkInfoflow(infoflow, 19);
         infoflow.checkResults();
+        infoflow.saveJimpleFiles();
     }
 
     @Test
     public void pngtasticOptimizerTest() throws IOException {
-        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic/target/classes");
+        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-optimizer/out/production/pngtastic-optimizer");
         AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
 
         TaintInfoflow infoflow = new TaintInfoflow("pngtasticOptimizer");
@@ -860,7 +862,7 @@ public class AnalysisTest {
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);
 
-        String entryPoint = "<com.googlecode.pngtastic.PngtasticOptimizer: void main(java.lang.String[])>";
+        String entryPoint = "<com.googlecode.pngtastic.Run: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
