@@ -63,18 +63,18 @@ public abstract class JUnitTests {
 	public static void setUp() throws IOException {
 		final String sep = System.getProperty("path.separator");
 //		File f = new File(".");
-		File f = new File("./soot-infoflow/");
+		File f = new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/soot-infoflow/");
 		File testSrc1 = new File(f, "bin");
-		File testSrc2 = new File(f, "build" + File.separator + "classes");
-		File testSrc3 = new File(f, "build" + File.separator + "testclasses");
+//		File testSrc2 = new File(f, "build" + File.separator + "classes");
+//		File testSrc3 = new File(f, "build" + File.separator + "testclasses");
 
-		if (!(testSrc1.exists() || testSrc2.exists() || testSrc3.exists())) {
+		if (!(testSrc1.exists() /*|| testSrc2.exists() || testSrc3.exists()*/)) {
 			fail("Test aborted - none of the test sources are available");
 		}
 
-		appPath = testSrc1.getCanonicalPath() + sep
-				+ testSrc2.getCanonicalPath() + sep
-				+ testSrc3.getCanonicalPath();
+		appPath = testSrc1.getCanonicalPath();// + sep
+//				+ testSrc2.getCanonicalPath() + sep
+//				+ testSrc3.getCanonicalPath();
 		libPath = System.getProperty("java.home") + File.separator + "lib"
 				+ File.separator + "rt.jar";
 
