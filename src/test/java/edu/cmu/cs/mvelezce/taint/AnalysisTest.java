@@ -55,11 +55,11 @@ public class AnalysisTest {
 //        AnalysisTest.infoflowConfiguration.setAccessPathLength(1);
         AnalysisTest.infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.ContextFlowSensitive);
 
-//        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
-//        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(false);
-
         AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
         AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(true);
+
+//        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
+//        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(false);
 
 //        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
 //        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(true);
@@ -85,6 +85,8 @@ public class AnalysisTest {
 //        InfoflowConfiguration.setPathAgnosticResults(true);
 //        AnalysisTest.infoflowConfiguration.setEnableExceptionTracking(true);
 //        InfoflowConfiguration.setOneResultPerAccessPath(true);
+//        InfoflowConfiguration.setPathAgnosticResults(true);
+
 
         // Config soot
         AnalysisTest.sootConfiguration = new SootConfig();
@@ -977,6 +979,7 @@ public class AnalysisTest {
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 //        this.checkInfoflow(infoflow, 45);
         infoflow.checkResults();
+        this.printResultCount(infoflow);
     }
 
     @Test
@@ -999,8 +1002,9 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 9);
+//        this.checkInfoflow(infoflow, 9);
         infoflow.checkResults();
+        this.printResultCount(infoflow);
     }
 
     @Test
@@ -1050,6 +1054,7 @@ public class AnalysisTest {
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 //        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
+        this.printResultCount(infoflow);
     }
 
     @Test

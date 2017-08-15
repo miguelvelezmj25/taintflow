@@ -10,6 +10,7 @@ public class ControlFlowResult {
     private int bytecodeIndex;
     private int javaLine;
     private Set<String> options;
+    private int optionCount;
 
     public ControlFlowResult(String packageName, String className, String methodSignature, int bytecodeIndex, int javaLine, Set<String> options) {
         this.packageName = packageName;
@@ -18,6 +19,15 @@ public class ControlFlowResult {
         this.bytecodeIndex = bytecodeIndex;
         this.javaLine = javaLine;
         this.options = options;
+        this.optionCount = options.size();
+    }
+
+    public int getOptionCount() {
+        return optionCount;
+    }
+
+    public void setOptionCount(int optionCount) {
+        this.optionCount = optionCount;
     }
 
     public int getJavaLine() {
