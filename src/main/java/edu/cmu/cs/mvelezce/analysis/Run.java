@@ -96,6 +96,7 @@ public class Run {
 
         infoflow.computeInfoflow(appPath, libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.checkResults();
+        System.out.println("Number of results: " + infoflow.getResults().size());
     }
 
 
