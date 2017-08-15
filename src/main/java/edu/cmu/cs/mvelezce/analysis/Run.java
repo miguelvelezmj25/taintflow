@@ -45,14 +45,14 @@ public class Run {
 //        infoflowConfiguration.setAccessPathLength(1);
         infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.ContextFlowSensitive);
 
-//        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
-//        infoflowConfiguration.setFlowSensitiveAliasing(true);
+        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
+        infoflowConfiguration.setFlowSensitiveAliasing(true);
 
 //        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
 //        infoflowConfiguration.setFlowSensitiveAliasing(false);
 
-        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
-        infoflowConfiguration.setFlowSensitiveAliasing(true);
+//        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
+//        infoflowConfiguration.setFlowSensitiveAliasing(true);
 
 //        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
 //        infoflowConfiguration.setFlowSensitiveAliasing(false);
@@ -90,7 +90,7 @@ public class Run {
         TaintInfoflow infoflow = new TaintInfoflow("pngtasticColorCounter");
         infoflow.setConfig(infoflowConfiguration);
         infoflow.setSootConfig(sootConfiguration);
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, true));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
 
         String entryPoint = "<com.googlecode.pngtastic.Run: void main(java.lang.String[])>";
 
