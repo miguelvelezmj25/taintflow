@@ -157,7 +157,7 @@ public class TaintInfoflow extends Infoflow {
         }
 
         ObjectMapper mapper = new ObjectMapper();
-        File outputFile = new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/main/resources/" + this.systemName + ".json");
+        File outputFile = new File("/home/mvelezce/programming/java/projects/taint-analysis/src/main/resources/" + this.systemName + ".json");
 
         try {
             mapper.writeValue(outputFile, controlFlowResults);
