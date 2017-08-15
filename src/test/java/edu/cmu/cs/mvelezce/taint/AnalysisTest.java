@@ -79,7 +79,8 @@ public class AnalysisTest {
         AnalysisTest.infoflowConfiguration.setEnableExceptionTracking(true);
         AnalysisTest.infoflowConfiguration.setMaxThreadNum(8);
 
-//        AnalysisTest.infoflowConfiguration.setOneSourceAtATime(true);
+        AnalysisTest.infoflowConfiguration.setOneSourceAtATime(true);
+
 //        AnalysisTest.infoflowConfiguration.setSequentialPathProcessing(true);
 
 //        AnalysisTest.infoflowConfiguration.setWriteOutputFiles(true);
@@ -876,7 +877,7 @@ public class AnalysisTest {
         TaintInfoflow infoflow = new TaintInfoflow("pngtasticColorCounter");
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
-//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
         infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
 
@@ -956,8 +957,8 @@ public class AnalysisTest {
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
 
-//        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
+        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+//        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 //        this.checkInfoflow(infoflow, 9);
         infoflow.checkResults();
         this.printResultCount(infoflow);
