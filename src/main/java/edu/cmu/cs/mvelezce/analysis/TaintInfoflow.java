@@ -38,6 +38,12 @@ public class TaintInfoflow extends Infoflow {
     }
 
     public void checkResults() {
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
         if(!this.isResultAvailable()) {
             return;
         }
