@@ -23,7 +23,7 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class TaintInfoflow extends Infoflow {
-    private static final String CONFIG_FILE = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
+    private static final String CONFIG_FILE = "/home/mvelezce/programming/java/projects/taint-analysis/src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
 
     private String systemName;
     //    private List<String> sources = new ArrayList<>();
