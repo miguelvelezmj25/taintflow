@@ -23,7 +23,7 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class TaintInfoflow extends Infoflow {
-    private static final String CONFIG_FILE = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
+    private static final String CONFIG_FILE = "src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
 
     private String systemName;
     //    private List<String> sources = new ArrayList<>();
@@ -163,7 +163,7 @@ public class TaintInfoflow extends Infoflow {
         }
 
         ObjectMapper mapper = new ObjectMapper();
-        File outputFile = new File("/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/main/resources/" + this.systemName + ".json");
+        File outputFile = new File("src/main/resources/" + this.systemName + ".json");
 
         try {
             mapper.writeValue(outputFile, controlFlowResults);
