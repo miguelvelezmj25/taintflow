@@ -22,7 +22,7 @@ public class SootConfig implements IInfoflowConfig {
         Options.v().set_no_bodies_for_excluded(true);
         Options.v().set_allow_phantom_refs(true);
 
-//        options.set_include(includeList);
+        options.set_include(includeList);
 
         options.set_output_format(Options.output_format_none);
         Options.v().setPhaseOption("jb", "use-original-names:true");

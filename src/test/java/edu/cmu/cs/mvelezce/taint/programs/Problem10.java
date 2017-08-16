@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * PLDI example
+ * System libraries are not tainteds
  */
 public class Problem10 {
 
