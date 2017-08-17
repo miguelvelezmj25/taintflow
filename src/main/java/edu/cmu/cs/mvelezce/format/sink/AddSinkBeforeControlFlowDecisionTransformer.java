@@ -27,9 +27,11 @@ public class AddSinkBeforeControlFlowDecisionTransformer extends MethodTransform
 
         while (instructionsIterator.hasNext()) {
             AbstractInsnNode instruction = instructionsIterator.next();
+            int opcode = instruction.getOpcode();
 
-            // TODO throws? table switch?
-            if(instruction.getOpcode() >= Opcodes.LCMP && instruction.getOpcode() <= Opcodes.IF_ACMPNE) {
+            // TODO Execptions?
+            if(opcode >= Opcodes.LCMP && opcode <= Opcodes.IF_ACMPNE || opcode == Opcodes.TABLESWITCH
+                    || opcode == Opcodes.LOOKUPSWITCH) {
                 MethodInsnNode methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(Z)Z", false);
                 newInstructions.add(methodInstructionNode);
             }
@@ -52,9 +54,11 @@ public class AddSinkBeforeControlFlowDecisionTransformer extends MethodTransform
 
             while (instructionsIterator.hasNext()) {
                 AbstractInsnNode instruction = instructionsIterator.next();
+                int opcode = instruction.getOpcode();
 
-                // TODO throws? table switch?
-                if(instruction.getOpcode() >= Opcodes.LCMP && instruction.getOpcode() <= Opcodes.IF_ACMPNE) {
+                // TODO Execptions?
+                if(opcode >= Opcodes.LCMP && opcode <= Opcodes.IF_ACMPNE || opcode == Opcodes.TABLESWITCH
+                        || opcode == Opcodes.LOOKUPSWITCH) {
                     methodsToInstrument.add(methodNode);
                     continue;
                 }
