@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.cmu.cs.mvelezce.analysis.option.json.ControlFlowResult;
+import edu.cmu.cs.mvelezce.format.instrument.methodnode.MethodTransformer;
+import edu.cmu.cs.mvelezce.format.sink.AddSinkBeforeControlFlowDecisionTransformer;
 import org.apache.commons.io.FileUtils;
 import soot.SootClass;
 import soot.SootMethod;
@@ -23,6 +25,8 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.reflect.InvocationTargetException;
+import java.net.MalformedURLException;
 import java.util.*;
 
 public class TaintInfoflow extends Infoflow {
@@ -39,6 +43,11 @@ public class TaintInfoflow extends Infoflow {
 
         this.readSources();
         this.readSinks();
+    }
+
+    public void addSinks(String directory) throws InvocationTargetException, NoSuchMethodException, IOException, IllegalAccessException {
+        MethodTransformer transformer = new AddSinkBeforeControlFlowDecisionTransformer(directory);
+        transformer.transformMethods();
     }
 
     public void aggregateInfoflowResults() throws IOException {
