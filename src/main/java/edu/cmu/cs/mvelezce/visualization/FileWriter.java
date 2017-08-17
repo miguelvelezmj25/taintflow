@@ -45,7 +45,14 @@ public class FileWriter {
                 String resultFilePath = resultPackage.replace(".", "/") + "/" + resultClassName + ".java";
 
                 if(file.getPath().contains(resultFilePath)) {
-                    linesToConstraints.put(result.getJavaLine(), result.getOptions().toString());
+                    if(linesToConstraints.containsKey(result.getJavaLine())) {
+                        String currentOptions = linesToConstraints.get(result.getJavaLine());
+                        currentOptions += " & " + result.getOptions();
+                        linesToConstraints.put(result.getJavaLine(), currentOptions);
+                    }
+                    else {
+                        linesToConstraints.put(result.getJavaLine(), result.getOptions().toString());
+                    }
                 }
 
             }
