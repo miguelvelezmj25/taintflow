@@ -1060,10 +1060,11 @@ public class AnalysisTest {
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
 
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 4);
-        infoflow.checkResults();
+
+        infoflow.aggregateInfoflowResults();
+        infoflow.saveJimpleFiles();
     }
 
     @Test
@@ -1136,10 +1137,11 @@ public class AnalysisTest {
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
 
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.checkResults();
+        infoflow.aggregateInfoflowResults();
+        infoflow.saveJimpleFiles();
     }
 
     @Test
@@ -1187,8 +1189,10 @@ public class AnalysisTest {
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
 
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        infoflow.checkResults();
+
+        infoflow.aggregateInfoflowResults();
+        infoflow.saveJimpleFiles();
     }
 }
