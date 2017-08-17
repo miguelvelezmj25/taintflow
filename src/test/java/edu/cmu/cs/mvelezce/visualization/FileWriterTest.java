@@ -31,4 +31,19 @@ public class FileWriterTest {
         fw.writeAnnotatedFile(directory, results);
     }
 
+    @Test
+    public void annotateRunningExample() throws IOException {
+        String system = "running-example";
+        String directory = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/running-example/src/main/java";
+        FileWriter fw = new FileWriter();
+
+        fw.writeAnnotatedFile(system, directory);
+    }
+
+    @Test
+    public void deleteAnnotatedRunningExample() throws IOException {
+        String directory = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/running-example/src/main/java";
+        FileWriter.deleteAnnotatedFiles(directory);
+    }
+
 }
