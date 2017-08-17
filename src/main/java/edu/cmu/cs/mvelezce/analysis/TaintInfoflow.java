@@ -1,8 +1,10 @@
 package edu.cmu.cs.mvelezce.analysis;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.cmu.cs.mvelezce.analysis.option.json.ControlFlowResult;
+import org.apache.commons.io.FileUtils;
 import soot.SootClass;
 import soot.SootMethod;
 import soot.jimple.InvokeExpr;
@@ -15,6 +17,7 @@ import soot.jimple.infoflow.solver.cfg.IInfoflowCFG;
 import soot.tagkit.BytecodeOffsetTag;
 import soot.tagkit.LineNumberTag;
 import soot.tagkit.Tag;
+import soot.util.MultiMap;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -24,6 +27,7 @@ import java.util.*;
 
 public class TaintInfoflow extends Infoflow {
     private static final String CONFIG_FILE = "src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
+    private static final String OUTPUT_DIR = "src/main/resources/";
 
     private String systemName;
     //    private List<String> sources = new ArrayList<>();
@@ -35,6 +39,201 @@ public class TaintInfoflow extends Infoflow {
 
         this.readSources();
         this.readSinks();
+    }
+
+    public void aggregateInfoflowResults() throws IOException {
+        String[] extensions = {"json"};
+
+        Collection<File> files = FileUtils.listFiles(new File(TaintInfoflow.OUTPUT_DIR), extensions, false);
+
+        List<ControlFlowResult> aggregatedResults = new ArrayList<>();
+
+        for(File file : files) {
+            if(!file.getName().contains(this.systemName + "_")) {
+                continue;
+            }
+
+            ObjectMapper mapper = new ObjectMapper();
+            List<ControlFlowResult> results = mapper.readValue(file, new TypeReference<List<ControlFlowResult>>() {
+            });
+
+            for(ControlFlowResult controlFlowResult : results) {
+                int index = aggregatedResults.indexOf(controlFlowResult);
+
+                if(index < 0) {
+                    aggregatedResults.add(controlFlowResult);
+                }
+                else {
+                    ControlFlowResult currentResult = aggregatedResults.get(index);
+                    Set<String> currentOptions = currentResult.getOptions();
+                    currentOptions.addAll(controlFlowResult.getOptions());
+                    currentResult.setOptions(currentOptions);
+                    currentResult.setOptionCount(currentOptions.size());
+                }
+            }
+        }
+
+
+        ObjectMapper mapper = new ObjectMapper();
+        File outputFile = new File(TaintInfoflow.OUTPUT_DIR + this.systemName +".json");
+
+        try {
+            mapper.writeValue(outputFile, aggregatedResults);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        Map<Integer, Integer> interactionCountsToEntryCount = new TreeMap<>();
+
+        for(ControlFlowResult controlFlowResult : aggregatedResults) {
+            int interactionOrder = controlFlowResult.getOptionCount();
+
+            if(!interactionCountsToEntryCount.containsKey(interactionOrder)) {
+                interactionCountsToEntryCount.put(interactionOrder, 0);
+            }
+
+            int currentEntryCount = interactionCountsToEntryCount.get(interactionOrder);
+            interactionCountsToEntryCount.put(interactionOrder, currentEntryCount + 1);
+        }
+
+        for(Map.Entry<Integer, Integer> interactionCountToEntryCount : interactionCountsToEntryCount.entrySet()) {
+            System.out.println("Interaction order= " + interactionCountToEntryCount.getKey() + " entries= " + interactionCountToEntryCount.getValue());
+        }
+
+        System.out.println("Number of results: " + aggregatedResults.size());
+    }
+
+    public void computeInfoflowOneSourceAtATime(String libPath, String appPath, String entryPoint, Collection<String> sources,
+                                                Collection<String> sinks) {
+
+        for(String source : sources) {
+            String currentOption = this.sourcesToOptions.get(source);
+
+            System.out.println("############## Analyzing option " + currentOption);
+
+            List<String> intermediateSources = new ArrayList<>();
+            intermediateSources.add(source);
+
+            this.computeInfoflow(libPath, appPath, entryPoint, intermediateSources, sinks);
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            this.saveResults(currentOption);
+
+            System.out.println("############## Option " + currentOption + " results size " + this.getResults().size());
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    private void saveResults(String option) {
+        MultiMap<ResultSinkInfo, ResultSourceInfo> resultMap = this.getResults().getResults();
+        List<ControlFlowResult> controlFlowResults = new ArrayList<>();
+
+        for(ResultSinkInfo resultSinkInfo : resultMap.keySet()) {
+            Stmt sink = resultSinkInfo.getSink();
+
+            // Sink
+            SootMethod sinkAtMethod = this.getiCfg().getMethodOf(sink);
+            SootClass sinkAtClass = sinkAtMethod.getDeclaringClass();
+
+            String packageName = sinkAtClass.getPackageName();
+            String className = sinkAtClass.getShortName();
+            String methodSignature = sinkAtMethod.getBytecodeSignature();
+
+            List<Integer> bytecodeIndexes = new ArrayList<>();
+
+            for(Tag tag : sink.getTags()) {
+                if(tag instanceof BytecodeOffsetTag) {
+                    int bytecodeIndex = ((BytecodeOffsetTag) tag).getBytecodeOffset();
+                    bytecodeIndexes.add(bytecodeIndex);
+                }
+            }
+
+            if(bytecodeIndexes.isEmpty()) {
+                bytecodeIndexes.add(-1);
+            }
+
+            int bytecodeIndex;
+
+            if(bytecodeIndexes.size() == 1) {
+                bytecodeIndex = bytecodeIndexes.get(0);
+            }
+            else {
+                bytecodeIndex = bytecodeIndexes.indexOf(Collections.min(bytecodeIndexes));
+            }
+
+            List<Integer> javaLines = new ArrayList<>();
+
+            for(Tag tag : sink.getTags()) {
+                if(tag instanceof LineNumberTag) {
+                    int javaLine = ((LineNumberTag) tag).getLineNumber();
+                    javaLines.add(javaLine);
+                }
+            }
+
+            if(javaLines.isEmpty()) {
+                javaLines.add(-1);
+            }
+
+            int javaLine;
+
+            if(javaLines.size() == 1) {
+                javaLine = javaLines.get(0);
+            }
+            else {
+                javaLine = javaLines.indexOf(Collections.min(javaLines));
+            }
+
+            // Source
+            Set<String> sources = new HashSet<>();
+
+            for(ResultSourceInfo resultSourceInfo : resultMap.values()) {
+                Stmt source = resultSourceInfo.getSource();
+
+                if(!source.containsInvokeExpr()) {
+                    throw new RuntimeException("The source does not have an invoke: " + source.toString());
+                }
+
+                InvokeExpr expr = source.getInvokeExpr();
+                SootMethod exprMethod = expr.getMethod();
+                String resultOption = this.sourcesToOptions.get(exprMethod.getSignature());
+
+                if(resultOption == null) {
+                    throw new RuntimeException("Source is not associated to an option: " + source);
+                }
+
+                if(!resultOption.equals(option)) {
+                    throw new RuntimeException("The option in this source is different than the one we analyzed");
+                }
+
+                sources.add(option);
+            }
+
+            // Saving
+            ControlFlowResult controlFlowResult = new ControlFlowResult(packageName, className, methodSignature,
+                    bytecodeIndex, javaLine, sources);
+
+            controlFlowResults.add(controlFlowResult);
+        }
+
+        ObjectMapper mapper = new ObjectMapper();
+        File outputFile = new File(TaintInfoflow.OUTPUT_DIR + this.systemName + "_" + option + ".json");
+
+        try {
+            mapper.writeValue(outputFile, controlFlowResults);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
     }
 
     public void checkResults() {
