@@ -131,6 +131,7 @@ public class TaintInfoflow extends Infoflow {
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
+
         }
     }
 
