@@ -12,6 +12,10 @@ public class ControlFlowResult {
     private Set<String> options;
     private int optionCount;
 
+    public ControlFlowResult() {
+        ;
+    }
+
     public ControlFlowResult(String packageName, String className, String methodSignature, int bytecodeIndex, int javaLine, Set<String> options) {
         this.packageName = packageName;
         this.className = className;
