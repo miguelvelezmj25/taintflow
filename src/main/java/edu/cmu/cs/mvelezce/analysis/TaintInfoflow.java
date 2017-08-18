@@ -26,7 +26,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
-import java.net.MalformedURLException;
 import java.util.*;
 
 public class TaintInfoflow extends Infoflow {
@@ -84,7 +83,7 @@ public class TaintInfoflow extends Infoflow {
 
 
         ObjectMapper mapper = new ObjectMapper();
-        File outputFile = new File(TaintInfoflow.OUTPUT_DIR + this.systemName +".json");
+        File outputFile = new File(TaintInfoflow.OUTPUT_DIR + this.systemName + ".json");
 
         try {
             mapper.writeValue(outputFile, aggregatedResults);

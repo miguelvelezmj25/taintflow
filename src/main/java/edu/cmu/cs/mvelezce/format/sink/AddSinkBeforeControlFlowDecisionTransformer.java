@@ -29,11 +29,23 @@ public class AddSinkBeforeControlFlowDecisionTransformer extends MethodTransform
             AbstractInsnNode instruction = instructionsIterator.next();
             int opcode = instruction.getOpcode();
 
+
+            if(opcode >= Opcodes.IF_ICMPEQ && opcode <= Opcodes.IF_ACMPNE) {
+                MethodInsnNode methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(I)I", false);
+                AbstractInsnNode lastInstruction = newInstructions.getLast();
+                newInstructions.insertBefore(lastInstruction, methodInstructionNode);
+            }
             // TODO Execptions?
             if(opcode >= Opcodes.IFEQ && opcode <= Opcodes.IF_ACMPNE || opcode == Opcodes.TABLESWITCH
-                    || opcode == Opcodes.LOOKUPSWITCH) {
-                MethodInsnNode methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(Z)Z", false);
-                newInstructions.add(methodInstructionNode);
+                    || opcode == Opcodes.LOOKUPSWITCH || opcode == Opcodes.IFNULL || opcode == Opcodes.IFNONNULL) {
+                if(newInstructions.getLast().getType() == AbstractInsnNode.FIELD_INSN) {
+                    MethodInsnNode methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(Z)Z", false);
+                    newInstructions.add(methodInstructionNode);
+                }
+                else {
+                    MethodInsnNode methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(I)I", false);
+                    newInstructions.add(methodInstructionNode);
+                }
             }
 
             newInstructions.add(instruction);
@@ -58,7 +70,7 @@ public class AddSinkBeforeControlFlowDecisionTransformer extends MethodTransform
 
                 // TODO Execptions?
                 if(opcode >= Opcodes.IFEQ && opcode <= Opcodes.IF_ACMPNE || opcode == Opcodes.TABLESWITCH
-                        || opcode == Opcodes.LOOKUPSWITCH) {
+                        || opcode == Opcodes.LOOKUPSWITCH || opcode == Opcodes.IFNULL || opcode == Opcodes.IFNONNULL) {
                     methodsToInstrument.add(methodNode);
                     continue;
                 }

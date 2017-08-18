@@ -608,7 +608,8 @@ public class Infoflow extends AbstractInfoflow {
 			maxMemoryConsumption = Math.max(maxMemoryConsumption, getUsedMemory());
 			System.out.println("Maximum memory consumption: " + maxMemoryConsumption / 1E6 + " MB");
 		} catch (Exception ex) {
-			results.addException(ex.getClass().getName() + ": " + ex.getMessage());
+			ex.printStackTrace();
+//			results.addException(ex.getClass().getName() + ": " + ex.getMessage());
 		}
 	}
 

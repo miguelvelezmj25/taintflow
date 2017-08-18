@@ -884,12 +884,16 @@ public class AnalysisTest {
     }
 
     @Test
-    public void pngtasticColorCounterTest() throws IOException {
+    public void pngtasticColorCounterTest() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
 //        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic/target/classes");
         File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-counter/out/production/pngtastic-counter");
         AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
 
         TaintInfoflow infoflow = new TaintInfoflow("pngtasticColorCounter");
+
+//        // Add sinks
+        infoflow.addSinks(file.getPath());
+
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 
@@ -1020,7 +1024,7 @@ public class AnalysisTest {
         TaintInfoflow infoflow = new TaintInfoflow("running-example");
 
         // Add sinks
-        infoflow.addSinks(file.getPath());
+//        infoflow.addSinks(file.getPath());
 
         // Configure analysis
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
@@ -1042,7 +1046,7 @@ public class AnalysisTest {
         infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+//        infoflow.aggregateInfoflowResults();
         infoflow.saveJimpleFiles();
     }
 
