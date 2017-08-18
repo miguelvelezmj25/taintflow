@@ -82,8 +82,8 @@ public abstract class ClassTransformerBase implements ClassTransformer {
 
     @Override
     public void writeClass(ClassNode classNode, String fileName) throws IOException {
-//        ClassWriter classWriter = new MyClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        ClassWriter classWriter = new CustomClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+//        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
 //        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 //        ClassWriter classWriter = new ClassWriter(0);
         classNode.accept(classWriter);
