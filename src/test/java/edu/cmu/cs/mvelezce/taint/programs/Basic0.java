@@ -6,10 +6,12 @@ import edu.cmu.cs.mvelezce.analysis.option.Source;
 public class Basic0 {
 
     public static void main(String[] args) throws InterruptedException {
-        boolean A = Source.getOptionA(Boolean.valueOf(args[0]));
+        boolean a = Source.getOptionA(Boolean.valueOf(args[0]));
 
-        Sink.getDecision(true);
-        Sink.getDecision(false);
+        if(Sink.getDecision(a)) {
+//        if(a) {
+            System.out.println("");
+        }
     }
 
 }

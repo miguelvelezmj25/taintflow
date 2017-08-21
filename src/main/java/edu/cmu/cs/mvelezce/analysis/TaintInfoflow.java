@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.cmu.cs.mvelezce.analysis.option.json.ControlFlowResult;
+import edu.cmu.cs.mvelezce.analysis.source.ControlFlowSinkSourceManager;
 import edu.cmu.cs.mvelezce.format.instrument.methodnode.MethodTransformer;
 import edu.cmu.cs.mvelezce.format.sink.AddSinkBeforeControlFlowDecisionTransformer;
 import org.apache.commons.io.FileUtils;
@@ -16,6 +17,7 @@ import soot.jimple.infoflow.results.InfoflowResults;
 import soot.jimple.infoflow.results.ResultSinkInfo;
 import soot.jimple.infoflow.results.ResultSourceInfo;
 import soot.jimple.infoflow.solver.cfg.IInfoflowCFG;
+import soot.jimple.infoflow.source.ISourceSinkManager;
 import soot.tagkit.BytecodeOffsetTag;
 import soot.tagkit.LineNumberTag;
 import soot.tagkit.Tag;
@@ -33,9 +35,8 @@ public class TaintInfoflow extends Infoflow {
     private static final String OUTPUT_DIR = "src/main/resources/";
 
     private String systemName;
-    //    private List<String> sources = new ArrayList<>();
-    private List<String> sinks = new ArrayList<>();
     private Map<String, String> sourcesToOptions = new HashMap<>();
+    private List<String> sinks = new ArrayList<>();
 
     public TaintInfoflow(String systemName) throws IOException {
         this.systemName = systemName;
@@ -140,6 +141,37 @@ public class TaintInfoflow extends Infoflow {
                 e.printStackTrace();
             }
 
+        }
+    }
+
+    public void computeInfoflowOneSourceAtATime(String libPath, String appPath, String entryPoint, Collection<String> sources) {
+        for(String source : sources) {
+            String currentOption = this.sourcesToOptions.get(source);
+
+            System.out.println("############## Analyzing option " + currentOption);
+
+            List<String> intermediateSources = new ArrayList<>();
+            intermediateSources.add(source);
+
+            ISourceSinkManager controlFlowSinkSourceManager = new ControlFlowSinkSourceManager(intermediateSources, this.sinks);
+
+            this.computeInfoflow(libPath, appPath, entryPoint, controlFlowSinkSourceManager);
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            this.saveResults(currentOption);
+
+            System.out.println("############## Option " + currentOption + " results size " + this.getResults().size());
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 

@@ -40,14 +40,15 @@ public class AddSinkBeforeControlFlowDecisionTransformer extends MethodTransform
                     || opcode == Opcodes.LOOKUPSWITCH || opcode == Opcodes.IFNULL || opcode == Opcodes.IFNONNULL) {
                 MethodInsnNode methodInstructionNode;
 
-                if(opcode == Opcodes.IFNULL || opcode == Opcodes.IFNONNULL) {
-                    methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(Ljava/lang/Object;)Ljava/lang/Object;", false);
-                }
-                else {
-
+//                if(opcode == Opcodes.IFNULL || opcode == Opcodes.IFNONNULL) {
+//                    methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(Ljava/lang/Object;)Ljava/lang/Object;", false);
+//                }
+//                else {
+//
 //                if(newInstructions.getLast().getType() == AbstractInsnNode.FIELD_INSN) {
-                    methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(Z)Z", false);
-                }
+//                    methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(Z)Z", false);
+                    methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(I)I", false);
+//                }
 //                else {
 //                    MethodInsnNode methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(I)I", false);
 //                    newInstructions.add(methodInstructionNode);

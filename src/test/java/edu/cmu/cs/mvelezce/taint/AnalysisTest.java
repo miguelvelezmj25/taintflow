@@ -77,7 +77,6 @@ public class AnalysisTest {
 //        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.PtsBased);
 //        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(false);
 
-
         AnalysisTest.infoflowConfiguration.setStopAfterFirstFlow(false);
         AnalysisTest.infoflowConfiguration.setEnableStaticFieldTracking(true);
         AnalysisTest.infoflowConfiguration.setEnableExceptionTracking(true);
@@ -163,19 +162,34 @@ public class AnalysisTest {
     @Test
     public void basic0Test() throws IOException {
         TaintInfoflow infoflow = new TaintInfoflow("basic0");
+
+        // Add sinks
+//        infoflow.addSinks(file.getPath());
+
+        // Configure analysis
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
         infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
 
+        // Add taint wrapper
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        // Add entry points
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Basic0: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
 
-//        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.negativeCheckInfoflow(infoflow);
+        // Run
+        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+//        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources());
+
+//        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
+
+//        infoflow.aggregateInfoflowResults();
+        infoflow.saveJimpleFiles();
     }
 
     @Test
@@ -1044,6 +1058,8 @@ public class AnalysisTest {
 
         // Run
         infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+//        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources());
+
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
 //        infoflow.aggregateInfoflowResults();

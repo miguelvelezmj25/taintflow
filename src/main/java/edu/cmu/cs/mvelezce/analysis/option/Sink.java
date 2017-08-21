@@ -6,4 +6,8 @@ public class Sink {
         return d;
     }
 
+    public static String string(boolean d) {
+        return String.valueOf(d);
+    }
+
 }
