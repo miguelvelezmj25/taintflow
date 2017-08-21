@@ -3,22 +3,19 @@ package edu.cmu.cs.mvelezce.analysis;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.json.ControlFlowResult;
-import edu.cmu.cs.mvelezce.analysis.source.ControlFlowSinkSourceManager;
 import edu.cmu.cs.mvelezce.format.instrument.methodnode.MethodTransformer;
 import edu.cmu.cs.mvelezce.format.sink.AddSinkBeforeControlFlowDecisionTransformer;
 import org.apache.commons.io.FileUtils;
-import soot.SootClass;
-import soot.SootMethod;
+import soot.*;
 import soot.jimple.InvokeExpr;
 import soot.jimple.Stmt;
+import soot.jimple.infoflow.ControlFlowSink;
 import soot.jimple.infoflow.Infoflow;
 import soot.jimple.infoflow.results.InfoflowResults;
 import soot.jimple.infoflow.results.ResultSinkInfo;
 import soot.jimple.infoflow.results.ResultSourceInfo;
 import soot.jimple.infoflow.solver.cfg.IInfoflowCFG;
-import soot.jimple.infoflow.source.ISourceSinkManager;
 import soot.tagkit.BytecodeOffsetTag;
 import soot.tagkit.LineNumberTag;
 import soot.tagkit.Tag;
@@ -44,6 +41,25 @@ public class TaintInfoflow extends Infoflow {
 
         this.readSources();
         this.readSinks();
+    }
+
+    @Override
+    protected void constructCallgraph() {
+        super.constructCallgraph();
+
+        ////////////////////////// Taintinfoflow
+        Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
+        PackManager.v().getPack("jtp").add(new Transform("jtp.ifsink", ControlFlowSink.v()));
+
+        while(iter.hasNext()) {
+            MethodOrMethodContext m = iter.next();
+            SootMethod method = m.method();
+
+            if(method.getDeclaringClass().getPackageName().contains("edu.cmu") && method.hasActiveBody()) {
+                PackManager.v().getPack("jtp").apply(method.getActiveBody());
+            }
+        }
+        ////////////////////////// Taintinfoflow
     }
 
     public void addSinks(String directory) throws InvocationTargetException, NoSuchMethodException, IOException, IllegalAccessException {
@@ -144,36 +160,36 @@ public class TaintInfoflow extends Infoflow {
         }
     }
 
-    public void computeInfoflowOneSourceAtATime(String libPath, String appPath, String entryPoint, Collection<String> sources) {
-        for(String source : sources) {
-            String currentOption = this.sourcesToOptions.get(source);
-
-            System.out.println("############## Analyzing option " + currentOption);
-
-            List<String> intermediateSources = new ArrayList<>();
-            intermediateSources.add(source);
-
-            ISourceSinkManager controlFlowSinkSourceManager = new ControlFlowSinkSourceManager(intermediateSources, this.sinks);
-
-            this.computeInfoflow(libPath, appPath, entryPoint, controlFlowSinkSourceManager);
-
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
-            this.saveResults(currentOption);
-
-            System.out.println("############## Option " + currentOption + " results size " + this.getResults().size());
-
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-    }
+//    public void computeInfoflowOneSourceAtATime(String libPath, String appPath, String entryPoint, Collection<String> sources) {
+//        for(String source : sources) {
+//            String currentOption = this.sourcesToOptions.get(source);
+//
+//            System.out.println("############## Analyzing option " + currentOption);
+//
+//            List<String> intermediateSources = new ArrayList<>();
+//            intermediateSources.add(source);
+//
+//            ISourceSinkManager controlFlowSinkSourceManager = new ControlFlowSinkSourceManager(intermediateSources, this.sinks);
+//
+//            this.computeInfoflow(libPath, appPath, entryPoint, controlFlowSinkSourceManager);
+//
+//            try {
+//                Thread.sleep(1000);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+//
+//            this.saveResults(currentOption);
+//
+//            System.out.println("############## Option " + currentOption + " results size " + this.getResults().size());
+//
+//            try {
+//                Thread.sleep(1000);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
+//        }
+//    }
 
     private void saveResults(String option) {
         MultiMap<ResultSinkInfo, ResultSourceInfo> resultMap = this.getResults().getResults();

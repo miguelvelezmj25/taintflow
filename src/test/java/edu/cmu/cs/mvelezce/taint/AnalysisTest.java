@@ -1037,9 +1037,6 @@ public class AnalysisTest {
 
         TaintInfoflow infoflow = new TaintInfoflow("running-example");
 
-        // Add sinks
-//        infoflow.addSinks(file.getPath());
-
         // Configure analysis
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
@@ -1062,7 +1059,7 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-//        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults();
         infoflow.saveJimpleFiles();
     }
 

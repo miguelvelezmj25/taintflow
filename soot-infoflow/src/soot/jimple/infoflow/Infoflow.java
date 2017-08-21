@@ -238,19 +238,6 @@ public class Infoflow extends AbstractInfoflow {
             // Build the callgraph
             long beforeCallgraph = System.nanoTime();
             constructCallgraph();
-
-            Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
-            PackManager.v().getPack("jtp").add(new Transform("jtp.ifsink", IfSink.v()));
-
-            while(iter.hasNext()) {
-                MethodOrMethodContext m = iter.next();
-                SootMethod method = m.method();
-
-                if(method.getDeclaringClass().getPackageName().contains("edu.cmu") && method.hasActiveBody()) {
-                    PackManager.v().getPack("jtp").apply(method.getActiveBody());
-                }
-            }
-
             logger.info("Callgraph construction took " + (System.nanoTime() - beforeCallgraph) / 1E9 + " seconds");
 
             // Initialize the source sink manager
