@@ -35,19 +35,20 @@ public class TaintInfoflow extends Infoflow {
     private String systemName;
     private Map<String, String> sourcesToOptions = new HashMap<>();
     private List<String> sinks = new ArrayList<>();
+    private List<String> packages = new ArrayList<>();
 
     public TaintInfoflow(String systemName) throws IOException {
         this.systemName = systemName;
 
         this.readSources();
         this.readSinks();
+        this.readPackages();
     }
 
     @Override
     protected void constructCallgraph() {
         super.constructCallgraph();
 
-        ////////////////////////// Taintinfoflow
         Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
         PackManager.v().getPack("jtp").add(new Transform("jtp.ifsink", ControlFlowSink.v()));
 
@@ -55,11 +56,14 @@ public class TaintInfoflow extends Infoflow {
             MethodOrMethodContext m = iter.next();
             SootMethod method = m.method();
 
-            if(method.getDeclaringClass().getPackageName().contains("edu.cmu") && method.hasActiveBody()) {
-                PackManager.v().getPack("jtp").apply(method.getActiveBody());
+            String methodPackage = method.getDeclaringClass().getPackageName();
+
+            for(String packageName : this.packages) {
+                if(methodPackage.contains(packageName) && method.hasActiveBody()) {
+                    PackManager.v().getPack("jtp").apply(method.getActiveBody());
+                }
             }
         }
-        ////////////////////////// Taintinfoflow
     }
 
     public void addSinks(String directory) throws InvocationTargetException, NoSuchMethodException, IOException, IllegalAccessException {
@@ -546,6 +550,24 @@ public class TaintInfoflow extends Infoflow {
             String methodSignature = element.get("method").asText();
 
             this.sinks.add(methodSignature);
+        }
+    }
+
+    private void readPackages() throws IOException {
+        File file = new File(TaintInfoflow.CONFIG_FILE);
+        ObjectMapper mapper = new ObjectMapper();
+
+        JsonNode node = mapper.readTree(file);
+        JsonNode systemNode = node.get(systemName);
+        JsonNode sources = systemNode.get("packages");
+
+        Iterator<JsonNode> it = sources.elements();
+
+        while (it.hasNext()) {
+            JsonNode element = it.next();
+            String methodSignature = element.get("package").asText();
+
+            this.packages.add(methodSignature);
         }
     }
 

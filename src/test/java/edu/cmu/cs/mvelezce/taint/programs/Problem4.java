@@ -26,8 +26,8 @@ public class Problem4 {
         List<Integer> x = new LinkedList<>();
         x.add(i);
 
-        Sink.getDecision(x == null);
-        Sink.getDecision(x.get(0) == 0);
+        Sink.sink(x == null);
+        Sink.sink(x.get(0) == 0);
     }
 
 }

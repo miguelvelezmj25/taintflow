@@ -26,17 +26,17 @@ public class Problem7 {
             b = true;
         }
 
-        Sink.getDecision(a);
-        Sink.getDecision(b);
+        Sink.sink(a);
+        Sink.sink(b);
 
-        if(Sink.getDecision(a)) {
-            if(Sink.getDecision(b)) {
+        if(a) {
+            if(b) {
                 a = false;
             }
         }
 
-        Sink.getDecision(a);
-        Sink.getDecision(b);
+        Sink.sink(a);
+        Sink.sink(b);
 
     }
 

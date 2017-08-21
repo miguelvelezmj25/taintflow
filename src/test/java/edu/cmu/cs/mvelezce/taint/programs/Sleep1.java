@@ -18,32 +18,32 @@ public class Sleep1 {
         Integer a;
         Integer b;
 
-        if(Sink.getDecision(A)) {
+        if(A) {
             a = 0;
         }
         else {
             a = 5;
         }
 
-        if(Sink.getDecision(B)) {
+        if(B) {
             b = 0;
         }
         else {
             b = 10;
         }
 
-        if(Sink.getDecision(a > 10)) {
+        if(a > 10) {
             Sleep1.method1(a);
         }
 
-        if(Sink.getDecision(b > 10)) {
+        if(b > 10) {
             Sleep1.method2(b);
         }
 
     }
 
     public static void method1(int a) {
-        if(Sink.getDecision(a > 0)) {
+        if(a > 0) {
             System.out.println("");
         }
 
@@ -51,7 +51,7 @@ public class Sleep1 {
     }
 
     public static void method2(int b) {
-        if(Sink.getDecision(b > 0)) {
+        if(b > 0) {
             System.out.println("");
         }
 

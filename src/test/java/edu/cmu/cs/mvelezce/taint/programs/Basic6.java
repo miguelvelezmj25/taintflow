@@ -9,13 +9,13 @@ public class Basic6 {
         boolean A = Source.getOptionA(Boolean.valueOf(args[0]));
         int x = 0;
 
-        if(Sink.getDecision(A)) {
+        if(A) {
             x++;
         }
 
         A = false;
 
-        if(Sink.getDecision(A)) {
+        if(A) {
             x++;
         }
 

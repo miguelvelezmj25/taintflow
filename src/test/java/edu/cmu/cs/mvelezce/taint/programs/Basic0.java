@@ -8,10 +8,8 @@ public class Basic0 {
     public static void main(String[] args) throws InterruptedException {
         boolean a = Source.getOptionA(Boolean.valueOf(args[0]));
 
-        if(Sink.getDecision(a)) {
-//        if(a) {
-            System.out.println("");
-        }
+        Sink.sink(true);
+        Sink.sink(false);
     }
 
 }

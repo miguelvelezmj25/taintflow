@@ -28,8 +28,8 @@ public class Problem11 {
         a.getB().setB(b);
         a.getB().setI(i);
 
-        Sink.getDecision(a.getB().isB());
-        Sink.getDecision(a.getB().getI() == 0);
+        Sink.sink(a.getB().isB());
+        Sink.sink(a.getB().getI() == 0);
     }
 
     private static class A {

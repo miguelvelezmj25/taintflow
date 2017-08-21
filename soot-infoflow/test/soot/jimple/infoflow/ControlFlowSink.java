@@ -54,7 +54,7 @@ public class ControlFlowSink extends BodyTransformer {
                 }
             }
             else if(unit instanceof SwitchStmt) {
-                throw new RuntimeException("Need to implement this type of control flow decision");
+//                throw new RuntimeException("Need to implement this type of control flow decision");
             }
         }
 
@@ -97,15 +97,4 @@ public class ControlFlowSink extends BodyTransformer {
 
     }
 
-    public class Ins {
-        Value variable;
-        Unit u;
-
-        public Ins(Value variable, Unit u) {
-            this.variable = variable;
-            this.u = u;
-        }
-
-
-    }
 }

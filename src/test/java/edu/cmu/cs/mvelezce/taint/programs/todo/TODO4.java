@@ -18,7 +18,7 @@ public class TODO4 {
         }
 
 //
-//        switch (Integer.valueOf(args[0])) {
+//        switch (Integer.valueOf(args[0]) {
 //            case 1:
 //                TODO4.inc1(1);
 //                break;

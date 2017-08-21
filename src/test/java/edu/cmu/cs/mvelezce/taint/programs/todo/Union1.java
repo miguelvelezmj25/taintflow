@@ -15,7 +15,7 @@ public class Union1 {
         boolean a;
         boolean b = false;
 
-        if(Sink.getDecision(A || b)) {
+        if(A || b) {
             a = true;
         }
         else {

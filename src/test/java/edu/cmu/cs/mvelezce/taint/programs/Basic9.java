@@ -15,7 +15,7 @@ public class Basic9 {
 
         int a = A ? 1 : 0;
 
-        if(Sink.getDecision(a == 0)) {
+        if(a == 0) {
             System.out.println("foo");
         }
 
@@ -31,7 +31,7 @@ public class Basic9 {
 class W {
     public W(int a) {
 
-        if(Sink.getDecision(a == 0)) {
+        if(a == 0) {
             System.out.println("foo");
         }
     }
@@ -39,7 +39,7 @@ class W {
 
 class Z {
     public void foo(int a) {
-        if(Sink.getDecision(a == 0)) {
+        if(a == 0) {
             System.out.println("foo");
         }
 

@@ -18,13 +18,13 @@ public class Problem10 {
         as.add(new A());
 
         for(A a : as) {
-            if(Sink.getDecision(!a.isB())) {
+            if(!a.isB()) {
                 a.setB(b);
             }
         }
 
         for(A a : as) {
-            if(Sink.getDecision(a.isB())) {
+            if(a.isB()) {
                 System.out.println("");
             }
         }

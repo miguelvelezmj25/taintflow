@@ -9,17 +9,17 @@ public class Basic7 {
         boolean A = Source.getOptionA(Boolean.valueOf(args[0]));
         int x = 0;
 
-        if(Sink.getDecision(A)) {
+        if(A) {
             x += foo(true);
         }
 
-        if(Sink.getDecision(x == 1)) {
+        if(x == 1) {
             x++;
         }
 
         x = foo(true);
 
-        if(Sink.getDecision(x == 0)) {
+        if(x == 0) {
             x = -1;
         }
     }
@@ -27,7 +27,7 @@ public class Basic7 {
     public static int foo(boolean x) {
         int i = 0;
 
-        if(Sink.getDecision(x)) {
+        if(x) {
             i++;
         }
 

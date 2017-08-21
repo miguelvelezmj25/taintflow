@@ -10,15 +10,15 @@ public class Basic2 {
         boolean B = false;
         int x = 0;
 
-        if(Sink.getDecision(A)) {
+        if(A) {
             x++;
         }
 
-        if(Sink.getDecision(B)) {
+        if(B) {
             x++;
         }
 
-        if(Sink.getDecision(x > 0)) {
+        if(x > 0) {
             x = -1;
         }
     }

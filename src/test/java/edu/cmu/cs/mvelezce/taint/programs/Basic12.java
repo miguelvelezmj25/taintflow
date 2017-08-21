@@ -18,14 +18,14 @@ public class Basic12 {
         Integer a;
         Integer b;
 
-        if(Sink.getDecision(A)) {
+        if(A) {
             a = 0;
         }
         else {
             a = 5;
         }
 
-        if(Sink.getDecision(B)) {
+        if(B) {
             b = 0;
         }
         else {
@@ -35,28 +35,28 @@ public class Basic12 {
         try {
             throw new RuntimeException();
         } catch (RuntimeException re) {
-            if(Sink.getDecision(a > 10)) {
+            if(a > 10) {
                 System.out.println(";");
             }
 
-            if(Sink.getDecision(b > 10)) {
+            if(b > 10) {
                 System.out.println(";");
             }
         } finally {
-            if(Sink.getDecision(a > 10)) {
+            if(a > 10) {
                 System.out.println(";");
             }
 
-            if(Sink.getDecision(b > 10)) {
+            if(b > 10) {
                 System.out.println(";");
             }
         }
 
-        if(Sink.getDecision(a > 10)) {
+        if(a > 10) {
             System.out.println(";");
         }
 
-        if(Sink.getDecision(b > 10)) {
+        if(b > 10) {
             System.out.println(";");
         }
 

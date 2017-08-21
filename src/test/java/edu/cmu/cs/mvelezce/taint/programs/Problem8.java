@@ -26,20 +26,20 @@ public class Problem8 {
             b = true;
         }
 
-        Sink.getDecision(a);
-        Sink.getDecision(b);
+        Sink.sink(a);
+        Sink.sink(b);
 
-        if(Sink.getDecision(a)) {
+        if(a) {
             throw new RuntimeException();
         }
 
-        if(Sink.getDecision(b)) {
+        if(b) {
             System.out.println(";");
         }
 
 
-        Sink.getDecision(a);
-        Sink.getDecision(b);
+        Sink.sink(a);
+        Sink.sink(b);
 
     }
 

@@ -21,9 +21,9 @@ public class Problem1 {
         }
 
         // Tainted by A
-        Sink.getDecision(a == 0);
+        Sink.sink(a == 0);
         // Tainted by A
-        Sink.getDecision(b == 0);
+        Sink.sink(b == 0);
     }
 
 }

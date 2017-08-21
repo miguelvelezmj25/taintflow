@@ -41,9 +41,9 @@ public class Basic18 {
         x.add(i);
         x.add(j);
 
-        Sink.getDecision(x == null);
-        Sink.getDecision(x.get(0) == 0);
-        Sink.getDecision(x.get(1) == 0);
+        Sink.sink(x == null);
+        Sink.sink(x.get(0) == 0);
+        Sink.sink(x.get(1) == 0);
     }
 
 }
