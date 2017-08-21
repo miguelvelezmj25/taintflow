@@ -3,6 +3,7 @@ package edu.cmu.cs.mvelezce.analysis;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.json.ControlFlowResult;
 import edu.cmu.cs.mvelezce.analysis.source.ControlFlowSinkSourceManager;
 import edu.cmu.cs.mvelezce.format.instrument.methodnode.MethodTransformer;
@@ -114,7 +115,6 @@ public class TaintInfoflow extends Infoflow {
 
     public void computeInfoflowOneSourceAtATime(String libPath, String appPath, String entryPoint, Collection<String> sources,
                                                 Collection<String> sinks) {
-
         for(String source : sources) {
             String currentOption = this.sourcesToOptions.get(source);
 

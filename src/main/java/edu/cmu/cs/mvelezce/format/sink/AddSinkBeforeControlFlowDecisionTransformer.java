@@ -30,15 +30,21 @@ public class AddSinkBeforeControlFlowDecisionTransformer extends MethodTransform
             int opcode = instruction.getOpcode();
 
 
-//            if(opcode >= Opcodes.IF_ICMPEQ && opcode <= Opcodes.IF_ACMPNE) {
+            if(opcode >= Opcodes.IF_ICMPEQ && opcode <= Opcodes.IF_ACMPNE) {
 //                MethodInsnNode methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(I)I", false);
 //                AbstractInsnNode lastInstruction = newInstructions.getLast();
 //                newInstructions.insertBefore(lastInstruction, methodInstructionNode);
-//            }
-            // TODO Execptions?
-            if(opcode >= Opcodes.IFEQ && opcode <= Opcodes.IF_ACMPNE || opcode == Opcodes.TABLESWITCH
-                    || opcode == Opcodes.LOOKUPSWITCH || opcode == Opcodes.IFNULL || opcode == Opcodes.IFNONNULL) {
-                MethodInsnNode methodInstructionNode;
+
+                InsnNode insnNode = new InsnNode(Opcodes.DUP);
+                MethodInsnNode methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "sink", "(Z)V", false);
+
+                AbstractInsnNode lastInstruction = newInstructions.getLast();
+                newInstructions.insertBefore(lastInstruction, methodInstructionNode);
+            }
+                // TODO Execptions?
+                if(opcode >= Opcodes.IFEQ && opcode <= Opcodes.IF_ACMPNE || opcode == Opcodes.TABLESWITCH
+                        || opcode == Opcodes.LOOKUPSWITCH || opcode == Opcodes.IFNULL || opcode == Opcodes.IFNONNULL) {
+                    MethodInsnNode methodInstructionNode;
 
 //                if(opcode == Opcodes.IFNULL || opcode == Opcodes.IFNONNULL) {
 //                    methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(Ljava/lang/Object;)Ljava/lang/Object;", false);
@@ -46,45 +52,47 @@ public class AddSinkBeforeControlFlowDecisionTransformer extends MethodTransform
 //                else {
 //
 //                if(newInstructions.getLast().getType() == AbstractInsnNode.FIELD_INSN) {
-//                    methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(Z)Z", false);
-                    methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(I)I", false);
+                    InsnNode insnNode = new InsnNode(Opcodes.DUP);
+                    methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "sink", "(Z)V", false);
+//                    methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(I)I", false);
 //                }
 //                else {
 //                    MethodInsnNode methodInstructionNode = new MethodInsnNode(Opcodes.INVOKESTATIC, "edu/cmu/cs/mvelezce/analysis/option/Sink", "getDecision", "(I)I", false);
 //                    newInstructions.add(methodInstructionNode);
 //                }
-                newInstructions.add(methodInstructionNode);
+                    newInstructions.add(insnNode);
+                    newInstructions.add(methodInstructionNode);
+                }
+
+                newInstructions.add(instruction);
             }
 
-            newInstructions.add(instruction);
+            methodNode.instructions.clear();
+            methodNode.instructions.add(newInstructions);
+
         }
 
-        methodNode.instructions.clear();
-        methodNode.instructions.add(newInstructions);
+        @Override
+        public Set<MethodNode> getMethodsToInstrument (ClassNode classNode){
+            Set<MethodNode> methodsToInstrument = new HashSet<>();
 
-    }
+            for(MethodNode methodNode : classNode.methods) {
+                InsnList instructions = methodNode.instructions;
+                ListIterator<AbstractInsnNode> instructionsIterator = instructions.iterator();
 
-    @Override
-    public Set<MethodNode> getMethodsToInstrument(ClassNode classNode) {
-        Set<MethodNode> methodsToInstrument = new HashSet<>();
+                while (instructionsIterator.hasNext()) {
+                    AbstractInsnNode instruction = instructionsIterator.next();
+                    int opcode = instruction.getOpcode();
 
-        for(MethodNode methodNode : classNode.methods) {
-            InsnList instructions = methodNode.instructions;
-            ListIterator<AbstractInsnNode> instructionsIterator = instructions.iterator();
-
-            while (instructionsIterator.hasNext()) {
-                AbstractInsnNode instruction = instructionsIterator.next();
-                int opcode = instruction.getOpcode();
-
-                // TODO Execptions?
-                if(opcode >= Opcodes.IFEQ && opcode <= Opcodes.IF_ACMPNE || opcode == Opcodes.TABLESWITCH
-                        || opcode == Opcodes.LOOKUPSWITCH || opcode == Opcodes.IFNULL || opcode == Opcodes.IFNONNULL) {
-                    methodsToInstrument.add(methodNode);
-                    continue;
+                    // TODO Execptions?
+                    if(opcode >= Opcodes.IFEQ && opcode <= Opcodes.IF_ACMPNE || opcode == Opcodes.TABLESWITCH
+                            || opcode == Opcodes.LOOKUPSWITCH || opcode == Opcodes.IFNULL || opcode == Opcodes.IFNONNULL) {
+                        methodsToInstrument.add(methodNode);
+                        continue;
+                    }
                 }
             }
-        }
 
-        return methodsToInstrument;
+            return methodsToInstrument;
+        }
     }
-}

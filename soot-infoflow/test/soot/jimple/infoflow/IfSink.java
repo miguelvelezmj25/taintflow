@@ -3,6 +3,9 @@ package soot.jimple.infoflow;
 import soot.*;
 import soot.jimple.*;
 import soot.jimple.internal.JimpleLocal;
+import soot.tagkit.BytecodeOffsetTag;
+import soot.tagkit.LineNumberTag;
+import soot.tagkit.Tag;
 import soot.util.Chain;
 
 import java.util.*;
@@ -41,13 +44,13 @@ public class IfSink extends BodyTransformer {
                     Value op2 = condExpr.getOp2();
 
                     if(locals.contains(op1)) {
-                        Ins i = new Ins(op1, unit, op1.getType());
+                        Ins i = new Ins(op1, unit);
                         System.out.println("SINK " + op1 + " " + op1.getType());
                         inss.add(i);
                     }
 
                     if(locals.contains(op2)) {
-                        Ins i = new Ins(op2, unit, op2.getType());
+                        Ins i = new Ins(op2, unit);
                         System.out.println("SINK " + op2 + " " + op2.getType());
                         inss.add(i);
                     }
@@ -61,8 +64,34 @@ public class IfSink extends BodyTransformer {
         if(!inss.isEmpty()) {
             for(Ins ins : inss) {
                 StaticInvokeExpr invExpr = Jimple.v().newStaticInvokeExpr(sootMethod.makeRef(), ins.variable);
-//                Local local = Jimple.v().newLocal("tmp" + UUID.randomUUID(), BooleanType.v());
                 Stmt stmt = Jimple.v().newInvokeStmt(invExpr);
+
+                Tag lineNumberTag = null;
+                Tag bytecodeOffsetTag = null;
+
+                for(Tag tag : ins.u.getTags()) {
+                    if(tag instanceof LineNumberTag) {
+                        int javaLine = ((LineNumberTag) tag).getLineNumber();
+                        lineNumberTag = new LineNumberTag(javaLine);
+                    }
+
+                    if(tag instanceof BytecodeOffsetTag) {
+                        int bytecodeIndex = ((BytecodeOffsetTag) tag).getBytecodeOffset();
+                        bytecodeOffsetTag = new BytecodeOffsetTag(bytecodeIndex);
+                    }
+                }
+
+                if(lineNumberTag == null) {
+                    lineNumberTag = new LineNumberTag(-1);
+                }
+
+                if(bytecodeOffsetTag == null) {
+                    bytecodeOffsetTag = new BytecodeOffsetTag(-1);
+                }
+
+                stmt.addTag(lineNumberTag);
+                stmt.addTag(bytecodeOffsetTag);
+
                 units.insertBefore(stmt, ins.u);
             }
         }
@@ -73,12 +102,10 @@ public class IfSink extends BodyTransformer {
     public class Ins {
         Value variable;
         Unit u;
-        Type t;
 
-        public Ins(Value variable, Unit u, Type t) {
+        public Ins(Value variable, Unit u) {
             this.variable = variable;
             this.u = u;
-            this.t = t;
         }
 
 
