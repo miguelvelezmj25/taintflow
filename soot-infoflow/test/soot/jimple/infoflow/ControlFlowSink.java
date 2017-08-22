@@ -28,7 +28,6 @@ public class ControlFlowSink extends BodyTransformer {
 
         Chain<Unit> units = b.getUnits();
         Chain<Local> locals = b.getLocals();
-//        List<Ins> inss = new ArrayList<>();
         Map<Value, Unit> valuesToUnits = new HashMap<>();
 
         for(Unit unit : units) {
@@ -54,7 +53,9 @@ public class ControlFlowSink extends BodyTransformer {
                 }
             }
             else if(unit instanceof SwitchStmt) {
-//                throw new RuntimeException("Need to implement this type of control flow decision");
+                SwitchStmt switchStmt = (SwitchStmt) unit;
+                Value cond = switchStmt.getKey();
+                valuesToUnits.put(cond, unit);
             }
         }
 

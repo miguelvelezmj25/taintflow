@@ -133,6 +133,36 @@ public class TaintInfoflow extends Infoflow {
         System.out.println("Number of results: " + aggregatedResults.size());
     }
 
+    public void computeInfoflowOneSourceAtATime(String libPath, String appPath, String entryPoint) {
+        for(String source : this.sourcesToOptions.keySet()) {
+            String currentOption = this.sourcesToOptions.get(source);
+
+            System.out.println("############## Analyzing option " + currentOption);
+
+            List<String> intermediateSources = new ArrayList<>();
+            intermediateSources.add(source);
+
+            this.computeInfoflow(libPath, appPath, entryPoint, intermediateSources, this.sinks);
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            this.saveResults(currentOption);
+
+            System.out.println("############## Option " + currentOption + " results size " + this.getResults().size());
+
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+        }
+    }
+
     public void computeInfoflowOneSourceAtATime(String libPath, String appPath, String entryPoint, Collection<String> sources,
                                                 Collection<String> sinks) {
         for(String source : sources) {
