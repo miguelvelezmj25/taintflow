@@ -6,12 +6,4 @@ public class Sink {
 
     public static void sink(Object o) { ; }
 
-//    public static boolean getDecision(boolean d) {
-//        return d;
-//    }
-//
-//    public static String string(boolean d) {
-//        return String.valueOf(d);
-//    }
-
 }

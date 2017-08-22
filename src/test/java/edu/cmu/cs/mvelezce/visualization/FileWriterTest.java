@@ -41,6 +41,15 @@ public class FileWriterTest {
     }
 
     @Test
+    public void annotateColorCounter() throws IOException {
+        String system = "pngtasticColorCounter";
+        String directory = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-counter/src";
+        FileWriter fw = new FileWriter();
+
+        fw.writeAnnotatedFile(system, directory);
+    }
+
+    @Test
     public void deleteAnnotatedRunningExample() throws IOException {
         String directory = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/running-example/src/main/java";
         FileWriter.deleteAnnotatedFiles(directory);
