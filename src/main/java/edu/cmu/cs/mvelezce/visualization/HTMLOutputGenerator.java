@@ -2,24 +2,30 @@ package edu.cmu.cs.mvelezce.visualization;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.cmu.cs.mvelezce.analysis.TaintInfoflow;
 import edu.cmu.cs.mvelezce.analysis.option.json.ControlFlowResult;
 import org.apache.commons.io.FileUtils;
 
 import java.io.*;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-public class HTMLOutputGenerator {
+public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
 
-    public static final String OUTPUT_DIR = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/visualization/";
-    public static final String HTML_BEGIN = "<!DOCTYPE html>\n" +
+    public static final String OUTPUT_DIR = "output/";
+    public static String HTML_HEAD_BEGIN = "<!DOCTYPE html>\n" +
             "<html lang=\"en\">\n" +
             "<head>\n" +
             "    <meta charset=\"UTF-8\">\n" +
-            "    <title>Example.java</title>\n" +
-            "    <link rel=\"stylesheet\" type=\"text/css\" href=\"../css/style.css\">\n" +
+            "    <title>";
+
+    public static String HTML_HEAD_END = "</title>\n" +
+            "    <link rel=\"stylesheet\" type=\"text/css\" href=\"../../css/style.css\">\n" +
             "    <link href=\"https://fonts.googleapis.com/css?family=Roboto+Mono:400,700\" rel=\"stylesheet\">\n" +
-            "</head>\n" +
-            "<body>\n" +
+            "</head>\n";
+    public static final String HTML_BODY = "<body>\n" +
             "\n" +
             "<div class=\"container\">\n" +
             "    <div class=\"container_1 grid_0 grid_1\">\n" +
@@ -27,28 +33,21 @@ public class HTMLOutputGenerator {
     public static final String HTML_END = "</div>\n" +
             "\n" +
             "    </div>\n" +
+            "</div>\n" +
             "</body>\n" +
             "</html>";
 
-    public String HTML_TITLE = "Default";
 
-    private String root;
-    private String systemName;
 
     public HTMLOutputGenerator(String root, String systemName) {
-        this.root = root;
-        this.systemName = systemName;
+        super(root, systemName);
     }
 
-    public void generateHTMLPage() throws IOException {
-        List<ControlFlowResult> results = this.readResults();
-        this.generateStaticHTMLPage(results);
-    }
-
+    @Override
     public void generateStaticHTMLPage(List<ControlFlowResult> results) throws IOException {
         String[] extensions = {"java"};
 
-        Collection<File> files = FileUtils.listFiles(new File(this.root), extensions, true);
+        Collection<File> files = FileUtils.listFiles(new File(this.getRoot()), extensions, true);
 
         for(File file : files) {
             Map<Integer, String> linesToConstraints = new HashMap<>();
@@ -76,11 +75,11 @@ public class HTMLOutputGenerator {
                 continue;
             }
 
-            this.HTML_TITLE = file.getName();
+            this.setHtmlTitle(file.getName());
 
             StringBuilder staticHTMLPage = new StringBuilder();
 
-            FileInputStream fstream = new FileInputStream(this.root + file.getPath().replace(this.root, ""));
+            FileInputStream fstream = new FileInputStream(this.getRoot() + file.getPath().replace(this.getRoot(), ""));
             DataInputStream in = new DataInputStream(fstream);
             BufferedReader br = new BufferedReader(new InputStreamReader(in));
             String strLine;
@@ -107,8 +106,6 @@ public class HTMLOutputGenerator {
                     staticHTMLPage.append("&nbsp;");
                     staticHTMLPage.append("&#8594; ").append(linesToConstraints.get(lineNumber));
                     staticHTMLPage.append("</b>");
-
-                    staticHTMLPage.append("&emsp;");
                 }
                 else {
                     staticHTMLPage.append(strLine);
@@ -121,10 +118,11 @@ public class HTMLOutputGenerator {
 
             in.close();
 
-            File outputFile = new File(HTMLOutputGenerator.OUTPUT_DIR + this.systemName + "/" + file.getName() + ".html");
+            File outputFile = new File(HTMLOutputGenerator.ROOT_DIR + this.getSystemName() + "/" + HTMLOutputGenerator.OUTPUT_DIR + file.getName() + ".html");
             outputFile.getParentFile().mkdirs();
             PrintWriter out = new PrintWriter(outputFile);
-            out.print(HTMLOutputGenerator.HTML_BEGIN + staticHTMLPage + HTMLOutputGenerator.HTML_END);
+            out.print(HTMLOutputGenerator.HTML_HEAD_BEGIN + this.getHtmlTitle() + HTMLOutputGenerator.HTML_HEAD_END
+                    + HTMLOutputGenerator.HTML_BODY + staticHTMLPage + HTMLOutputGenerator.HTML_END);
             out.flush();
             out.close();
 
@@ -132,9 +130,10 @@ public class HTMLOutputGenerator {
         }
     }
 
+    @Override
     public List<ControlFlowResult> readResults() throws IOException {
         ObjectMapper mapper = new ObjectMapper();
-        File inputFile = new File("src/main/resources/" + this.systemName + ".json");
+        File inputFile = new File(TaintInfoflow.OUTPUT_DIR + this.getSystemName() + ".json");
         List<ControlFlowResult> results = mapper.readValue(inputFile, new TypeReference<List<ControlFlowResult>>() {
         });
 

@@ -2,9 +2,14 @@ package edu.cmu.cs.mvelezce.analysis.option.json;
 
 import java.util.List;
 
+//@JsonDeserialize(using = SourceToSinkPath.SourceToSinkDeserializer.class)
 public class SourceToSinkPath {
 
     private List<PathElement> path;
+
+    public SourceToSinkPath() {
+        ;
+    }
 
     public SourceToSinkPath(List<PathElement> path) {
         this.path = path;
@@ -21,6 +26,10 @@ public class SourceToSinkPath {
     public static class PathElement {
         private String className;
         private int javaLineNumber;
+
+        public PathElement() {
+            ;
+        }
 
         public PathElement(String className, int javaLineNumber) {
             this.className = className;
@@ -43,4 +52,21 @@ public class SourceToSinkPath {
             this.javaLineNumber = javaLineNumber;
         }
     }
+
+
+//    public static class SourceToSinkDeserializer extends JsonDeserializer<SourceToSinkPath> {
+//
+//        @Override
+//        public SourceToSinkPath deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException {
+//            ObjectCodec oc = jsonParser.getCodec();
+//            JsonNode node = oc.readTree(jsonParser);
+//
+//            ObjectMapper mapper = new ObjectMapper();
+//            ObjectReader reader = mapper.readerFor(new TypeReference<List<PathElement>>() {
+//            });
+//            List<PathElement> path = reader.readValue(node.get("configuration"));
+//
+//            return null;
+//        }
+//    }
 }

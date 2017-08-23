@@ -30,9 +30,9 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 public class TaintInfoflow extends Infoflow {
-    private static final String CONFIG_FILE = "src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
-    private static final String OUTPUT_DIR = "src/main/resources/output/";
-    private static final String PATHS_DIR = "src/main/resources/paths/";
+    public static final String CONFIG_FILE = "src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
+    public static final String OUTPUT_DIR = "src/main/resources/output/";
+    public static final String PATHS_DIR = "src/main/resources/paths/";
 
     private String systemName;
     private Map<String, String> sourcesToOptions = new HashMap<>();
@@ -175,7 +175,7 @@ public class TaintInfoflow extends Infoflow {
     }
 
     private void getSourceToSinkPath(String option) throws IOException {
-        List<List<SourceToSinkPath.PathElement>> paths = new ArrayList<>();
+        List<SourceToSinkPath> paths = new ArrayList<>();
         MultiMap<ResultSinkInfo, ResultSourceInfo> resultMap = this.getResults().getResults();
 
         for(ResultSinkInfo sink : resultMap.keySet()) {
@@ -220,7 +220,8 @@ public class TaintInfoflow extends Infoflow {
                     }
                 }
 
-                paths.add(path);
+                SourceToSinkPath sourceToSinkPath = new SourceToSinkPath(path);
+                paths.add(sourceToSinkPath);
             }
         }
 
