@@ -118,7 +118,8 @@ public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
 
             in.close();
 
-            File outputFile = new File(HTMLOutputGenerator.ROOT_DIR + this.getSystemName() + "/" + HTMLOutputGenerator.OUTPUT_DIR + file.getName() + ".html");
+            File outputFile = new File(HTMLOutputGenerator.ROOT_DIR + this.getSystemName() + "/"
+                    + HTMLOutputGenerator.OUTPUT_DIR + "/" + this.getSystemName() + "/" + file.getName() + ".html");
             outputFile.getParentFile().mkdirs();
             PrintWriter out = new PrintWriter(outputFile);
             out.print(HTMLOutputGenerator.HTML_HEAD_BEGIN + this.getHtmlTitle() + HTMLOutputGenerator.HTML_HEAD_END

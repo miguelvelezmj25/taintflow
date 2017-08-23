@@ -166,7 +166,8 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
                     in.close();
 
                     File outputFile = new File(HTMLPathGenerator.ROOT_DIR + this.getSystemName() + "/"
-                            + HTMLPathGenerator.PATH_DIR + this.option + "_" + r + "_" + file.getName() + ".html");
+                            + HTMLPathGenerator.PATH_DIR + "/" + this.getSystemName() + "/" + this.option + "_" + r
+                            + "_" + file.getName() + ".html");
                     outputFile.getParentFile().mkdirs();
                     PrintWriter out = new PrintWriter(outputFile);
                     out.print(HTMLPathGenerator.HTML_HEAD_BEGIN + this.getHtmlTitle() + HTMLPathGenerator.HTML_HEAD_END
