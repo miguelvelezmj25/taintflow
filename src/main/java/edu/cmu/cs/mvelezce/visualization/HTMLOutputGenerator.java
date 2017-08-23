@@ -22,7 +22,7 @@ public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
             "    <title>";
 
     public static String HTML_HEAD_END = "</title>\n" +
-            "    <link rel=\"stylesheet\" type=\"text/css\" href=\"../../css/style.css\">\n" +
+            "    <link rel=\"stylesheet\" type=\"text/css\" href=\"../../../css/style.css\">\n" +
             "    <link href=\"https://fonts.googleapis.com/css?family=Roboto+Mono:400,700\" rel=\"stylesheet\">\n" +
             "</head>\n";
     public static final String HTML_BODY = "<body>\n" +
@@ -134,7 +134,7 @@ public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
     @Override
     public List<ControlFlowResult> readResults() throws IOException {
         ObjectMapper mapper = new ObjectMapper();
-        File inputFile = new File(TaintInfoflow.OUTPUT_DIR + this.getSystemName() + ".json");
+        File inputFile = new File(TaintInfoflow.OUTPUT_DIR + "/" + this.getSystemName() + "/" + this.getSystemName() + ".json");
         List<ControlFlowResult> results = mapper.readValue(inputFile, new TypeReference<List<ControlFlowResult>>() {
         });
 

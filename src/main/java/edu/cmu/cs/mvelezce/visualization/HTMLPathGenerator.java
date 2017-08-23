@@ -19,7 +19,7 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
             "    <title>";
 
     public static String HTML_HEAD_END = "</title>\n" +
-            "    <link rel=\"stylesheet\" type=\"text/css\" href=\"../../css/style.css\">\n" +
+            "    <link rel=\"stylesheet\" type=\"text/css\" href=\"../../../css/style.css\">\n" +
             "    <link href=\"https://fonts.googleapis.com/css?family=Roboto+Mono:400,700\" rel=\"stylesheet\">\n" +
             "</head>\n";
     public static final String HTML_BODY = "<body>\n" +
@@ -41,19 +41,19 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
         this.option = option;
     }
 
-    public static void something(String root, String systemName) throws IOException {
+    public static void generateHTMLForSystem(String root, String systemName) throws IOException {
         String[] extensions = {"json"};
 
-        Collection<File> files = FileUtils.listFiles(new File(TaintInfoflow.PATHS_DIR), extensions, true);
-        Set<File> toAnalyze = new HashSet<>();
+        Collection<File> files = FileUtils.listFiles(new File(TaintInfoflow.PATHS_DIR + systemName), extensions, true);
+        Set<File> filesToAnalyze = new HashSet<>();
 
         for(File file : files) {
-            if(file.getPath().contains(TaintInfoflow.PATHS_DIR + systemName + "_")) {
-                toAnalyze.add(file);
+            if(file.getPath().contains(TaintInfoflow.PATHS_DIR + systemName + "/")) {
+                filesToAnalyze.add(file);
             }
         }
 
-        for(File file : toAnalyze) {
+        for(File file : filesToAnalyze) {
            String option = file.getName().replace(".json", "");
            option = option.replace(systemName, "");
            option = option.replace("_", "");
@@ -166,8 +166,7 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
                     in.close();
 
                     File outputFile = new File(HTMLPathGenerator.ROOT_DIR + this.getSystemName() + "/"
-                            + HTMLPathGenerator.PATH_DIR + "/" + this.getSystemName() + "/" + this.option + "_" + r
-                            + "/" + file.getName() + ".html");
+                            + HTMLPathGenerator.PATH_DIR + "/" + this.option + "_" + r + "/" + file.getName() + ".html");
                     outputFile.getParentFile().mkdirs();
                     PrintWriter out = new PrintWriter(outputFile);
                     out.print(HTMLPathGenerator.HTML_HEAD_BEGIN + this.getHtmlTitle() + HTMLPathGenerator.HTML_HEAD_END
@@ -184,7 +183,7 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
     @Override
     public List<SourceToSinkPath> readResults() throws IOException {
         ObjectMapper mapper = new ObjectMapper();
-        File inputFile = new File(TaintInfoflow.PATHS_DIR + this.getSystemName() + "_" + this.option + ".json");
+        File inputFile = new File(TaintInfoflow.PATHS_DIR + "/" + this.getSystemName() + "/" + this.option + ".json");
         List<SourceToSinkPath> results = mapper.readValue(inputFile, new TypeReference<List<SourceToSinkPath>>() {
         });
 

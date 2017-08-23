@@ -76,12 +76,12 @@ public class TaintInfoflow extends Infoflow {
     public void aggregateInfoflowResults() throws IOException {
         String[] extensions = {"json"};
 
-        Collection<File> files = FileUtils.listFiles(new File(TaintInfoflow.OUTPUT_DIR), extensions, false);
+        Collection<File> files = FileUtils.listFiles(new File(TaintInfoflow.OUTPUT_DIR + this.systemName), extensions, false);
 
         List<ControlFlowResult> aggregatedResults = new ArrayList<>();
 
         for(File file : files) {
-            if(!file.getName().contains(this.systemName + "_")) {
+            if(file.getName().contains(this.systemName + "/" + this.systemName + ".json")) {
                 continue;
             }
 
@@ -107,7 +107,7 @@ public class TaintInfoflow extends Infoflow {
 
 
         ObjectMapper mapper = new ObjectMapper();
-        File outputFile = new File(TaintInfoflow.OUTPUT_DIR + this.systemName + ".json");
+        File outputFile = new File(TaintInfoflow.OUTPUT_DIR + "/" + this.systemName + "/" + this.systemName + ".json");
         mapper.writeValue(outputFile, aggregatedResults);
 
         System.out.println("\n############## STATS");
@@ -246,12 +246,12 @@ public class TaintInfoflow extends Infoflow {
         }
 
         ObjectMapper mapper = new ObjectMapper();
-        File outputFile = new File(TaintInfoflow.PATHS_DIR + this.systemName + "_" + option + ".json");
-
+        File outputFile = new File(TaintInfoflow.PATHS_DIR + "/" + this.systemName + "/" + option + ".json");
+        outputFile.getParentFile().mkdirs();
         mapper.writeValue(outputFile, paths);
     }
 
-    private void saveResults(String option) {
+    private void saveResults(String option) throws IOException {
         MultiMap<ResultSinkInfo, ResultSourceInfo> resultMap = this.getResults().getResults();
         List<ControlFlowResult> controlFlowResults = new ArrayList<>();
 
@@ -259,7 +259,7 @@ public class TaintInfoflow extends Infoflow {
             Stmt sink = resultSinkInfo.getSink();
 
             // Sink
-            SootMethod sinkAtMethod = this.getiCfg().getMethodOf(sink);
+            SootMethod sinkAtMethod = this.iCfg.getMethodOf(sink);
             SootClass sinkAtClass = sinkAtMethod.getDeclaringClass();
 
             String packageName = sinkAtClass.getPackageName();
@@ -345,14 +345,9 @@ public class TaintInfoflow extends Infoflow {
         }
 
         ObjectMapper mapper = new ObjectMapper();
-        File outputFile = new File(TaintInfoflow.OUTPUT_DIR + this.systemName + "_" + option + ".json");
-
-        try {
-            mapper.writeValue(outputFile, controlFlowResults);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
+        File outputFile = new File(TaintInfoflow.OUTPUT_DIR + "/" + this.systemName + "/" + option + ".json");
+        outputFile.getParentFile().mkdirs();
+        mapper.writeValue(outputFile, controlFlowResults);
     }
 
     // TODO delete
@@ -385,7 +380,7 @@ public class TaintInfoflow extends Infoflow {
             Stmt sink = resultSinkInfo.getSink();
 
             // Sink
-            SootMethod sinkAtMethod = this.getiCfg().getMethodOf(sink);
+            SootMethod sinkAtMethod = this.iCfg.getMethodOf(sink);
             SootClass sinkAtClass = sinkAtMethod.getDeclaringClass();
 
             String packageName = sinkAtClass.getPackageName();
@@ -495,7 +490,7 @@ public class TaintInfoflow extends Infoflow {
     private void printSinkResult(Stmt sink, Set<ResultSourceInfo> sources) {
         System.out.println("Sink: " + sink);
 
-        SootMethod sinkAtMethod = this.getiCfg().getMethodOf(sink);
+        SootMethod sinkAtMethod = this.iCfg.getMethodOf(sink);
         SootClass sinkAtClass = sinkAtMethod.getDeclaringClass();
         String sinkAtPackage = sinkAtClass.getPackageName();
         System.out.println("sink at method: " + sinkAtMethod.getName());
@@ -581,10 +576,6 @@ public class TaintInfoflow extends Infoflow {
             this.sourcesToOptions.put(methodSignature, option);
 //            this.sources.add(methodSignature);
         }
-    }
-
-    public IInfoflowCFG getiCfg() {
-        return this.iCfg;
     }
 
     public List<String> getSources() {

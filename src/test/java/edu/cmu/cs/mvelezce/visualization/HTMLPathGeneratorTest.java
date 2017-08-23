@@ -11,7 +11,7 @@ public class HTMLPathGeneratorTest {
         String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/running-example/src/main/java";
         String systemName = "running-example";
 
-        HTMLPathGenerator.something(root, systemName);
+        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
 
 //        HTMLBaseGenerator generator = new HTMLPathGenerator(root, systemName);
 //        generator.generateHTMLPage();
