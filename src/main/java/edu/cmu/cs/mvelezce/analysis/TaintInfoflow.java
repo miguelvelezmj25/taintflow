@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.cmu.cs.mvelezce.analysis.option.json.ControlFlowResult;
+import edu.cmu.cs.mvelezce.analysis.option.json.SourceToSinkPath;
 import edu.cmu.cs.mvelezce.format.instrument.methodnode.MethodTransformer;
 import edu.cmu.cs.mvelezce.format.sink.AddSinkBeforeControlFlowDecisionTransformer;
 import org.apache.commons.io.FileUtils;
@@ -30,7 +31,8 @@ import java.util.*;
 
 public class TaintInfoflow extends Infoflow {
     private static final String CONFIG_FILE = "src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
-    private static final String OUTPUT_DIR = "src/main/resources/";
+    private static final String OUTPUT_DIR = "src/main/resources/output/";
+    private static final String PATHS_DIR = "src/main/resources/paths/";
 
     private String systemName;
     private Map<String, String> sourcesToOptions = new HashMap<>();
@@ -52,7 +54,7 @@ public class TaintInfoflow extends Infoflow {
         Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
         PackManager.v().getPack("jtp").add(new Transform("jtp.ifsink", ControlFlowSink.v()));
 
-        while(iter.hasNext()) {
+        while (iter.hasNext()) {
             MethodOrMethodContext m = iter.next();
             SootMethod method = m.method();
 
@@ -133,38 +135,12 @@ public class TaintInfoflow extends Infoflow {
         System.out.println("Number of results: " + aggregatedResults.size());
     }
 
-    public void computeInfoflowOneSourceAtATime(String libPath, String appPath, String entryPoint) {
-        for(String source : this.sourcesToOptions.keySet()) {
-            String currentOption = this.sourcesToOptions.get(source);
-
-            System.out.println("############## Analyzing option " + currentOption);
-
-            List<String> intermediateSources = new ArrayList<>();
-            intermediateSources.add(source);
-
-            this.computeInfoflow(libPath, appPath, entryPoint, intermediateSources, this.sinks);
-
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
-            this.saveResults(currentOption);
-
-            System.out.println("############## Option " + currentOption + " results size " + this.getResults().size());
-
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
-        }
+    public void computeInfoflowOneSourceAtATime(String libPath, String appPath, String entryPoint) throws IOException {
+        this.computeInfoflowOneSourceAtATime(libPath, appPath, entryPoint, this.sourcesToOptions.keySet(), this.sinks);
     }
 
     public void computeInfoflowOneSourceAtATime(String libPath, String appPath, String entryPoint, Collection<String> sources,
-                                                Collection<String> sinks) {
+                                                Collection<String> sinks) throws IOException {
         for(String source : sources) {
             String currentOption = this.sourcesToOptions.get(source);
 
@@ -183,6 +159,10 @@ public class TaintInfoflow extends Infoflow {
 
             this.saveResults(currentOption);
 
+            if(this.pathBuilderFactory.supportsPathReconstruction()) {
+                this.getSourceToSinkPath(currentOption);
+            }
+
             System.out.println("############## Option " + currentOption + " results size " + this.getResults().size());
 
             try {
@@ -194,36 +174,61 @@ public class TaintInfoflow extends Infoflow {
         }
     }
 
-//    public void computeInfoflowOneSourceAtATime(String libPath, String appPath, String entryPoint, Collection<String> sources) {
-//        for(String source : sources) {
-//            String currentOption = this.sourcesToOptions.get(source);
-//
-//            System.out.println("############## Analyzing option " + currentOption);
-//
-//            List<String> intermediateSources = new ArrayList<>();
-//            intermediateSources.add(source);
-//
-//            ISourceSinkManager controlFlowSinkSourceManager = new ControlFlowSinkSourceManager(intermediateSources, this.sinks);
-//
-//            this.computeInfoflow(libPath, appPath, entryPoint, controlFlowSinkSourceManager);
-//
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//
-//            this.saveResults(currentOption);
-//
-//            System.out.println("############## Option " + currentOption + " results size " + this.getResults().size());
-//
-//            try {
-//                Thread.sleep(1000);
-//            } catch (InterruptedException e) {
-//                e.printStackTrace();
-//            }
-//        }
-//    }
+    private void getSourceToSinkPath(String option) throws IOException {
+        List<List<SourceToSinkPath.PathElement>> paths = new ArrayList<>();
+        MultiMap<ResultSinkInfo, ResultSourceInfo> resultMap = this.getResults().getResults();
+
+        for(ResultSinkInfo sink : resultMap.keySet()) {
+
+            if(resultMap.get(sink).size() != 1) {
+                throw new RuntimeException("Something weird with paths");
+            }
+
+            for(ResultSourceInfo source : resultMap.get(sink)) {
+                List<SourceToSinkPath.PathElement> path = new ArrayList<>();
+
+                if(source.getPath() != null) {
+                    for(Unit p : source.getPath()) {
+                        SootMethod method = this.iCfg.getMethodOf(p);
+                        String fullName = method.getDeclaringClass().getName();
+
+                        List<Integer> javaLines = new ArrayList<>();
+
+                        for(Tag tag : p.getTags()) {
+                            if(tag instanceof LineNumberTag) {
+                                int javaLine = ((LineNumberTag) tag).getLineNumber();
+                                javaLines.add(javaLine);
+                            }
+                        }
+
+                        if(javaLines.isEmpty()) {
+                            javaLines.add(-1);
+                        }
+
+                        int javaLine;
+
+                        if(javaLines.size() == 1) {
+                            javaLine = javaLines.get(0);
+                        }
+                        else {
+                            int index = javaLines.indexOf(Collections.min(javaLines));
+                            javaLine = javaLines.get(index);
+                        }
+
+                        SourceToSinkPath.PathElement element = new SourceToSinkPath.PathElement(fullName, javaLine);
+                        path.add(element);
+                    }
+                }
+
+                paths.add(path);
+            }
+        }
+
+        ObjectMapper mapper = new ObjectMapper();
+        File outputFile = new File(TaintInfoflow.PATHS_DIR + this.systemName + "_" + option + ".json");
+
+        mapper.writeValue(outputFile, paths);
+    }
 
     private void saveResults(String option) {
         MultiMap<ResultSinkInfo, ResultSourceInfo> resultMap = this.getResults().getResults();
@@ -259,7 +264,8 @@ public class TaintInfoflow extends Infoflow {
                 bytecodeIndex = bytecodeIndexes.get(0);
             }
             else {
-                bytecodeIndex = bytecodeIndexes.indexOf(Collections.min(bytecodeIndexes));
+                int index = bytecodeIndexes.indexOf(Collections.min(bytecodeIndexes));
+                bytecodeIndex = bytecodeIndexes.get(index);
             }
 
             List<Integer> javaLines = new ArrayList<>();
@@ -281,7 +287,8 @@ public class TaintInfoflow extends Infoflow {
                 javaLine = javaLines.get(0);
             }
             else {
-                javaLine = javaLines.indexOf(Collections.min(javaLines));
+                int index = javaLines.indexOf(Collections.min(javaLines));
+                javaLine = javaLines.get(index);
             }
 
             // Source
@@ -327,6 +334,7 @@ public class TaintInfoflow extends Infoflow {
 
     }
 
+    // TODO delete
     public void checkResults() {
         try {
             Thread.sleep(1000);
@@ -462,74 +470,6 @@ public class TaintInfoflow extends Infoflow {
         }
 
     }
-
-//    private void saveResults(Stmt sink, Set<ResultSourceInfo> sourcesInfo) {
-//        // Sink
-//        SootMethod sinkAtMethod = this.getiCfg().getMethodOf(sink);
-//        SootClass sinkAtClass = sinkAtMethod.getDeclaringClass();
-//
-//        String packageName = sinkAtClass.getPackageName();
-//        String className = sinkAtClass.getShortName();
-//        String methodSignature = sinkAtMethod.getBytecodeSignature();
-//
-//        List<Integer> bytecodeIndexes = new ArrayList<>();
-//
-//        for(Tag tag : sink.getTags()) {
-//            if(tag instanceof BytecodeOffsetTag) {
-//                int bytecodeIndex = ((BytecodeOffsetTag) tag).getBytecodeOffset();
-//                bytecodeIndexes.add(bytecodeIndex);
-//            }
-//        }
-//
-//        if(bytecodeIndexes.isEmpty()) {
-//            bytecodeIndexes.add(-1);
-//        }
-//
-//        int bytecodeIndex = -1;
-//
-//        if(bytecodeIndexes.size() == 1) {
-//            bytecodeIndex = bytecodeIndexes.get(0);
-//        }
-//        else {
-//            bytecodeIndex = bytecodeIndexes.indexOf(Collections.min(bytecodeIndexes));
-//        }
-//
-//
-//        // Source
-//        Set<String> sources = new HashSet<>();
-//
-//        for(ResultSourceInfo resultSourceInfo : sourcesInfo) {
-//            Stmt source = resultSourceInfo.getSource();
-//
-//            if(!source.containsInvokeExpr()) {
-//                throw new RuntimeException("The source does not have an invoke: " + source.toString());
-//            }
-//
-//            InvokeExpr expr = source.getInvokeExpr();
-//            SootMethod exprMethod = expr.getMethod();
-//            String option = this.sourcesToOptions.get(exprMethod.getSignature());
-//
-//            if(option == null) {
-//                throw new RuntimeException("Source is not associated to an option: " + source);
-//            }
-//
-//            sources.add(option);
-//        }
-//
-//        // Saving
-//        ControlFlowResult controlFlowResult = new ControlFlowResult(packageName, className, methodSignature,
-//                bytecodeIndex, sources);
-//
-//        ObjectMapper mapper = new ObjectMapper();
-//        File outputFile = new File(this.systemName + ".json");
-//
-//        try {
-//            mapper.writeValue(outputFile, controlFlowResult);
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
-//
-//    }
 
     private void printSinkResult(Stmt sink, Set<ResultSourceInfo> sources) {
         System.out.println("Sink: " + sink);
