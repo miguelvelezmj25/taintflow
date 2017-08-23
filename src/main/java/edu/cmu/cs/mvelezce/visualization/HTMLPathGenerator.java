@@ -25,7 +25,7 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
     public static final String HTML_BODY = "<body>\n" +
             "\n" +
             "<div class=\"container\">\n" +
-            "    <div id=\"code_area\" class=\"container_0 grid_0 grid_1\">\n";
+            "    <div id=\"code_area\" class=\"container_0\">\n";
     public static final String HTML_END = "</div>\n" +
             "    </div>\n" +
             "</body>\n" +
@@ -140,12 +140,10 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
                             staticHTMLPage.append(strLine);
                             staticHTMLPage.append("&nbsp;");
 
-                            for(int i = 0; i < fileToPathElements.getValue().size(); i++) {
-                                SourceToSinkPath.PathElement pathElement = fileToPathElements.getValue().get(i);
-
+                            for(SourceToSinkPath.PathElement pathElement : fileToPathElements.getValue()) {
                                 if(pathElement.getJavaLineNumber() == lineNumber) {
                                     staticHTMLPage.append(" &#8594; ");
-                                    staticHTMLPage.append(i);
+                                    staticHTMLPage.append(path.indexOf(pathElement));
                                 }
                             }
 

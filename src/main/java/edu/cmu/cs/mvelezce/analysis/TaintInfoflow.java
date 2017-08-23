@@ -133,6 +133,8 @@ public class TaintInfoflow extends Infoflow {
         for(Map.Entry<Integer, Integer> interactionCountToEntryCount : interactionCountsToEntryCount.entrySet()) {
             System.out.println("Interaction order= " + interactionCountToEntryCount.getKey() + " entries= " + interactionCountToEntryCount.getValue());
         }
+
+        System.out.println("");
     }
 
     private void calculateOptionToSinkCount(List<ControlFlowResult> aggregatedResults) {
@@ -153,6 +155,8 @@ public class TaintInfoflow extends Infoflow {
         for(Map.Entry<String, Integer> optionToSinkCount : optionsToSinkCount.entrySet()) {
             System.out.println(optionToSinkCount.getKey() + " -> " + optionToSinkCount.getValue());
         }
+
+        System.out.println("");
     }
 
     public void computeInfoflowOneSourceAtATime(String libPath, String appPath, String entryPoint) throws IOException {

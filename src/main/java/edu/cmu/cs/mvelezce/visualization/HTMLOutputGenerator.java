@@ -28,7 +28,7 @@ public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
     public static final String HTML_BODY = "<body>\n" +
             "\n" +
             "<div class=\"container\">\n" +
-            "    <div id=\"code_area\" class=\"container_0 grid_0 grid_1\">\n";
+            "    <div id=\"code_area\" class=\"container_0\">\n";
     public static final String HTML_END = "</div>\n" +
             "</div>\n" +
             "</body>\n" +
