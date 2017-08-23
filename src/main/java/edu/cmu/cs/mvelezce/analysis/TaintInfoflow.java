@@ -108,13 +108,15 @@ public class TaintInfoflow extends Infoflow {
 
         ObjectMapper mapper = new ObjectMapper();
         File outputFile = new File(TaintInfoflow.OUTPUT_DIR + this.systemName + ".json");
+        mapper.writeValue(outputFile, aggregatedResults);
 
-        try {
-            mapper.writeValue(outputFile, aggregatedResults);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        System.out.println("\n############## STATS");
+        System.out.println("Number of results: " + aggregatedResults.size());
+        this.calculateOptionToSinkCount(aggregatedResults);
+        this.calculateInteractionOrder(aggregatedResults);
+    }
 
+    private void calculateInteractionOrder(List<ControlFlowResult> aggregatedResults) {
         Map<Integer, Integer> interactionCountsToEntryCount = new TreeMap<>();
 
         for(ControlFlowResult controlFlowResult : aggregatedResults) {
@@ -131,8 +133,26 @@ public class TaintInfoflow extends Infoflow {
         for(Map.Entry<Integer, Integer> interactionCountToEntryCount : interactionCountsToEntryCount.entrySet()) {
             System.out.println("Interaction order= " + interactionCountToEntryCount.getKey() + " entries= " + interactionCountToEntryCount.getValue());
         }
+    }
 
-        System.out.println("Number of results: " + aggregatedResults.size());
+    private void calculateOptionToSinkCount(List<ControlFlowResult> aggregatedResults) {
+        Map<String, Integer> optionsToSinkCount = new HashMap<>();
+
+        for(String option : this.sourcesToOptions.values()) {
+            int count = 0;
+
+            for(ControlFlowResult controlFlowResult : aggregatedResults) {
+                if(controlFlowResult.getOptions().contains(option)) {
+                    count++;
+                }
+            }
+
+            optionsToSinkCount.put(option, count);
+        }
+
+        for(Map.Entry<String, Integer> optionToSinkCount : optionsToSinkCount.entrySet()) {
+            System.out.println(optionToSinkCount.getKey() + " -> " + optionToSinkCount.getValue());
+        }
     }
 
     public void computeInfoflowOneSourceAtATime(String libPath, String appPath, String entryPoint) throws IOException {
