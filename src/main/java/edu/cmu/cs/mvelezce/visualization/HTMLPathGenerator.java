@@ -25,12 +25,9 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
     public static final String HTML_BODY = "<body>\n" +
             "\n" +
             "<div class=\"container\">\n" +
-            "    <div class=\"container_1 grid_0 grid_1\">\n" +
-            "        <div id=\"code_area\" class=\"container_0 grid_0 grid_1\">\n";
+            "    <div id=\"code_area\" class=\"container_0 grid_0 grid_1\">\n";
     public static final String HTML_END = "</div>\n" +
-            "\n" +
             "    </div>\n" +
-            "</div>\n" +
             "</body>\n" +
             "</html>";
 

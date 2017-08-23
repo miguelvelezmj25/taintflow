@@ -51,7 +51,7 @@ public class FileWriterTest {
 
     @Test
     public void deleteAnnotatedRunningExample() throws IOException {
-        String directory = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/running-example/src/main/java";
+        String directory = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-counter/src";
         FileWriter.deleteAnnotatedFiles(directory);
     }
 

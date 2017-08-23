@@ -16,4 +16,13 @@ public class HTMLOutputGeneratorTest {
         generator.generateHTMLPage();
     }
 
+    @Test
+    public void generateHTMLColorCounter() throws IOException {
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-counter/src";
+        String systemName = "pngtasticColorCounter";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+    }
+
 }

@@ -22,6 +22,12 @@ public abstract class HTMLBaseGenerator<V> implements HTMLGenerator<V> {
         this.generateStaticHTMLPage(results);
     }
 
+    public static String replaceSpecialChars(String line) {
+        line = line.replace("<", "&#60;");
+        line = line.replace("<", "&#62;");
+
+        return line;
+    }
 
     public String getHtmlTitle() {
         return htmlTitle;

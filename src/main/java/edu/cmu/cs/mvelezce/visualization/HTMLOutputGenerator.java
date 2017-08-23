@@ -28,16 +28,11 @@ public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
     public static final String HTML_BODY = "<body>\n" +
             "\n" +
             "<div class=\"container\">\n" +
-            "    <div class=\"container_1 grid_0 grid_1\">\n" +
-            "        <div id=\"code_area\" class=\"container_0 grid_0 grid_1\">\n";
+            "    <div id=\"code_area\" class=\"container_0 grid_0 grid_1\">\n";
     public static final String HTML_END = "</div>\n" +
-            "\n" +
-            "    </div>\n" +
             "</div>\n" +
             "</body>\n" +
             "</html>";
-
-
 
     public HTMLOutputGenerator(String root, String systemName) {
         super(root, systemName);
@@ -87,7 +82,7 @@ public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
 
             while ((strLine = br.readLine()) != null) {
                 if(linesToConstraints.containsKey(lineNumber)) {
-                    staticHTMLPage.append("<div style=\"background-color:lawngreen;\">");
+                    staticHTMLPage.append("<div style=\"background-color:limegreen;\">");
                 }
                 else {
                     staticHTMLPage.append("<div>");
@@ -99,6 +94,8 @@ public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
                 for(int i = 0; !strLine.isEmpty() && strLine.charAt(i) == ' '; i++) {
                     staticHTMLPage.append("&nbsp;");
                 }
+
+                strLine = HTMLBaseGenerator.replaceSpecialChars(strLine);
 
                 if(linesToConstraints.containsKey(lineNumber)) {
                     staticHTMLPage.append("<b>");
