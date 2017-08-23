@@ -22,7 +22,7 @@ public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
             "    <title>";
 
     public static String HTML_HEAD_END = "</title>\n" +
-            "    <link rel=\"stylesheet\" type=\"text/css\" href=\"../../../css/style.css\">\n" +
+            "    <link rel=\"stylesheet\" type=\"text/css\" href=\"../../css/style.css\">\n" +
             "    <link href=\"https://fonts.googleapis.com/css?family=Roboto+Mono:400,700\" rel=\"stylesheet\">\n" +
             "</head>\n";
     public static final String HTML_BODY = "<body>\n" +
@@ -116,7 +116,7 @@ public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
             in.close();
 
             File outputFile = new File(HTMLOutputGenerator.ROOT_DIR + this.getSystemName() + "/"
-                    + HTMLOutputGenerator.OUTPUT_DIR + "/" + this.getSystemName() + "/" + file.getName() + ".html");
+                    + HTMLOutputGenerator.OUTPUT_DIR + "/" + file.getName() + ".html");
             outputFile.getParentFile().mkdirs();
             PrintWriter out = new PrintWriter(outputFile);
             out.print(HTMLOutputGenerator.HTML_HEAD_BEGIN + this.getHtmlTitle() + HTMLOutputGenerator.HTML_HEAD_END

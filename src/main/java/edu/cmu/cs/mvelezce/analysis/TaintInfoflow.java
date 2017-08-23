@@ -81,7 +81,8 @@ public class TaintInfoflow extends Infoflow {
         List<ControlFlowResult> aggregatedResults = new ArrayList<>();
 
         for(File file : files) {
-            if(file.getName().contains(this.systemName + "/" + this.systemName + ".json")) {
+            String name = file.getName();
+            if(file.getName().contains(this.systemName + ".json")) {
                 continue;
             }
 

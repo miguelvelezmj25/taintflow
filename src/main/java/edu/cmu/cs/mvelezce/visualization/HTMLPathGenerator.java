@@ -101,7 +101,7 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
                         continue;
                     }
 
-                    this.setHtmlTitle(this.option + "_" + file.getName());
+                    this.setHtmlTitle(this.option + "_" + r + "_" + file.getName());
 
                     StringBuilder staticHTMLPage = new StringBuilder();
 
@@ -143,7 +143,39 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
                             for(SourceToSinkPath.PathElement pathElement : fileToPathElements.getValue()) {
                                 if(pathElement.getJavaLineNumber() == lineNumber) {
                                     staticHTMLPage.append(" &#8594; ");
-                                    staticHTMLPage.append(path.indexOf(pathElement));
+                                    int currentIndex = path.indexOf(pathElement);
+                                    staticHTMLPage.append(currentIndex);
+
+                                    if(currentIndex == (path.size() - 1)) {
+                                        break;
+                                    }
+
+                                    currentIndex += 1;
+                                    SourceToSinkPath.PathElement nextPathElement = path.get(currentIndex);
+                                    Iterator<List<SourceToSinkPath.PathElement>> pathsIter = filesToPathElements.values().iterator();
+
+                                    while(pathsIter.hasNext()) {
+                                        List<SourceToSinkPath.PathElement> elements = pathsIter.next();
+
+                                        if(elements.contains(nextPathElement)) {
+                                            break;
+                                        }
+
+                                        if(!pathsIter.hasNext()) {
+                                            staticHTMLPage.append(" &#8594; ");
+                                            staticHTMLPage.append("<i>(");
+                                            staticHTMLPage.append(currentIndex);
+                                            staticHTMLPage.append(")</i>");
+
+                                            if(currentIndex == (path.size() - 1)) {
+                                                break;
+                                            }
+
+                                            currentIndex += 1;
+                                            nextPathElement = path.get(currentIndex);
+                                            pathsIter = filesToPathElements.values().iterator();
+                                        }
+                                    }
                                 }
                             }
 
@@ -172,6 +204,14 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
                     System.out.println("Generated " + file.getName() + "_" + r);
                 }
             }
+
+            File outputFile = new File(HTMLPathGenerator.ROOT_DIR + this.getSystemName() + "/"
+                    + HTMLPathGenerator.PATH_DIR + "/" + this.option + "_" + r + "/" + path.size() + ".path");
+            outputFile.getParentFile().mkdirs();
+            PrintWriter out = new PrintWriter(outputFile);
+            out.flush();
+            out.close();
+
         }
     }
 
