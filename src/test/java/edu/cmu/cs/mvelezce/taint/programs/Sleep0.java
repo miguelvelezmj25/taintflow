@@ -12,6 +12,7 @@ public class Sleep0 {
     public static boolean B;
 
     public static void main(String[] args) throws InterruptedException {
+        Sink.init();
         A = Source.getOptionA(Boolean.valueOf(args[0]));
         B = Source.getOptionB(Boolean.valueOf(args[0]));
 

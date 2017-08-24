@@ -6,7 +6,7 @@ import edu.cmu.cs.mvelezce.analysis.option.Source;
 /*
     Exceptions
  */
-public class Interaction1 {
+public class Interaction2 {
 
     public static void main(String[] args) {
         Sink.init();
@@ -25,24 +25,17 @@ public class Interaction1 {
             b = true;
         }
 
-        boolean x = false;
-
-        if(x) {
-            System.out.println("");
-        }
-
-        if(a) {
-            throw new RuntimeException();
-        }
-
-        if(x) {
-            System.out.println("");
+        try {
+            if(a) {
+                System.out.println("");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
         if(b) {
             System.out.println("");
         }
-
     }
 
 }

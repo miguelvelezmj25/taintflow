@@ -12,6 +12,8 @@ public class Problem2 {
     public static boolean B;
 
     public static void main(String[] args) {
+        Sink.init();
+
         A = Source.getOptionA(true);
         B = Source.getOptionB(true);
 

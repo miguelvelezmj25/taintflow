@@ -1,4 +1,4 @@
-package soot.jimple.infoflow;
+package edu.cmu.cs.mvelezce.soot.jimple.jtp;
 
 import soot.*;
 import soot.jimple.*;

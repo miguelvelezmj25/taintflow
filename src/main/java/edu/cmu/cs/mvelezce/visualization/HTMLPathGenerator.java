@@ -50,6 +50,13 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
             }
         }
 
+        File destDir = new File(HTMLPathGenerator.ROOT_DIR + systemName + "/"
+                + HTMLPathGenerator.PATH_DIR + "/");
+
+        if(destDir.exists()) {
+            FileUtils.forceDelete(destDir);
+        }
+
         for(File file : filesToAnalyze) {
            String option = file.getName().replace(".json", "");
            option = option.replace(systemName, "");
@@ -64,13 +71,6 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
     public void generateStaticHTMLPage(List<SourceToSinkPath> results) throws IOException {
         String[] extensions = {"java"};
         Collection<File> files = FileUtils.listFiles(new File(this.getRoot()), extensions, true);
-
-        File destDir = new File(HTMLPathGenerator.ROOT_DIR + this.getSystemName() + "/"
-                + HTMLPathGenerator.PATH_DIR + "/");
-
-        if(destDir.exists()) {
-            FileUtils.forceDelete(destDir);
-        }
 
         for(int r = 0; r < results.size(); r++) {
             List<SourceToSinkPath.PathElement> path = results.get(r).getPath();

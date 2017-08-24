@@ -40,4 +40,12 @@ public class HTMLPathGeneratorTest {
 
         HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
+
+    @Test
+    public void generateHTMLInteraction2() throws IOException {
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+        String systemName = "interaction2";
+
+        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+    }
 }
