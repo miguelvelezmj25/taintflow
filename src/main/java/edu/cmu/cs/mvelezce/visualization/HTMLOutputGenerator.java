@@ -41,8 +41,12 @@ public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
     @Override
     public void generateStaticHTMLPage(List<ControlFlowResult> results) throws IOException {
         String[] extensions = {"java"};
-
         Collection<File> files = FileUtils.listFiles(new File(this.getRoot()), extensions, true);
+
+        File destDir = new File (HTMLOutputGenerator.ROOT_DIR + this.getSystemName() + "/"
+                + HTMLOutputGenerator.OUTPUT_DIR + "/");
+
+        FileUtils.forceDelete(destDir);
 
         for(File file : files) {
             Map<Integer, String> linesToConstraints = new HashMap<>();
@@ -51,6 +55,11 @@ public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
                 String resultPackage = result.getPackageName();
                 String resultClassName = result.getClassName();
 
+                if(resultClassName.contains("$")) {
+                    int index = resultClassName.indexOf("$");
+                    resultClassName = resultClassName.substring(0, index);
+                }
+                
                 String resultFilePath = resultPackage.replace(".", "/") + "/" + resultClassName + ".java";
 
                 if(file.getPath().contains(resultFilePath)) {
@@ -115,8 +124,7 @@ public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
 
             in.close();
 
-            File outputFile = new File(HTMLOutputGenerator.ROOT_DIR + this.getSystemName() + "/"
-                    + HTMLOutputGenerator.OUTPUT_DIR + "/" + file.getName() + ".html");
+            File outputFile = new File(destDir, file.getName() + ".html");
             outputFile.getParentFile().mkdirs();
             PrintWriter out = new PrintWriter(outputFile);
             out.print(HTMLOutputGenerator.HTML_HEAD_BEGIN + this.getHtmlTitle() + HTMLOutputGenerator.HTML_HEAD_END

@@ -63,8 +63,11 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
     @Override
     public void generateStaticHTMLPage(List<SourceToSinkPath> results) throws IOException {
         String[] extensions = {"java"};
-
         Collection<File> files = FileUtils.listFiles(new File(this.getRoot()), extensions, true);
+
+        File destDir = new File(HTMLPathGenerator.ROOT_DIR + this.getSystemName() + "/"
+                + HTMLPathGenerator.PATH_DIR + "/");
+        FileUtils.forceDelete(destDir);
 
         for(int r = 0; r < results.size(); r++) {
             List<SourceToSinkPath.PathElement> path = results.get(r).getPath();
@@ -72,6 +75,12 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
 
             for(SourceToSinkPath.PathElement pathElement : path) {
                 String resultClassName = pathElement.getClassName();
+
+                if(resultClassName.contains("$")) {
+                    int index = resultClassName.indexOf("$");
+                    resultClassName = resultClassName.substring(0, index);
+                }
+
                 String resultFilePath = resultClassName.replace(".", "/") + ".java";
 
                 for(File file : files) {
@@ -212,7 +221,6 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
             out.print(path.size());
             out.flush();
             out.close();
-
         }
     }
 
