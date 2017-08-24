@@ -71,6 +71,24 @@ public class HTMLOutputGeneratorTest {
     }
 
     @Test
+    public void generateHTMLInteraction5() throws IOException {
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+        String systemName = "interaction5";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+    }
+
+    @Test
+    public void generateHTMLInteraction6() throws IOException {
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+        String systemName = "interaction6";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+    }
+
+    @Test
     public void generateHTMLSleep0() throws IOException {
         String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
         String systemName = "sleep0";
