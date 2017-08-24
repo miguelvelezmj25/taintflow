@@ -28,7 +28,7 @@ public class ControlFlowSink extends BodyTransformer {
 
         Chain<Unit> units = b.getUnits();
         Chain<Local> locals = b.getLocals();
-        Map<Value, Unit> valuesToUnits = new HashMap<>();
+        Map<Unit, Value> unitsToValues = new HashMap<>();
 
         for(Unit unit : units) {
             if(unit instanceof IfStmt) {
@@ -41,11 +41,11 @@ public class ControlFlowSink extends BodyTransformer {
                     Value op2 = condExpr.getOp2();
 
                     if(locals.contains(op1)) {
-                        valuesToUnits.put(op1, unit);
+                        unitsToValues.put(unit, op1);
                     }
 
                     if(locals.contains(op2)) {
-                        valuesToUnits.put(op2, unit);
+                        unitsToValues.put(unit, op2);
                     }
                 }
                 else {
@@ -55,22 +55,22 @@ public class ControlFlowSink extends BodyTransformer {
             else if(unit instanceof SwitchStmt) {
                 SwitchStmt switchStmt = (SwitchStmt) unit;
                 Value cond = switchStmt.getKey();
-                valuesToUnits.put(cond, unit);
+                unitsToValues.put(unit, cond);
             }
         }
 
-        if(valuesToUnits.isEmpty()) {
+        if(unitsToValues.isEmpty()) {
             return;
         }
 
-        for(Map.Entry<Value, Unit> valueToUnit : valuesToUnits.entrySet()) {
-            StaticInvokeExpr invExpr = Jimple.v().newStaticInvokeExpr(sootMethod.makeRef(), valueToUnit.getKey());
+        for(Map.Entry<Unit, Value> unitToValue : unitsToValues.entrySet()) {
+            StaticInvokeExpr invExpr = Jimple.v().newStaticInvokeExpr(sootMethod.makeRef(), unitToValue.getValue());
             Stmt stmt = Jimple.v().newInvokeStmt(invExpr);
 
             Tag lineNumberTag = null;
             Tag bytecodeOffsetTag = null;
 
-            for(Tag tag : valueToUnit.getValue().getTags()) {
+            for(Tag tag : unitToValue.getKey().getTags()) {
                 if(tag instanceof LineNumberTag) {
                     int javaLine = ((LineNumberTag) tag).getLineNumber();
                     lineNumberTag = new LineNumberTag(javaLine);
@@ -93,7 +93,7 @@ public class ControlFlowSink extends BodyTransformer {
             stmt.addTag(lineNumberTag);
             stmt.addTag(bytecodeOffsetTag);
 
-            units.insertBefore(stmt, valueToUnit.getValue());
+            units.insertBefore(stmt, unitToValue.getKey());
         }
 
     }
