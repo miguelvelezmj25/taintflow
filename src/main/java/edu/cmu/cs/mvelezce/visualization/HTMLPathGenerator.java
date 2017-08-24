@@ -67,7 +67,10 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
 
         File destDir = new File(HTMLPathGenerator.ROOT_DIR + this.getSystemName() + "/"
                 + HTMLPathGenerator.PATH_DIR + "/");
-        FileUtils.forceDelete(destDir);
+
+        if(destDir.exists()) {
+            FileUtils.forceDelete(destDir);
+        }
 
         for(int r = 0; r < results.size(); r++) {
             List<SourceToSinkPath.PathElement> path = results.get(r).getPath();

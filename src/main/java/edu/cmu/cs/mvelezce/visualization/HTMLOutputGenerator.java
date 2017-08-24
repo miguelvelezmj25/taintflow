@@ -46,7 +46,9 @@ public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
         File destDir = new File (HTMLOutputGenerator.ROOT_DIR + this.getSystemName() + "/"
                 + HTMLOutputGenerator.OUTPUT_DIR + "/");
 
-        FileUtils.forceDelete(destDir);
+        if(destDir.exists()) {
+            FileUtils.forceDelete(destDir);
+        }
 
         for(File file : files) {
             Map<Integer, String> linesToConstraints = new HashMap<>();
