@@ -3,14 +3,17 @@ package edu.cmu.cs.mvelezce.taint.programs;
 import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.Source;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /*
     Equals and hashcode
  */
-public class Interaction7 {
+public class Interaction8 {
 
     private boolean b;
 
-    public Interaction7(boolean b) {
+    public Interaction8(boolean b) {
         this.b = b;
     }
 
@@ -23,7 +26,7 @@ public class Interaction7 {
             return false;
         }
 
-        Interaction7 that = (Interaction7) o;
+        Interaction8 that = (Interaction8) o;
 
         if(this.b == that.b) {
             return true;
@@ -45,24 +48,24 @@ public class Interaction7 {
         Sink.init();
 
         boolean A = Source.getOptionA(true);
-        boolean B = Source.getOptionB(true);
 
         boolean a = false;
-        boolean b = false;
 
         if(A) {
             a = true;
         }
 
-        if(B) {
-            b = true;
+        Interaction8 i = new Interaction8(a);
+
+        List<Interaction8> interactions = new ArrayList<>();
+
+        if(!interactions.contains(i)) {
+            interactions.add(i);
         }
 
-        Interaction7 i = new Interaction7(a);
-        Interaction7 j = new Interaction7(b);
-
-        i.hashCode();
-        i.equals(j);
+        if(!interactions.contains(i)) {
+            interactions.add(i);
+        }
     }
 
 }
