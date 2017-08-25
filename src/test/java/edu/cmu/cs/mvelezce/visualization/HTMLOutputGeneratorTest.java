@@ -35,6 +35,15 @@ public class HTMLOutputGeneratorTest {
     }
 
     @Test
+    public void generateHTMLCommonsCompress() throws IOException {
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/commons-compress/src/main/java";
+        String systemName = "commonsCompress";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+    }
+
+    @Test
     public void generateHTMLInteraction0() throws IOException {
         String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
         String systemName = "interaction0";
