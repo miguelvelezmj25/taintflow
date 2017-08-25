@@ -26,9 +26,9 @@ public class Interaction4 {
         }
 
         try {
-//            if(a) {
-//                System.out.println("");
-//            }
+            if(a) {
+                System.out.println("");
+            }
 
             throw new RuntimeException();
         } catch (Exception e) {

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>COMPRESSIONLEVEL_6_PngtasticCompressionHandler.java</title>
+    <link rel="stylesheet" type="text/css" href="../../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;package com.googlecode.pngtastic.core.processing;</div>
+<div>2&emsp;&emsp;</div>
+<div>3&emsp;&emsp;import com.googlecode.pngtastic.core.Logger;</div>
+<div>4&emsp;&emsp;import edu.cmu.cs.mvelezce.analysis.option.Sink;</div>
+<div>5&emsp;&emsp;</div>
+<div>6&emsp;&emsp;import java.io.ByteArrayOutputStream;</div>
+<div>7&emsp;&emsp;import java.io.IOException;</div>
+<div>8&emsp;&emsp;import java.util.*;</div>
+<div>9&emsp;&emsp;import java.util.concurrent.Callable;</div>
+<div>10&emsp;&emsp;import java.util.concurrent.ConcurrentLinkedQueue;</div>
+<div>11&emsp;&emsp;import java.util.concurrent.ExecutorService;</div>
+<div>12&emsp;&emsp;import java.util.concurrent.Executors;</div>
+<div>13&emsp;&emsp;import java.util.zip.Deflater;</div>
+<div>14&emsp;&emsp;import java.util.zip.DeflaterOutputStream;</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/**</div>
+<div>17&emsp;&emsp;&nbsp; * Implements PNG compression and decompression</div>
+<div>18&emsp;&emsp;&nbsp; *</div>
+<div>19&emsp;&emsp;&nbsp; * @author rayvanderborght</div>
+<div>20&emsp;&emsp;&nbsp; */</div>
+<div>21&emsp;&emsp;public class PngtasticCompressionHandler implements PngCompressionHandler {</div>
+<div>22&emsp;&emsp;</div>
+<div>23&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final List<Integer> compressionStrategies = Arrays.asList(</div>
+<div>24&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Deflater.DEFAULT_STRATEGY,</div>
+<div>25&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Deflater.FILTERED,</div>
+<div>26&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Deflater.HUFFMAN_ONLY);</div>
+<div>27&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final Logger log;</div>
+<div>28&emsp;&emsp;</div>
+<div>29&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** */</div>
+<div>30&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public PngtasticCompressionHandler(Logger log) {</div>
+<div>31&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.log = log;</div>
+<div>32&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>33&emsp;&emsp;</div>
+<div>34&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>35&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * {@inheritDoc}</div>
+<div>36&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>37&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>38&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public byte[] deflate(PngByteArrayOutputStream inflatedImageData, Integer compressionLevel, boolean concurrent) throws IOException {</div>
+<div>39&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final List<byte[]> results = (concurrent)</div>
+<div>40&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                ? deflateImageDataConcurrently(inflatedImageData, compressionLevel)</div>
+<div style="background-color:orange;">41&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                : deflateImageDataSerially(inflatedImageData, compressionLevel, Deflater.DEFAULT_STRATEGY);&nbsp; &#8594; 9</b></div>
+<div>42&emsp;&emsp;</div>
+<div>43&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        byte[] result = null;</div>
+<div>44&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for(int i = 0; i < results.size(); i++) {</div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            final byte[] data = results.get(i);</div>
+<div>46&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(result == null || (data.length < result.length)) {</div>
+<div>47&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                result = data;</div>
+<div>48&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        log.debug("Image bytes=%d", (result == null) ? -1 : result.length);</div>
+<div>51&emsp;&emsp;</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return result;</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>54&emsp;&emsp;</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String encodeBytes(byte[] bytes) {</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Base64.encodeBytes(bytes);</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>59&emsp;&emsp;</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Do the work of deflating (compressing) the image data with the</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * different compression strategies in separate threads to take</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * advantage of multiple core architectures.</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private List<byte[]> deflateImageDataConcurrently(final PngByteArrayOutputStream inflatedImageData, final Integer compressionLevel) {</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final Collection<byte[]> results = new ConcurrentLinkedQueue<>();</div>
+<div>67&emsp;&emsp;</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final Collection<Callable<Object>> tasks = new ArrayList<>();</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for(final int strategy : compressionStrategies) {</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            tasks.add(Executors.callable(new Runnable() {</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                @Override</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                public void run() {</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    try {</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        results.add(PngtasticCompressionHandler.this.deflateImageData(inflatedImageData, strategy, compressionLevel));</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    } catch (Throwable e) {</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        PngtasticCompressionHandler.this.log.error("Uncaught Exception: %s", e.getMessage());</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    }</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }));</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>81&emsp;&emsp;</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final ExecutorService compressionThreadPool = Executors.newFixedThreadPool(compressionStrategies.size());</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            compressionThreadPool.invokeAll(tasks);</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (InterruptedException ex) {</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } finally {</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            compressionThreadPool.shutdown();</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>89&emsp;&emsp;</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return new ArrayList<>(results);</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>92&emsp;&emsp;</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* */</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private List<byte[]> deflateImageDataSerially(PngByteArrayOutputStream inflatedImageData, Integer compressionLevel, Integer compressionStrategy) {</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final List<byte[]> results = new ArrayList<>();</div>
+<div>96&emsp;&emsp;</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final List<Integer> strategies = (compressionStrategy == null) ? compressionStrategies</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                : Collections.singletonList(compressionStrategy);</div>
+<div>99&emsp;&emsp;</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for(final int strategy : strategies) {</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            try {</div>
+<div style="background-color:orange;">102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                results.add(PngtasticCompressionHandler.this.deflateImageData(inflatedImageData, strategy, compressionLevel));&nbsp; &#8594; 10</b></div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } catch (Throwable e) {</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                PngtasticCompressionHandler.this.log.error("Uncaught Exception: %s", e.getMessage());</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>107&emsp;&emsp;</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return results;</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>110&emsp;&emsp;</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* */</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private byte[] deflateImageData(PngByteArrayOutputStream inflatedImageData, int strategy, Integer compressionLevel) throws IOException {</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        byte[] result = null;</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int bestCompression = Deflater.BEST_COMPRESSION;</div>
+<div>115&emsp;&emsp;</div>
+<div style="background-color:orange;">116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(compressionLevel == null || compressionLevel > Deflater.BEST_COMPRESSION || compressionLevel < Deflater.NO_COMPRESSION) {&nbsp; &#8594; 11 &#8594; 12</b></div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            for(int compression = Deflater.BEST_COMPRESSION; compression > Deflater.NO_COMPRESSION; compression--) {</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                final ByteArrayOutputStream deflatedOut = deflate(inflatedImageData, strategy, compression);</div>
+<div>119&emsp;&emsp;</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if(result == null || (result.length > deflatedOut.size())) {</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    result = deflatedOut.toByteArray();</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    bestCompression = compression;</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            result = deflate(inflatedImageData, strategy, compressionLevel).toByteArray();</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            bestCompression = compressionLevel;</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        log.debug("Compression strategy: %s, compression level=%d, bytes=%d", strategy, bestCompression, (result == null) ? -1 : result.length);</div>
+<div>131&emsp;&emsp;</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return result;</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>134&emsp;&emsp;</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* */</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private ByteArrayOutputStream deflate(PngByteArrayOutputStream inflatedImageData, int strategy, int compression) throws IOException {</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final ByteArrayOutputStream deflatedOut = new ByteArrayOutputStream();</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final Deflater deflater = new Deflater(compression);</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        deflater.setStrategy(strategy);</div>
+<div>140&emsp;&emsp;</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            final DeflaterOutputStream stream = new DeflaterOutputStream(deflatedOut, deflater);</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            stream.write(inflatedImageData.get(), 0, inflatedImageData.len());</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            stream.close();</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } finally {</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            deflater.end();</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>148&emsp;&emsp;</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return deflatedOut;</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>151&emsp;&emsp;}</div>
+</div>
+    </div>
+</body>
+</html>

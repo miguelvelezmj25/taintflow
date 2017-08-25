@@ -26,6 +26,15 @@ public class HTMLOutputGeneratorTest {
     }
 
     @Test
+    public void generateHTMLOptimizer() throws IOException {
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-optimizer/src";
+        String systemName = "pngtasticOptimizer";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+    }
+
+    @Test
     public void generateHTMLInteraction0() throws IOException {
         String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
         String systemName = "interaction0";
@@ -83,6 +92,15 @@ public class HTMLOutputGeneratorTest {
     public void generateHTMLInteraction6() throws IOException {
         String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
         String systemName = "interaction6";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+    }
+
+    @Test
+    public void generateHTMLInteraction7() throws IOException {
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+        String systemName = "interaction7";
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();

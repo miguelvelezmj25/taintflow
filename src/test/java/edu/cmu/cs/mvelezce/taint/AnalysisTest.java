@@ -79,7 +79,7 @@ public class AnalysisTest {
 
         AnalysisTest.infoflowConfiguration.setStopAfterFirstFlow(false);
         AnalysisTest.infoflowConfiguration.setEnableStaticFieldTracking(true);
-        AnalysisTest.infoflowConfiguration.setEnableExceptionTracking(false);
+        AnalysisTest.infoflowConfiguration.setEnableExceptionTracking(true);
         AnalysisTest.infoflowConfiguration.setMaxThreadNum(8);
         AnalysisTest.infoflowConfiguration.setOneSourceAtATime(true);
 
@@ -355,6 +355,36 @@ public class AnalysisTest {
 
         // Add entry points
         String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction6: void main(java.lang.String[])>";
+
+        List<String> entryPoints = new ArrayList<>();
+        entryPoints.add(entryPoint);
+
+        // Run
+        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint);
+//        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+//        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
+
+        infoflow.aggregateInfoflowResults();
+        infoflow.saveJimpleFiles();
+    }
+
+    @Test
+    public void interaction7() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        TaintInfoflow infoflow = new TaintInfoflow("interaction7");
+
+        // Configure analysis
+        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
+        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
+
+        // Add taint wrapper
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        // Add entry points
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction7: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -1166,21 +1196,27 @@ public class AnalysisTest {
         AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
 
         TaintInfoflow infoflow = new TaintInfoflow("pngtasticOptimizer");
+
+        // Configure analysis
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
-
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
 
+        // Add taint wrapper
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);
 
+        // Add entry points
         String entryPoint = "<com.googlecode.pngtastic.Run: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
 
-        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+        // Run
+        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint);
+//        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
         infoflow.aggregateInfoflowResults();

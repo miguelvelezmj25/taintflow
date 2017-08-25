@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Squeeze.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;Copyright 2014 Google Inc. All Rights Reserved.</div>
+<div>3&emsp;&emsp;</div>
+<div>4&emsp;&emsp;Licensed under the Apache License, Version 2.0 (the "License");</div>
+<div>5&emsp;&emsp;you may not use this file except in compliance with the License.</div>
+<div>6&emsp;&emsp;You may obtain a copy of the License at</div>
+<div>7&emsp;&emsp;</div>
+<div>8&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    http://www.apache.org/licenses/LICENSE-2.0</div>
+<div>9&emsp;&emsp;</div>
+<div>10&emsp;&emsp;Unless required by applicable law or agreed to in writing, software</div>
+<div>11&emsp;&emsp;distributed under the License is distributed on an "AS IS" BASIS,</div>
+<div>12&emsp;&emsp;WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</div>
+<div>13&emsp;&emsp;See the License for the specific language governing permissions and</div>
+<div>14&emsp;&emsp;limitations under the License.</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;Author: eustas.ru@gmail.com (Eugene Klyuchnikov)</div>
+<div>17&emsp;&emsp;*/</div>
+<div>18&emsp;&emsp;</div>
+<div>19&emsp;&emsp;package com.googlecode.pngtastic.core.processing.zopfli;</div>
+<div>20&emsp;&emsp;</div>
+<div>21&emsp;&emsp;import edu.cmu.cs.mvelezce.analysis.option.Sink;</div>
+<div>22&emsp;&emsp;</div>
+<div>23&emsp;&emsp;final class Squeeze {</div>
+<div>24&emsp;&emsp;</div>
+<div>25&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static LzStore optimal(Cookie cookie, int numIterations, LongestMatchCache lmc, byte[] input, int from, int to) {</div>
+<div>26&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LzStore currentStore = cookie.store1;</div>
+<div>27&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        currentStore.reset();</div>
+<div>28&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LzStore store = cookie.store2;</div>
+<div>29&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Deflate.greedy(cookie, lmc, input, from, to, currentStore);</div>
+<div>30&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        SymbolStats stats = cookie.stats;</div>
+<div>31&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        SymbolStats bestStats = cookie.bestStats;</div>
+<div>32&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        SymbolStats lastStats = cookie.lastStats;</div>
+<div>33&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        stats.getFreqs(currentStore);</div>
+<div>34&emsp;&emsp;</div>
+<div>35&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        char[] lengthArray = cookie.lengthArray;</div>
+<div>36&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long[] costs = cookie.costs;</div>
+<div>37&emsp;&emsp;</div>
+<div>38&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int cost;</div>
+<div>39&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int bestCost = Integer.MAX_VALUE;</div>
+<div>40&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int lastCost = 0;</div>
+<div>41&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int lastRandomStep = -1;</div>
+<div>42&emsp;&emsp;</div>
+<div style="background-color:limegreen;">43&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for(int i = 0; i &#60; numIterations; i++) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>44&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            currentStore.reset();</div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            bestLengths(cookie, lmc, from, input, from, to, stats.minCost(), stats, lengthArray, costs);</div>
+<div>46&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            optimalRun(cookie, lmc, input, from, to, lengthArray, currentStore);</div>
+<div>47&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            cost = Deflate.calculateBlockSize(cookie, currentStore.litLens, currentStore.dists, 0, currentStore.size);</div>
+<div style="background-color:limegreen;">48&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(cost &#60; bestCost) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                store.copy(currentStore);</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                bestStats.copy(stats);</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                bestCost = cost;</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            lastStats.copy(stats);</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            stats.getFreqs(currentStore);</div>
+<div style="background-color:limegreen;">55&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(lastRandomStep != -1) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                stats.alloy(lastStats);</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                stats.calculate();</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div style="background-color:limegreen;">59&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(i > 5 && cost == lastCost) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS] & [COMPRESSOR, ITERATIONS]</b></div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                stats.copy(bestStats);</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                cookie.rnd = stats.randomizeFreqs(cookie.rnd);</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                stats.calculate();</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                lastRandomStep = i;</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            lastCost = cost;</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return store;</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>69&emsp;&emsp;</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static void optimalRun(Cookie cookie, LongestMatchCache lmc, byte[] input, int from, int to,</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                           char[] lengthArray, LzStore store) {</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // assert from != to</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        char[] path = cookie.path;</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int pathSize = 0;</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int size = to - from;</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        do {</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            char las = lengthArray[size];</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            path[pathSize++] = las;</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            size -= las;</div>
+<div style="background-color:limegreen;">80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        } while (size != 0);&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>81&emsp;&emsp;</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int windowStart = Math.max(from - 0x8000, 0);</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Hash h = cookie.h;</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        h.init(input, windowStart, from, to);</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int pos = from;</div>
+<div>86&emsp;&emsp;</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        do {</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            h.updateHash(input, pos, to);</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int length = path[--pathSize];</div>
+<div style="background-color:limegreen;">90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(length >= 3) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                Deflate.findLongestMatch(cookie, lmc, from, h, input, pos, to, length, null);</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                store.append((char) length, (char) cookie.distVal);</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            else {</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                length = 1;</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                store.append((char) (input[pos] & 0xFF), (char) 0);</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>98&emsp;&emsp;</div>
+<div style="background-color:limegreen;">99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            for(int j = 1; j &#60; length; ++j) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                h.updateHash(input, pos + j, to);</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pos += length;</div>
+<div style="background-color:limegreen;">103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        } while (pathSize != 0);&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>105&emsp;&emsp;</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static long fixedCost(int litLen, int dist) {</div>
+<div style="background-color:limegreen;">107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(dist == 0) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div style="background-color:limegreen;">108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(litLen &#60;= 143) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return 8;</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return 9;</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div style="background-color:limegreen;">114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            long cost = 12 + (dist &#60; 4097 ? Util.CACHED_DIST_EXTRA_BITS[dist] : dist &#60; 16385 ? dist &#60; 8193 ? 11 : 12 : 13)&nbsp;&#8594; [COMPRESSOR, ITERATIONS] & [COMPRESSOR, ITERATIONS] & [COMPRESSOR, ITERATIONS]</b></div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    + Util.LENGTH_EXTRA_BITS[litLen];</div>
+<div style="background-color:limegreen;">116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(Util.LENGTH_SYMBOL[litLen] > 279) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return cost + 1;</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return cost;</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>122&emsp;&emsp;</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static void bestLengths(Cookie cookie, LongestMatchCache lmc, int blockStart, byte[] input, int from, int to,</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                    long minCost, SymbolStats stats, char[] lengthArray, long[] costs) {</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        //# WINDOW_SIZE = 0x8000</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        //# WINDOW_MASK = 0x7FFF</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        //# MAX_MATCH = 258</div>
+<div>128&emsp;&emsp;</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int windowStart = Math.max(from - 0x8000, 0);</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Hash h = cookie.h;</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        h.init(input, windowStart, from, to);</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Cookie.fillCostMax(costs, to - from + 1);</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        costs[0] = 0L;</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        lengthArray[0] = 0;</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int[] same = h.same;</div>
+<div>136&emsp;&emsp;</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        char[] subLen = cookie.c259a;</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.arraycopy(Cookie.charZeroes, 0, subLen, 0, 259);</div>
+<div>139&emsp;&emsp;</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long[] slLiterals = stats.lLiterals;</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long[] slLengths = stats.lLengths;</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long[] sdSymbols = stats.dSymbols;</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long stepCost = slLengths[258] + sdSymbols[0];</div>
+<div>144&emsp;&emsp;</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int[] cachedDistSymbol = Util.CACHED_DIST_SYMBOL;</div>
+<div>146&emsp;&emsp;</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int i = from;</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int j = 0;</div>
+<div style="background-color:limegreen;">149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        while (i &#60; to) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            h.updateHash(input, i, to);</div>
+<div>151&emsp;&emsp;</div>
+<div style="background-color:limegreen;">152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(same[i & 0x7FFF] > 516 && i > from + 259 && i + 517 &#60; to && same[(i - 258) & 0x7FFF] > 258) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS] & [COMPRESSOR, ITERATIONS] & [COMPRESSOR, ITERATIONS] & [COMPRESSOR, ITERATIONS]</b></div>
+<div style="background-color:limegreen;">153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                for(int k = 0; k &#60; 258; ++k) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    costs[j + 258] = costs[j] + stepCost;</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    lengthArray[j + 258] = 258;</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    i++;</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    j++;</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    h.updateHash(input, i, to);</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>161&emsp;&emsp;</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Deflate.findLongestMatch(cookie, lmc, blockStart, h, input, i, to, 258, subLen);</div>
+<div>163&emsp;&emsp;</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            long costsJ = costs[j];</div>
+<div style="background-color:limegreen;">165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(i + 1 &#60;= to) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                long newCost = costsJ + slLiterals[input[i] & 0xFF];</div>
+<div style="background-color:limegreen;">167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if(newCost &#60; costs[j + 1]) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    costs[j + 1] = newCost;</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    lengthArray[j + 1] = 1;</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int lenValue = cookie.lenVal;</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            long baseCost = minCost + costsJ;</div>
+<div style="background-color:limegreen;">174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(lenValue > to - i) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                lenValue = to - i;</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int jpk = j + 3;</div>
+<div style="background-color:limegreen;">178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            for(char k = 3; k &#60;= lenValue; k++, jpk++) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div style="background-color:limegreen;">179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if(costs[jpk] > baseCost) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    long newCost = costsJ + (slLengths[k] + sdSymbols[cachedDistSymbol[subLen[k]]]);</div>
+<div style="background-color:limegreen;">181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                    if(costs[jpk] > newCost) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        costs[jpk] = newCost;</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        lengthArray[jpk] = k;</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    }</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>187&emsp;&emsp;</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            i++;</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            j++;</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>192&emsp;&emsp;</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static void bestFixedLengths(Cookie cookie, LongestMatchCache lmc, byte[] input, int from, int to,</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                 char[] lengthArray, long[] costs) {</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int windowStart = Math.max(from - 0x8000, 0);</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Hash h = cookie.h;</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        h.init(input, windowStart, from, to);</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Cookie.fillCostMax(costs, to - from + 1);</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        costs[0] = 0L;</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        lengthArray[0] = 0;</div>
+<div>201&emsp;&emsp;</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        char[] subLen = cookie.c259a;</div>
+<div style="background-color:limegreen;">203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for(int i = from; i &#60; to; i++) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int j = i - from;</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            h.updateHash(input, i, to);</div>
+<div>206&emsp;&emsp;</div>
+<div style="background-color:limegreen;">207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(h.same[i & 0x7FFF] > 258 * 2&nbsp;&#8594; [COMPRESSOR, ITERATIONS] & [COMPRESSOR, ITERATIONS] & [COMPRESSOR, ITERATIONS] & [COMPRESSOR, ITERATIONS]</b></div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    && i > from + 258 + 1</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    && i + 258 * 2 + 1 &#60; to</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    && h.same[(i - 258) & 0x7FFF]</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    > 258) {</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                long symbolCost = fixedCost(258, 1);</div>
+<div style="background-color:limegreen;">213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                for(int k = 0; k &#60; 258; k++) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    costs[j + 258] = costs[j] + symbolCost;</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    lengthArray[j + 258] = 258;</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    i++;</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    j++;</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    h.updateHash(input, i, to);</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>221&emsp;&emsp;</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Deflate.findLongestMatch(cookie, lmc, from, h, input, i, to, 258, subLen);</div>
+<div>223&emsp;&emsp;</div>
+<div style="background-color:limegreen;">224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(i + 1 &#60;= to) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                long newCost = costs[j] + fixedCost(input[i] & 0xFF, 0);</div>
+<div style="background-color:limegreen;">226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if(newCost &#60; costs[j + 1]) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    costs[j + 1] = newCost;</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    lengthArray[j + 1] = 1;</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int lenValue = cookie.lenVal;</div>
+<div style="background-color:limegreen;">232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            for(char k = 3; k &#60;= lenValue && i + k &#60;= to; k++) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS] & [COMPRESSOR, ITERATIONS]</b></div>
+<div style="background-color:limegreen;">233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if(costs[j + k] - costs[j] &#60;= 12.0) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    continue;</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>236&emsp;&emsp;</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                long newCost = costs[j] + fixedCost(k, subLen[k]);</div>
+<div style="background-color:limegreen;">238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if(newCost &#60; costs[j + k]) {&nbsp;&#8594; [COMPRESSOR, ITERATIONS]</b></div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    costs[j + k] = newCost;</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    lengthArray[j + k] = k;</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>245&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>
