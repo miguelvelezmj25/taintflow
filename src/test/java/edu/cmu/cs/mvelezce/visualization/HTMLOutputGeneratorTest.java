@@ -44,6 +44,15 @@ public class HTMLOutputGeneratorTest {
     }
 
     @Test
+    public void generateHTMLKanzi() throws IOException {
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/kanzi/java/src";
+        String systemName = "kanzi";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+    }
+
+    @Test
     public void generateHTMLInteraction0() throws IOException {
         String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
         String systemName = "interaction0";
@@ -119,6 +128,15 @@ public class HTMLOutputGeneratorTest {
     public void generateHTMLInteraction8() throws IOException {
         String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
         String systemName = "interaction8";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+    }
+
+    @Test
+    public void generateHTMLInteraction9() throws IOException {
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+        String systemName = "interaction9";
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();

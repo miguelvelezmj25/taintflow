@@ -206,7 +206,7 @@ public class TaintInfoflow extends Infoflow {
         for(ResultSinkInfo sink : resultMap.keySet()) {
 
             if(resultMap.get(sink).size() != 1) {
-                throw new RuntimeException("Something weird with paths");
+//                throw new RuntimeException("Something weird with paths");
             }
 
             for(ResultSourceInfo source : resultMap.get(sink)) {
