@@ -41,10 +41,18 @@ public class ControlFlowSink extends BodyTransformer {
                     Value op2 = condExpr.getOp2();
 
                     if(locals.contains(op1)) {
+                        if(unitsToValues.containsKey(unit)) {
+                            throw new RuntimeException("The same unit has multiple conditions");
+                        }
+
                         unitsToValues.put(unit, op1);
                     }
 
                     if(locals.contains(op2)) {
+                        if(unitsToValues.containsKey(unit)) {
+                            throw new RuntimeException("The same unit has multiple conditions");
+                        }
+
                         unitsToValues.put(unit, op2);
                     }
                 }
@@ -55,6 +63,10 @@ public class ControlFlowSink extends BodyTransformer {
             else if(unit instanceof SwitchStmt) {
                 SwitchStmt switchStmt = (SwitchStmt) unit;
                 Value cond = switchStmt.getKey();
+                if(unitsToValues.containsKey(unit)) {
+                    throw new RuntimeException("The same unit has multiple conditions");
+                }
+
                 unitsToValues.put(unit, cond);
             }
         }
