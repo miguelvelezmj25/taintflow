@@ -12,7 +12,7 @@ public class ControlFlowResult {
     private Set<String> options;
     private int optionCount;
 
-    public ControlFlowResult() {
+    private ControlFlowResult() {
         ;
     }
 

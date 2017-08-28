@@ -7,7 +7,7 @@ public class SourceToSinkPath {
 
     private List<PathElement> path;
 
-    public SourceToSinkPath() {
+    private SourceToSinkPath() {
         ;
     }
 
@@ -27,7 +27,7 @@ public class SourceToSinkPath {
         private String className;
         private int javaLineNumber;
 
-        public PathElement() {
+        private PathElement() {
             ;
         }
 
