@@ -143,6 +143,15 @@ public class HTMLOutputGeneratorTest {
     }
 
     @Test
+    public void generateHTMLInteraction11() throws IOException {
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+        String systemName = "interaction11";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+    }
+
+    @Test
     public void generateHTMLSleep0() throws IOException {
         String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
         String systemName = "sleep0";

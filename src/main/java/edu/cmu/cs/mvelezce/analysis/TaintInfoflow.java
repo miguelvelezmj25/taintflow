@@ -112,7 +112,7 @@ public class TaintInfoflow extends Infoflow {
         mapper.writeValue(outputFile, aggregatedResults);
 
         System.out.println("\n############## STATS");
-        System.out.println("Number of results: " + aggregatedResults.size());
+        System.out.println("Number of results: " + aggregatedResults.size() + "\n");
         this.calculateOptionToSinkCount(aggregatedResults);
         this.calculateInteractionOrder(aggregatedResults);
     }
