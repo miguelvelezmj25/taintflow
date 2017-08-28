@@ -12,9 +12,6 @@ public class HTMLPathGeneratorTest {
         String systemName = "running-example";
 
         HTMLPathGenerator.generateHTMLForSystem(root, systemName);
-
-//        HTMLBaseGenerator generator = new HTMLPathGenerator(root, systemName);
-//        generator.generateHTMLPage();
     }
 
     @Test
