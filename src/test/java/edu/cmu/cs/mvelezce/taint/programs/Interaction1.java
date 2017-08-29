@@ -5,7 +5,9 @@ import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 /*
     When an exception is thrown depending on an option, all following control flow decsions depend on that
-    option. This is the correct result
+    option. This is the correct result.
+
+    There are 6 results
  */
 public class Interaction1 {
 

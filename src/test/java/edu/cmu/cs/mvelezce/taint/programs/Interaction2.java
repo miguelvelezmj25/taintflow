@@ -6,7 +6,9 @@ import edu.cmu.cs.mvelezce.analysis.option.Source;
 /*
     When an if statement follows directly a try block and the first instruction of the try block is a
     sink, the sink is tainted. There seems to be a bug with the analysis. I added a nop before each
-    sink to fix this issue
+    sink to fix this issue.
+
+    There should be 2 results, but the default analysis shows 3 results
  */
 public class Interaction2 {
 
