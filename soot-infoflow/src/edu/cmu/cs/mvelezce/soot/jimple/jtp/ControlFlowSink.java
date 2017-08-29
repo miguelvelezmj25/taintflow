@@ -113,6 +113,9 @@ public class ControlFlowSink extends BodyTransformer {
                 stmt.addTag(bytecodeOffsetTag);
 
                 units.insertBefore(stmt, unitToValues.getKey());
+
+                NopStmt nop = Jimple.v().newNopStmt();
+                units.insertBefore(nop, stmt);
             }
         }
 
