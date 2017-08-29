@@ -186,7 +186,7 @@ public class AnalysisTest {
         infoflow.aggregateInfoflowResults();
         infoflow.saveJimpleFiles();
 
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+        String root = "src/test/java/edu/cmu/cs/mvelezce/taint/programs";
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
@@ -222,7 +222,7 @@ public class AnalysisTest {
         infoflow.aggregateInfoflowResults();
         infoflow.saveJimpleFiles();
 
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+        String root = "src/test/java/edu/cmu/cs/mvelezce/taint/programs";
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
@@ -258,7 +258,7 @@ public class AnalysisTest {
         infoflow.aggregateInfoflowResults();
         infoflow.saveJimpleFiles();
 
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+        String root = "src/test/java/edu/cmu/cs/mvelezce/taint/programs";
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
@@ -294,7 +294,7 @@ public class AnalysisTest {
         infoflow.aggregateInfoflowResults();
         infoflow.saveJimpleFiles();
 
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+        String root = "src/test/java/edu/cmu/cs/mvelezce/taint/programs";
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
@@ -360,7 +360,7 @@ public class AnalysisTest {
         infoflow.aggregateInfoflowResults();
         infoflow.saveJimpleFiles();
 
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+        String root = "src/test/java/edu/cmu/cs/mvelezce/taint/programs";
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
@@ -607,7 +607,7 @@ public class AnalysisTest {
         infoflow.saveJimpleFiles();
 
 
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+        String root = "src/test/java/edu/cmu/cs/mvelezce/taint/programs";
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();

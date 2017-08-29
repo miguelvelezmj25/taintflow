@@ -11,7 +11,7 @@ public class FileWriterTest {
 
     @Test
     public void deleteAnnotatedFiles() throws IOException {
-        String directory = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+        String directory = "src/test/java/edu/cmu/cs/mvelezce/taint/programs";
         FileWriter.deleteAnnotatedFiles(directory);
     }
 
@@ -24,7 +24,7 @@ public class FileWriterTest {
 
     @Test
     public void writeFileWithResultsTest() throws IOException {
-        String directory = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+        String directory = "src/test/java/edu/cmu/cs/mvelezce/taint/programs";
         FileWriter fw = new FileWriter();
         List<ControlFlowResult> results = fw.readResults("basic1");
 

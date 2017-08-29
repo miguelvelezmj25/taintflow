@@ -5,7 +5,7 @@ import java.util.List;
 
 public abstract class HTMLBaseGenerator<V> implements HTMLGenerator<V> {
 
-    public static final String ROOT_DIR = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/src/visualization/";
+    public static final String ROOT_DIR = "src/visualization/";
 
     private String htmlTitle = "Default";
     private String root;

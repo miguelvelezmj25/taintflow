@@ -623,7 +623,7 @@ public class TaintInfoflow extends Infoflow {
             classBody.append("\n");
         }
 
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/taint-analysis/sootOutput/";
+        String root = "sootOutput/";
 
         for(Map.Entry<String, StringBuilder> classToMethods : classesToMethods.entrySet()) {
             PrintWriter out = new PrintWriter(root + classToMethods.getKey());
