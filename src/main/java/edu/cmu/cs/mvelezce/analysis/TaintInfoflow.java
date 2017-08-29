@@ -184,6 +184,7 @@ public class TaintInfoflow extends Infoflow {
                 e.printStackTrace();
             }
 
+            // TODO check for exceptions thrown while the analysis executed
             this.saveResults(currentOption);
 
             if(this.pathBuilderFactory.supportsPathReconstruction()) {

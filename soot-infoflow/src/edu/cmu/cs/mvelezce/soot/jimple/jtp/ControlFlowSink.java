@@ -25,9 +25,6 @@ public class ControlFlowSink extends BodyTransformer {
 
     @Override
     protected void internalTransform(Body b, String phaseName, Map<String, String> options) {
-        SootClass sootClass = Scene.v().loadClassAndSupport("edu.cmu.cs.mvelezce.analysis.option.Sink");
-        SootMethod sootMethod = sootClass.getMethod("void sink(java.lang.Object)");
-
         Chain<Unit> units = b.getUnits();
         Chain<Local> locals = b.getLocals();
         Map<Unit, List<Value>> unitsToValues = new HashMap<>();
@@ -80,6 +77,9 @@ public class ControlFlowSink extends BodyTransformer {
         if(unitsToValues.isEmpty()) {
             return;
         }
+
+        SootClass sootClass = Scene.v().loadClassAndSupport("edu.cmu.cs.mvelezce.analysis.option.Sink");
+        SootMethod sootMethod = sootClass.getMethod("void sink(java.lang.Object)");
 
         for(Map.Entry<Unit, List<Value>> unitToValues : unitsToValues.entrySet()) {
             for(Value value : unitToValues.getValue()) {
