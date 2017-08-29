@@ -18,8 +18,7 @@ public class Interaction12 {
         try {
             int i = 0;
             if(A) {
-                i = 1;
-//                Thread.sleep(45);
+//                i = 1;
             }
             throw new InterruptedException();
         } catch (Exception ex) {

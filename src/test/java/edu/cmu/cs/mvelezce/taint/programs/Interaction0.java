@@ -4,7 +4,9 @@ import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 /*
-    multiple calls to the same method
+    Multiple calls to the same method. Both sources reach the last if statement. The overapproximated result
+    is to say that both sources taint the sink. However, the correct result is that the sink is tainted by each
+    source separately.
  */
 public class Interaction0 {
 

@@ -4,7 +4,8 @@ import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 /*
-    Exceptions
+    When an exception is thrown depending on an option, all following control flow decsions depend on that
+    option. This is the correct result
  */
 public class Interaction1 {
 

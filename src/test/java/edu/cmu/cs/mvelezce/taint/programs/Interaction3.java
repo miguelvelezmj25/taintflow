@@ -4,7 +4,8 @@ import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 /*
-    Exceptions
+    This code does not have the bug as in Interaction 3 because the compiler optimizes the try catch and
+    does not put in the the bytecode.
  */
 public class Interaction3 {
 
@@ -12,7 +13,6 @@ public class Interaction3 {
         Sink.init();
 
         boolean A = Source.getOptionA(true);
-        boolean B = Source.getOptionB(true);
 
         boolean a = false;
         boolean b = false;
@@ -21,21 +21,14 @@ public class Interaction3 {
             a = true;
         }
 
-        if(B) {
-            b = true;
-        }
-
         try {
-            if(a) {
-                System.out.println("");
+            if(b) {
             }
-
-            throw new RuntimeException();
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        if(b) {
+        if(a) {
             System.out.println("");
         }
     }

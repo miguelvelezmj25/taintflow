@@ -265,8 +265,8 @@ public class AnalysisTest {
     }
 
     @Test
-    public void interaction21() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        String systemName = "interaction21";
+    public void interaction3() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        String systemName = "interaction3";
         TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
@@ -281,7 +281,7 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction21: void main(java.lang.String[])>";
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction3: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -301,8 +301,8 @@ public class AnalysisTest {
     }
 
     @Test
-    public void interaction3() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        TaintInfoflow infoflow = new TaintInfoflow("interaction3");
+    public void interaction31() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        TaintInfoflow infoflow = new TaintInfoflow("interaction31");
 
         // Configure analysis
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
@@ -316,7 +316,7 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction3: void main(java.lang.String[])>";
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction31: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
