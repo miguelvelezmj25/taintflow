@@ -107,6 +107,8 @@ public class Infoflow extends AbstractInfoflow {
 
 	protected SootMethod dummyMainMethod = null;
 
+	protected IInfoflowCFG iCfg = null;
+
 	/**
 	 * Creates a new instance of the InfoFlow class for analyzing plain Java
 	 * code without any references to APKs or the Android SDK.
@@ -289,7 +291,10 @@ public class Infoflow extends AbstractInfoflow {
 				return;
 
 			logger.info("Starting Taint Analysis");
-			IInfoflowCFG iCfg = icfgFactory.buildBiDirICFG(config.getCallgraphAlgorithm(),
+//			IInfoflowCFG iCfg = icfgFactory.buildBiDirICFG(config.getCallgraphAlgorithm(),
+//					config.getEnableExceptionTracking());
+
+			this.iCfg = icfgFactory.buildBiDirICFG(config.getCallgraphAlgorithm(),
 					config.getEnableExceptionTracking());
 
 			// Check whether we need to run with one source at a time
@@ -876,7 +881,8 @@ public class Infoflow extends AbstractInfoflow {
 		}
 	}
 
-	private Collection<SootMethod> getMethodsForSeeds(IInfoflowCFG icfg) {
+//	private Collection<SootMethod> getMethodsForSeeds(IInfoflowCFG icfg) {
+	protected Collection<SootMethod> getMethodsForSeeds(IInfoflowCFG icfg) {
 		List<SootMethod> seeds = new LinkedList<SootMethod>();
 		// If we have a callgraph, we retrieve the reachable methods. Otherwise,
 		// we have no choice but take all application methods as an
