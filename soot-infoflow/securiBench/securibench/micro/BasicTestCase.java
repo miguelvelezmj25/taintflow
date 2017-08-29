@@ -11,7 +11,7 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
-import soot.jimple.infoflow.test.securibench.supportClasses.DummyServletConfig;
+//import soot.jimple.infoflow.test.securibench.supportClasses.DummyServletConfig;
 
 public abstract class BasicTestCase extends HttpServlet {
     protected void doTrace(HttpServletRequest req, HttpServletResponse resp)
@@ -42,7 +42,8 @@ public abstract class BasicTestCase extends HttpServlet {
     
     @Override
 	public ServletConfig getServletConfig(){
-		return new DummyServletConfig();
+//		return new DummyServletConfig();
+        throw new RuntimeException();
     	
     }
     
