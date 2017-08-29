@@ -12,7 +12,6 @@ public class Interaction2 {
         Sink.init();
 
         boolean A = Source.getOptionA(true);
-        boolean B = Source.getOptionB(true);
 
         boolean a = false;
         boolean b = false;
@@ -21,19 +20,15 @@ public class Interaction2 {
             a = true;
         }
 
-        if(B) {
-            b = true;
-        }
-
         try {
-            if(a) {
+            if(b) {
                 System.out.println("");
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        if(b) {
+        if(a) {
             System.out.println("");
         }
     }

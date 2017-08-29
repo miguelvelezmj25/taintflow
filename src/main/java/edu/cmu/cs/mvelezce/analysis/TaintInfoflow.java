@@ -53,7 +53,7 @@ public class TaintInfoflow extends Infoflow {
 
         Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
         PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink", ControlFlowSink.v()));
-        PackManager.v().getPack("jtp").add(new Transform("jtp.trycatchlabelnop", TryCatchLabelNop.v()));
+//        PackManager.v().getPack("jtp").add(new Transform("jtp.trycatchlabelnop", TryCatchLabelNop.v()));
 
         while (iter.hasNext()) {
             MethodOrMethodContext m = iter.next();
@@ -171,10 +171,13 @@ public class TaintInfoflow extends Infoflow {
 
             System.out.println("############## Analyzing option " + currentOption);
 
+            List<String> entryPoints = new ArrayList<>();
+            entryPoints.add(entryPoint);
+
             List<String> intermediateSources = new ArrayList<>();
             intermediateSources.add(source);
 
-            this.computeInfoflow(libPath, appPath, entryPoint, intermediateSources, sinks);
+            this.computeInfoflow(libPath, appPath, entryPoints, intermediateSources, sinks);
 
             try {
                 Thread.sleep(1000);
