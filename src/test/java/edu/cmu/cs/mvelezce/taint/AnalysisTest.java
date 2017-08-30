@@ -222,6 +222,7 @@ public class AnalysisTest {
 
         infoflow.aggregateInfoflowResults();
         infoflow.saveJimpleFiles();
+        infoflow.saveDotStringFiles();
 
         String root = "src/test/java/edu/cmu/cs/mvelezce/taint/programs";
 

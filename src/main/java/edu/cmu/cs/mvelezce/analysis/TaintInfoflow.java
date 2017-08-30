@@ -7,14 +7,17 @@ import edu.cmu.cs.mvelezce.analysis.option.json.ControlFlowResult;
 import edu.cmu.cs.mvelezce.analysis.option.json.SourceToSinkPath;
 import edu.cmu.cs.mvelezce.format.instrument.methodnode.MethodTransformer;
 import edu.cmu.cs.mvelezce.format.sink.AddSinkBeforeControlFlowDecisionTransformer;
+import edu.cmu.cs.mvelezce.soot.jimple.jtp.ControlFlowSink;
 import org.apache.commons.io.FileUtils;
 import soot.*;
 import soot.jimple.InvokeExpr;
+import soot.jimple.NopStmt;
 import soot.jimple.Stmt;
 import soot.jimple.infoflow.Infoflow;
 import soot.jimple.infoflow.results.InfoflowResults;
 import soot.jimple.infoflow.results.ResultSinkInfo;
 import soot.jimple.infoflow.results.ResultSourceInfo;
+import soot.jimple.internal.JInvokeStmt;
 import soot.tagkit.BytecodeOffsetTag;
 import soot.tagkit.LineNumberTag;
 import soot.tagkit.Tag;
@@ -51,7 +54,7 @@ public class TaintInfoflow extends Infoflow {
         super.constructCallgraph();
 
         Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
-//        PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink", ControlFlowSink.v()));
+        PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink", ControlFlowSink.v()));
 //        PackManager.v().getPack("jtp").add(new Transform("jtp.trycatchlabelnop", TryCatchLabelNop.v()));
 
         while (iter.hasNext()) {
@@ -654,20 +657,87 @@ public class TaintInfoflow extends Infoflow {
             classDotString.append(method.getName());
             classDotString.append(" {\n");
 
+//            DirectedGraph<Unit> s = this.iCfg.getOrCreateUnitGraph(method);
             ExceptionalGraph<Unit> exceptionalGraph = (ExceptionalGraph<Unit>) this.iCfg.getOrCreateUnitGraph(method);
             Iterator<Unit> units = exceptionalGraph.iterator();
+            Set<String> instrumentedNodes = new HashSet<>();
 
-            while(units.hasNext()) {
+            while (units.hasNext()) {
                 Unit unit = units.next();
                 List<Unit> succs = exceptionalGraph.getSuccsOf(unit);
 
                 for(Unit succ : succs) {
+                    String node = unit.toString().replace("\"", "\\\"");
+                    node += " [" + unit.hashCode() + "]";
+
+                    if(unit instanceof NopStmt) {
+//                        for(Tag tag : unit.getTags()) {
+//                            if(tag instanceof BytecodeOffsetTag) {
+//                                int bytecodeOffset = ((BytecodeOffsetTag) tag).getBytecodeOffset();
+//                                node = bytecodeOffset + " " + node;
+//                                break;
+//                            }
+//                        }
+
+                        instrumentedNodes.add(node);
+                    }
+                    else if(unit instanceof JInvokeStmt) {
+                        InvokeExpr v = ((JInvokeStmt) unit).getInvokeExpr();
+                        String name = v.getMethod().getName();
+
+                        if(name.equals("sink")) {
+                            instrumentedNodes.add(node);
+                        }
+
+//                        for(Tag tag : unit.getTags()) {
+//                            if(tag instanceof BytecodeOffsetTag) {
+//                                int bytecodeOffset = ((BytecodeOffsetTag) tag).getBytecodeOffset();
+//                                node = bytecodeOffset + " " + node;
+//                                break;
+//                            }
+//                        }
+
+                    }
+
                     classDotString.append('"');
-                    classDotString.append(unit.toString().replace("\"", "\\\""));
+                    classDotString.append(node);
                     classDotString.append('"');
                     classDotString.append(" -> ");
+
+                    node = succ.toString().replace("\"", "\\\"");
+                    node += " [" + succ.hashCode() + "]";
+
+                    if(succ instanceof NopStmt) {
+//                        for(Tag tag : succ.getTags()) {
+//                            if(tag instanceof BytecodeOffsetTag) {
+//                                int bytecodeOffset = ((BytecodeOffsetTag) tag).getBytecodeOffset();
+//                                node = bytecodeOffset + " " + node;
+//                                break;
+//                            }
+//                        }
+
+                        instrumentedNodes.add(node);
+                    }
+                    else if(succ instanceof JInvokeStmt) {
+                        InvokeExpr v = ((JInvokeStmt) succ).getInvokeExpr();
+                        String name = v.getMethod().getName();
+
+                        if(name.equals("sink")) {
+                            instrumentedNodes.add(node);
+                        }
+
+//                        for(Tag tag : succ.getTags()) {
+//                            if(tag instanceof BytecodeOffsetTag) {
+//                                int bytecodeOffset = ((BytecodeOffsetTag) tag).getBytecodeOffset();
+//                                node = bytecodeOffset + " " + node;
+//                                break;
+//                            }
+//                        }
+
+                    }
+
                     classDotString.append('"');
-                    classDotString.append(succ.toString().replace("\"", "\\\""));
+                    classDotString.append(node);
                     classDotString.append('"');
 
                     if(exceptionalGraph.getExceptionalSuccsOf(unit).contains(succ)) {
@@ -676,6 +746,13 @@ public class TaintInfoflow extends Infoflow {
 
                     classDotString.append(";\n");
                 }
+            }
+
+            for(String nopNode : instrumentedNodes) {
+                classDotString.append('"');
+                classDotString.append(nopNode);
+                classDotString.append('"');
+                classDotString.append("[fontcolor=\"blue\", penwidth=3, color=\"blue\"];\n");
             }
 
             classDotString.append("}\n\n");

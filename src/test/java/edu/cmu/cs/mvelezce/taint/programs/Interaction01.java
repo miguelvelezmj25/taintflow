@@ -16,7 +16,6 @@ public class Interaction01 {
         }
 
         System.out.println(a);
-
     }
 
 }
