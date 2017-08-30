@@ -7,7 +7,6 @@ import edu.cmu.cs.mvelezce.analysis.option.json.ControlFlowResult;
 import edu.cmu.cs.mvelezce.analysis.option.json.SourceToSinkPath;
 import edu.cmu.cs.mvelezce.format.instrument.methodnode.MethodTransformer;
 import edu.cmu.cs.mvelezce.format.sink.AddSinkBeforeControlFlowDecisionTransformer;
-import edu.cmu.cs.mvelezce.soot.jimple.jtp.ControlFlowSink;
 import org.apache.commons.io.FileUtils;
 import soot.*;
 import soot.jimple.InvokeExpr;
@@ -19,6 +18,7 @@ import soot.jimple.infoflow.results.ResultSourceInfo;
 import soot.tagkit.BytecodeOffsetTag;
 import soot.tagkit.LineNumberTag;
 import soot.tagkit.Tag;
+import soot.toolkits.graph.ExceptionalGraph;
 import soot.util.MultiMap;
 
 import java.io.File;
@@ -51,7 +51,7 @@ public class TaintInfoflow extends Infoflow {
         super.constructCallgraph();
 
         Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
-        PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink", ControlFlowSink.v()));
+//        PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink", ControlFlowSink.v()));
 //        PackManager.v().getPack("jtp").add(new Transform("jtp.trycatchlabelnop", TryCatchLabelNop.v()));
 
         while (iter.hasNext()) {
@@ -632,4 +632,64 @@ public class TaintInfoflow extends Infoflow {
             out.flush();
         }
     }
+
+    public void saveDotStringFiles() throws FileNotFoundException {
+        List<SootMethod> methods = new ArrayList<>(this.getMethodsForSeeds(this.iCfg));
+
+        Map<String, StringBuilder> classesToDoStrings = new HashMap<>();
+
+        for(SootMethod method : methods) {
+            if(!method.hasActiveBody()) {
+                continue;
+            }
+
+            String className = method.getDeclaringClass().getName();
+
+            if(!classesToDoStrings.containsKey(className)) {
+                classesToDoStrings.put(className, new StringBuilder());
+            }
+
+            StringBuilder classDotString = classesToDoStrings.get(className);
+            classDotString.append("digraph ");
+            classDotString.append(method.getName());
+            classDotString.append(" {\n");
+
+            ExceptionalGraph<Unit> exceptionalGraph = (ExceptionalGraph<Unit>) this.iCfg.getOrCreateUnitGraph(method);
+            Iterator<Unit> units = exceptionalGraph.iterator();
+
+            while(units.hasNext()) {
+                Unit unit = units.next();
+                List<Unit> succs = exceptionalGraph.getSuccsOf(unit);
+
+                for(Unit succ : succs) {
+                    classDotString.append('"');
+                    classDotString.append(unit.toString().replace("\"", "\\\""));
+                    classDotString.append('"');
+                    classDotString.append(" -> ");
+                    classDotString.append('"');
+                    classDotString.append(succ.toString().replace("\"", "\\\""));
+                    classDotString.append('"');
+
+                    if(exceptionalGraph.getExceptionalSuccsOf(unit).contains(succ)) {
+                        classDotString.append("[penwidth=3, color=\"red\"]");
+                    }
+
+                    classDotString.append(";\n");
+                }
+            }
+
+            classDotString.append("}\n\n");
+
+        }
+
+        String root = "dotStringOutput/";
+
+        for(Map.Entry<String, StringBuilder> classDotString : classesToDoStrings.entrySet()) {
+            PrintWriter out = new PrintWriter(root + classDotString.getKey());
+            out.println(classDotString.getValue());
+            out.close();
+            out.flush();
+        }
+    }
+
 }
