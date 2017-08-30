@@ -21,17 +21,12 @@ public class Interaction50 {
         Sink.init();
 
         boolean A = Source.getOptionA(true);
-        boolean B = Source.getOptionB(true);
 
         boolean a = false;
-        boolean b = false;
+        boolean x = false;
 
         if(A) {
             a = true;
-        }
-
-        if(B) {
-            b = true;
         }
 
         try {
@@ -45,11 +40,7 @@ public class Interaction50 {
             System.out.println();
         }
 
-        if(a) {
-            System.out.println("");
-        }
-
-        if(b) {
+        if(x) {
             System.out.println("");
         }
     }
