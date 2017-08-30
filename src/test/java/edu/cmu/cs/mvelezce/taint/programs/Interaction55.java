@@ -4,9 +4,9 @@ import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 /*
-    Exceptions
+
  */
-public class Interaction31 {
+public class Interaction55 {
 
     public static void main(String[] args) {
         Sink.init();
@@ -27,17 +27,22 @@ public class Interaction31 {
 
         try {
             if(a) {
-                System.out.println("");
+                int i = 0;
+                i = i % 2;
+                System.out.println(i);
             }
 
-            throw new RuntimeException();
+            Thread.sleep(100);
         } catch (Exception e) {
-            e.printStackTrace();
+            System.out.println();
+        }
+
+        if(a) {
+            System.out.println("");
         }
 
         if(b) {
             System.out.println("");
         }
     }
-
 }

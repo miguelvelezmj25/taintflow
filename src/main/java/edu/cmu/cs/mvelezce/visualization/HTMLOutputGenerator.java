@@ -103,7 +103,7 @@ public class HTMLOutputGenerator extends HTMLBaseGenerator<ControlFlowResult> {
                 staticHTMLPage.append("&emsp;&emsp;");
 
 //                System.out.println(lineNumber);
-                for(int i = 0; !strLine.isEmpty() && strLine.charAt(i) == ' '; i++) {
+                for(int i = 0; !strLine.isEmpty() && i < strLine.length() && strLine.charAt(i) == ' '; i++) {
                     staticHTMLPage.append("&nbsp;");
                 }
 

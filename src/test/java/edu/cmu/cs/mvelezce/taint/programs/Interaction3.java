@@ -33,6 +33,10 @@ public class Interaction3 {
         if(a) {
             System.out.println("");
         }
+
+        if(b) {
+            System.out.println("");
+        }
     }
 
 }

@@ -4,7 +4,10 @@ import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 /*
-    Exceptions
+    Explicitly throwing an exception inside of a try. Since the if statement inside of the try does not have a tainted
+    variable, the conditions after the catch block behave as excepted.
+
+    There are 2 results
  */
 public class Interaction4 {
 
@@ -12,7 +15,6 @@ public class Interaction4 {
         Sink.init();
 
         boolean A = Source.getOptionA(true);
-        boolean B = Source.getOptionB(true);
 
         boolean a = false;
         boolean b = false;
@@ -21,53 +23,22 @@ public class Interaction4 {
             a = true;
         }
 
-        if(B) {
-            b = true;
-        }
-
         try {
-            int i = 0;
-            if(a) {
+            if(b) {
                 System.out.println("");
             }
 
             throw new RuntimeException();
         } catch (Exception e) {
-            System.out.println();
+            e.printStackTrace();
+        }
+
+        if(a) {
+            System.out.println("");
         }
 
         if(b) {
             System.out.println("");
-        }
-
-        FOO f = new FOO(A,B);
-        if(f == null) {
-            System.out.println("");
-        }
-        f.count(100);
-
-    }
-
-    private static class FOO {
-        private final boolean x;
-        private final boolean y;
-        private Log log = new Log();
-
-        FOO(boolean x, boolean y) {
-            this.x
-                    =x;
-            this.y=y;
-        }
-
-        void count(int y) {
-            log.log(y);
-        }
-    }
-    private static class Log{
-        public void log(int y) {
-            if (y>0) {
-                System.out.println("...");
-            }
         }
     }
 

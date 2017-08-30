@@ -21,6 +21,7 @@ import soot.jimple.internal.JInvokeStmt;
 import soot.tagkit.BytecodeOffsetTag;
 import soot.tagkit.LineNumberTag;
 import soot.tagkit.Tag;
+import soot.toolkits.graph.DirectedGraph;
 import soot.toolkits.graph.ExceptionalGraph;
 import soot.util.MultiMap;
 
@@ -168,6 +169,13 @@ public class TaintInfoflow extends Infoflow {
 
     public void computeInfoflowOneSourceAtATime(String libPath, String appPath, String entryPoint, Collection<String> sources,
                                                 Collection<String> sinks) throws IOException {
+
+        File outputFile = new File(TaintInfoflow.OUTPUT_DIR + "/" + this.systemName + "/");
+
+        if(outputFile.exists()) {
+            FileUtils.forceDelete(outputFile);
+        }
+
         for(String source : sources) {
             String currentOption = this.sourcesToOptions.get(source);
 
@@ -657,28 +665,19 @@ public class TaintInfoflow extends Infoflow {
             classDotString.append(method.getName());
             classDotString.append(" {\n");
 
-//            DirectedGraph<Unit> s = this.iCfg.getOrCreateUnitGraph(method);
-            ExceptionalGraph<Unit> exceptionalGraph = (ExceptionalGraph<Unit>) this.iCfg.getOrCreateUnitGraph(method);
-            Iterator<Unit> units = exceptionalGraph.iterator();
+            DirectedGraph<Unit> graph = this.iCfg.getOrCreateUnitGraph(method);
+            Iterator<Unit> units = graph.iterator();
             Set<String> instrumentedNodes = new HashSet<>();
 
             while (units.hasNext()) {
                 Unit unit = units.next();
-                List<Unit> succs = exceptionalGraph.getSuccsOf(unit);
+                List<Unit> succs = graph.getSuccsOf(unit);
 
                 for(Unit succ : succs) {
                     String node = unit.toString().replace("\"", "\\\"");
-                    node += " [" + unit.hashCode() + "]";
+                    node += " {" + unit.hashCode() + "}";
 
                     if(unit instanceof NopStmt) {
-//                        for(Tag tag : unit.getTags()) {
-//                            if(tag instanceof BytecodeOffsetTag) {
-//                                int bytecodeOffset = ((BytecodeOffsetTag) tag).getBytecodeOffset();
-//                                node = bytecodeOffset + " " + node;
-//                                break;
-//                            }
-//                        }
-
                         instrumentedNodes.add(node);
                     }
                     else if(unit instanceof JInvokeStmt) {
@@ -688,15 +687,6 @@ public class TaintInfoflow extends Infoflow {
                         if(name.equals("sink")) {
                             instrumentedNodes.add(node);
                         }
-
-//                        for(Tag tag : unit.getTags()) {
-//                            if(tag instanceof BytecodeOffsetTag) {
-//                                int bytecodeOffset = ((BytecodeOffsetTag) tag).getBytecodeOffset();
-//                                node = bytecodeOffset + " " + node;
-//                                break;
-//                            }
-//                        }
-
                     }
 
                     classDotString.append('"');
@@ -705,17 +695,9 @@ public class TaintInfoflow extends Infoflow {
                     classDotString.append(" -> ");
 
                     node = succ.toString().replace("\"", "\\\"");
-                    node += " [" + succ.hashCode() + "]";
+                    node += " {" + succ.hashCode() + "}";
 
                     if(succ instanceof NopStmt) {
-//                        for(Tag tag : succ.getTags()) {
-//                            if(tag instanceof BytecodeOffsetTag) {
-//                                int bytecodeOffset = ((BytecodeOffsetTag) tag).getBytecodeOffset();
-//                                node = bytecodeOffset + " " + node;
-//                                break;
-//                            }
-//                        }
-
                         instrumentedNodes.add(node);
                     }
                     else if(succ instanceof JInvokeStmt) {
@@ -725,23 +707,17 @@ public class TaintInfoflow extends Infoflow {
                         if(name.equals("sink")) {
                             instrumentedNodes.add(node);
                         }
-
-//                        for(Tag tag : succ.getTags()) {
-//                            if(tag instanceof BytecodeOffsetTag) {
-//                                int bytecodeOffset = ((BytecodeOffsetTag) tag).getBytecodeOffset();
-//                                node = bytecodeOffset + " " + node;
-//                                break;
-//                            }
-//                        }
-
                     }
 
                     classDotString.append('"');
                     classDotString.append(node);
                     classDotString.append('"');
 
-                    if(exceptionalGraph.getExceptionalSuccsOf(unit).contains(succ)) {
-                        classDotString.append("[penwidth=3, color=\"red\"]");
+                    if(graph instanceof ExceptionalGraph) {
+                        ExceptionalGraph<Unit> exceptionalGraph = (ExceptionalGraph<Unit>) graph;
+                        if(exceptionalGraph.getExceptionalSuccsOf(unit).contains(succ)) {
+                            classDotString.append("[penwidth=3, color=\"red\"]");
+                        }
                     }
 
                     classDotString.append(";\n");

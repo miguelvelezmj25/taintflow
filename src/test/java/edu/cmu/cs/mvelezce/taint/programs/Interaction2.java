@@ -35,6 +35,10 @@ public class Interaction2 {
         if(a) {
             System.out.println("");
         }
+
+        if(b) {
+            System.out.println("");
+        }
     }
 
 }
