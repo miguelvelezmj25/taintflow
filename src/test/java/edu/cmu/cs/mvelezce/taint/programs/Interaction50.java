@@ -4,16 +4,10 @@ import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 /*
-    Try catch with a control flow decision that uses a tainted value. Try catch is present in jimple, but that does not
-    taint the control flow decisions after the catch block. There are 4 exceptional edges that point to the catching of
-    an exception:
+    Try catch with a control flow decision that uses a tainted value. Try catch is present in jimple, but, since the
+    exception is thrown outside of a condition, it does not taint the catch block.
 
-    - nop
-    - sink
-    - $r0 = new java.lang.RuntimeException
-    - specialinvoke $r0.<java.lang.RuntimeException: void <init>()>()
-
-    There are 5 correct results.
+    There are 3 correct results.
  */
 public class Interaction50 {
 
@@ -35,13 +29,16 @@ public class Interaction50 {
                 i = i % 2;
             }
 
-            throw new RuntimeException();
+            throw new InterruptedException();
         } catch (Exception e) {
-            System.out.println();
+            Sink.sink(a);
+            Sink.sink(x);
+            Sink.sink(e);
+            Math.random();
         }
 
         if(x) {
-            System.out.println("");
+            Math.random();
         }
     }
 }

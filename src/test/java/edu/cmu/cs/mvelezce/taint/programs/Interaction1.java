@@ -4,8 +4,10 @@ import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 /*
-    When an exception is thrown depending on an option, all following control flow decsions depend on that
+    When an exception is thrown depending on an option, all following control flow decisions depend on that
     option. This is the correct result.
+
+    There are no exception edges in this example
 
     There are 6 results
  */

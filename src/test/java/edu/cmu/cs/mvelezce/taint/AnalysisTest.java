@@ -1723,7 +1723,8 @@ public class AnalysisTest {
         File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-counter/out/production/pngtastic-counter");
         AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
 
-        TaintInfoflow infoflow = new TaintInfoflow("pngtasticColorCounter");
+        String systemName = "pngtasticColorCounter";
+        TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
@@ -1750,6 +1751,11 @@ public class AnalysisTest {
         infoflow.aggregateInfoflowResults();
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
+
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-counter/src";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
     }
 
     @Test

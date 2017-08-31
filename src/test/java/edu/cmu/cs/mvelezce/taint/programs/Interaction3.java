@@ -7,6 +7,8 @@ import edu.cmu.cs.mvelezce.analysis.option.Source;
     This code does not have the bug as in Interaction 3 because the compiler optimizes the try catch and
     does not put in the the bytecode.
 
+    There are no exception edges in this example
+
     There are 3 results.
  */
 public class Interaction3 {

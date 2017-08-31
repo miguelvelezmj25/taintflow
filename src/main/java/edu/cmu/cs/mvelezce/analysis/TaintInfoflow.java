@@ -8,6 +8,8 @@ import edu.cmu.cs.mvelezce.analysis.option.json.SourceToSinkPath;
 import edu.cmu.cs.mvelezce.format.instrument.methodnode.MethodTransformer;
 import edu.cmu.cs.mvelezce.format.sink.AddSinkBeforeControlFlowDecisionTransformer;
 import edu.cmu.cs.mvelezce.soot.jimple.jtp.ControlFlowSink;
+import edu.cmu.cs.mvelezce.soot.jimple.jtp.Nop;
+import edu.cmu.cs.mvelezce.soot.jimple.jtp.TryCatchLabelNop;
 import org.apache.commons.io.FileUtils;
 import soot.*;
 import soot.jimple.InvokeExpr;
@@ -57,6 +59,7 @@ public class TaintInfoflow extends Infoflow {
         Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
         PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink", ControlFlowSink.v()));
 //        PackManager.v().getPack("jtp").add(new Transform("jtp.trycatchlabelnop", TryCatchLabelNop.v()));
+//        PackManager.v().getPack("jtp").add(new Transform("jtp.nop", Nop.v()));
 
         while (iter.hasNext()) {
             MethodOrMethodContext m = iter.next();
@@ -666,6 +669,11 @@ public class TaintInfoflow extends Infoflow {
             classDotString.append(" {\n");
 
             DirectedGraph<Unit> graph = this.iCfg.getOrCreateUnitGraph(method);
+
+            if(className.contains("Interaction")) {
+                System.out.println();
+            }
+
             Iterator<Unit> units = graph.iterator();
             Set<String> instrumentedNodes = new HashSet<>();
 

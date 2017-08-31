@@ -30,6 +30,9 @@ public class Interaction510 {
                 System.out.println("das");
             }
 
+            int i = 0;
+
+
             throw new RuntimeException();
 ////            Thread.sleep(100);
 //            System.out.println("");

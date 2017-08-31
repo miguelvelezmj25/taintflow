@@ -7,7 +7,9 @@ import edu.cmu.cs.mvelezce.analysis.option.Source;
     Try catch with a control flow decision that uses a tainted value. The compiler optimizes the bytecode an removes
     the try catch since no statement can throw an exception.
 
-    There are 5 correct results.
+    There are no exception edges in this example
+
+    There are 2 correct results.
  */
 public class Interaction5 {
 
@@ -29,11 +31,14 @@ public class Interaction5 {
                 i = i % 2;
             }
         } catch (Exception e) {
-            System.out.println();
+            Sink.sink(a);
+            Sink.sink(x);
+            Sink.sink(e);
+            Math.random();
         }
 
         if(x) {
-            System.out.println("");
+            Math.random();
         }
     }
 }
