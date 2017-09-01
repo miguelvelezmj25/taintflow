@@ -143,7 +143,7 @@ public class HTMLPathGenerator extends HTMLBaseGenerator<SourceToSinkPath> {
                         staticHTMLPage.append(lineNumber);
                         staticHTMLPage.append("&emsp;&emsp;");
 
-                        for(int i = 0; !strLine.isEmpty() && strLine.charAt(i) == ' '; i++) {
+                        for(int i = 0; !strLine.isEmpty() && i < strLine.length() && strLine.charAt(i) == ' '; i++) {
                             staticHTMLPage.append("&nbsp;");
                         }
 
