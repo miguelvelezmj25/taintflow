@@ -693,7 +693,7 @@ public class IFDSSolver<N,D extends FastSolverLinkedNode<D, N>,I extends BiDiInt
 		}
 
 		public void run() {
-            System.out.println("Edge: " + this.edge);
+//            System.out.println("Edge: " + this.edge);
             if(icfg.isCallStmt(edge.getTarget())) {
 				processCall(edge);
 			} else {
