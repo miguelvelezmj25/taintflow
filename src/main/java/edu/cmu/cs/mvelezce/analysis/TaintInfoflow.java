@@ -75,12 +75,7 @@ public class TaintInfoflow extends Infoflow {
         }
     }
 
-    public void addSinks(String directory) throws InvocationTargetException, NoSuchMethodException, IOException, IllegalAccessException {
-        MethodTransformer transformer = new AddSinkBeforeControlFlowDecisionTransformer(directory);
-        transformer.transformMethods();
-    }
-
-    public void aggregateInfoflowResults() throws IOException {
+    public void aggregateInfoflowResults(int count) throws IOException {
         String[] extensions = {"json"};
 
         Collection<File> files = FileUtils.listFiles(new File(TaintInfoflow.OUTPUT_DIR + this.systemName), extensions, false);
@@ -119,6 +114,7 @@ public class TaintInfoflow extends Infoflow {
 
         System.out.println("\n############## STATS");
         System.out.println("Number of results: " + aggregatedResults.size() + "\n");
+        assert aggregatedResults.size() == count;
         this.calculateOptionToSinkCount(aggregatedResults);
         this.calculateInteractionOrder(aggregatedResults);
     }
@@ -670,9 +666,9 @@ public class TaintInfoflow extends Infoflow {
 
             DirectedGraph<Unit> graph = this.iCfg.getOrCreateUnitGraph(method);
 
-            if(className.contains("Interaction")) {
-                System.out.println();
-            }
+//            if(className.contains("Interaction")) {
+//                System.out.println();
+//            }
 
             Iterator<Unit> units = graph.iterator();
             Set<String> instrumentedNodes = new HashSet<>();

@@ -8,6 +8,8 @@ import edu.cmu.cs.mvelezce.analysis.option.Source;
     sink, the sink is tainted. There seems to be a bug with the analysis. I added a nop before each
     sink to fix this issue.
 
+    We decided to use TaintflowGraph which fixes the issue.
+
     There should be 2 results, but the default analysis shows 3 results
  */
 public class Interaction2 {

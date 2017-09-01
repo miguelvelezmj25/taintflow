@@ -78,7 +78,7 @@ public class AnalysisTest {
 
         AnalysisTest.infoflowConfiguration.setStopAfterFirstFlow(false);
         AnalysisTest.infoflowConfiguration.setEnableStaticFieldTracking(true);
-        AnalysisTest.infoflowConfiguration.setEnableExceptionTracking(true);
+        AnalysisTest.infoflowConfiguration.setEnableExceptionTracking(false);
         AnalysisTest.infoflowConfiguration.setMaxThreadNum(1);
         AnalysisTest.infoflowConfiguration.setOneSourceAtATime(true);
 
@@ -107,59 +107,9 @@ public class AnalysisTest {
 //        infoflow.getSinks().add("<edu.cmu.cs.mvelezce.analysis.Sink: boolean getDecision(boolean)>");
 //    }
 
-
-    protected void checkInfoflow(TaintInfoflow infoflow, int resultCount) {
-        if(infoflow.isResultAvailable()) {
-            InfoflowResults map = infoflow.getResults();
-            boolean containsSink = false;
-            List<String> actualSinkStrings = new LinkedList<String>();
-            assertEquals(resultCount, map.size());
-            for(String sink : infoflow.getSinks()) {
-                if(map.containsSinkMethod(sink)) {
-                    containsSink = true;
-                    actualSinkStrings.add(sink);
-                }
-            }
-
-            assertTrue(containsSink);
-            boolean onePathFound = false;
-            for(String sink : actualSinkStrings) {
-                boolean hasPath = false;
-                for(String source : infoflow.getSources()) {
-                    if(map.isPathBetweenMethods(sink, source)) {
-                        hasPath = true;
-                        break;
-                    }
-                }
-                if(hasPath) {
-                    onePathFound = true;
-                }
-            }
-            assertTrue(onePathFound);
-        }
-        else {
-            fail("result is not available");
-        }
-    }
-
-    protected void negativeCheckInfoflow(TaintInfoflow infoflow) {
-        if(infoflow.isResultAvailable()) {
-            InfoflowResults map = infoflow.getResults();
-            for(String sink : infoflow.getSinks()) {
-                if(map.containsSinkMethod(sink)) {
-                    fail("sink is reached: " + sink);
-                }
-            }
-            assertEquals(0, map.size());
-        }
-        else {
-            fail("result is not available");
-        }
-    }
-
     @Test
-    public void interaction01() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        String systemName = "interaction01";
+    public void interaction0_1() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        String systemName = "interaction0_1";
         TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
@@ -174,7 +124,7 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction01: void main(java.lang.String[])>";
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction0_1: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -184,7 +134,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -221,7 +171,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(3);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -258,7 +208,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(5);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -295,7 +245,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(2);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -332,7 +282,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(2);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -340,36 +290,6 @@ public class AnalysisTest {
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
-    }
-
-    @Test
-    public void interaction31() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        TaintInfoflow infoflow = new TaintInfoflow("interaction31");
-
-        // Configure analysis
-        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
-        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
-//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
-//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
-
-        // Add taint wrapper
-//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
-//        infoflow.setTaintWrapper(easyWrapper);
-
-        // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction4: void main(java.lang.String[])>";
-
-        List<String> entryPoints = new ArrayList<>();
-        entryPoints.add(entryPoint);
-
-        // Run
-        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint);
-//        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-
-        infoflow.aggregateInfoflowResults();
-        infoflow.saveJimpleFiles();
     }
 
     @Test
@@ -399,7 +319,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(2);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -436,7 +356,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(2);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -447,8 +367,8 @@ public class AnalysisTest {
     }
 
     @Test
-    public void interaction50() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        String systemName = "interaction50";
+    public void interaction5_0() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        String systemName = "interaction5_0";
         TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
@@ -463,7 +383,7 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction50: void main(java.lang.String[])>";
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction5_0: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -473,7 +393,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(3);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -484,8 +404,8 @@ public class AnalysisTest {
     }
 
     @Test
-    public void interaction51() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        String systemName = "interaction51";
+    public void interaction5_1() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        String systemName = "interaction5_1";
         TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
@@ -500,7 +420,7 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction51: void main(java.lang.String[])>";
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction5_1: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -510,7 +430,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(2);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -521,8 +441,8 @@ public class AnalysisTest {
     }
 
     @Test
-    public void interaction52() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        String systemName = "interaction52";
+    public void interaction5_2() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        String systemName = "interaction5_2";
         TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
@@ -537,7 +457,7 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction52: void main(java.lang.String[])>";
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction5_2: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -547,7 +467,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(3);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -558,8 +478,8 @@ public class AnalysisTest {
     }
 
     @Test
-    public void interaction53() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        String systemName = "interaction53";
+    public void interaction5_3() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        String systemName = "interaction5_3";
         TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
@@ -574,7 +494,7 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction53: void main(java.lang.String[])>";
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction5_3: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -584,7 +504,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(6);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -595,8 +515,8 @@ public class AnalysisTest {
     }
 
     @Test
-    public void interaction54() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        String systemName = "interaction54";
+    public void interaction5_4() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        String systemName = "interaction5_4";
         TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
@@ -611,7 +531,7 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction54: void main(java.lang.String[])>";
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction5_4: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -621,7 +541,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(3);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -632,8 +552,8 @@ public class AnalysisTest {
     }
 
     @Test
-    public void interaction55() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        String systemName = "interaction55";
+    public void interaction5_5() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        String systemName = "interaction5_5";
         TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
@@ -648,7 +568,7 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction55: void main(java.lang.String[])>";
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction5_5: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -658,7 +578,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(6);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -669,8 +589,8 @@ public class AnalysisTest {
     }
 
     @Test
-    public void interaction56() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        String systemName = "interaction56";
+    public void interaction5_6() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        String systemName = "interaction5_6";
         TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
@@ -685,7 +605,7 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction56: void main(java.lang.String[])>";
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction5_6: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -695,7 +615,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(6);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -706,8 +626,8 @@ public class AnalysisTest {
     }
 
     @Test
-    public void interaction510() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        String systemName = "interaction510";
+    public void Interaction5_ColorCounter() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        String systemName = "interaction5_ColorCounter";
         TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
@@ -722,7 +642,7 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction510: void main(java.lang.String[])>";
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction5_ColorCounter: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -732,7 +652,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(5);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -769,7 +689,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -799,7 +719,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -829,7 +749,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -859,7 +779,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -889,7 +809,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -919,7 +839,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -950,7 +870,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
 
 
@@ -984,7 +904,7 @@ public class AnalysisTest {
         infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -1003,7 +923,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 2);
         infoflow.checkResults();
         infoflow.saveJimpleFiles();
     }
@@ -1024,7 +943,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 2);
         infoflow.checkResults();
     }
 
@@ -1044,7 +962,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 2);
         infoflow.checkResults();
     }
 
@@ -1064,7 +981,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 1);
         infoflow.checkResults();
     }
 
@@ -1084,7 +1000,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 1);
         infoflow.checkResults();
     }
 
@@ -1104,7 +1019,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 1);
         infoflow.checkResults();
     }
 
@@ -1124,7 +1038,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -1144,7 +1057,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.negativeCheckInfoflow(infoflow);
     }
 
     @Test
@@ -1163,7 +1075,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -1191,7 +1102,7 @@ public class AnalysisTest {
         infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -1210,7 +1121,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
 
@@ -1229,7 +1139,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 10);
         infoflow.checkResults();
     }
 
@@ -1251,7 +1160,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 2);
         infoflow.checkResults();
     }
 
@@ -1270,7 +1178,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 7);
         infoflow.checkResults();
     }
 
@@ -1289,7 +1196,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 7);
         infoflow.checkResults();
     }
 
@@ -1308,7 +1214,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 1);
         infoflow.checkResults();
     }
 
@@ -1327,7 +1232,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 2);
         infoflow.checkResults();
     }
 
@@ -1346,7 +1250,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -1365,7 +1268,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.negativeCheckInfoflow(infoflow);
         infoflow.checkResults();
     }
 
@@ -1384,7 +1286,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
 
@@ -1405,7 +1306,6 @@ public class AnalysisTest {
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
         infoflow.saveJimpleFiles();
-        this.checkInfoflow(infoflow, 2);
         infoflow.checkResults();
     }
 
@@ -1435,7 +1335,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -1456,7 +1356,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -1498,7 +1397,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 2);
         infoflow.checkResults();
     }
 
@@ -1519,7 +1417,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -1539,7 +1436,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -1560,7 +1456,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -1581,7 +1476,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -1604,7 +1498,6 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -1626,7 +1519,6 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 3);
         infoflow.checkResults();
     }
 
@@ -1656,7 +1548,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -1676,7 +1568,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 6);
         infoflow.checkResults();
     }
 
@@ -1695,7 +1586,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
 
@@ -1714,7 +1604,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 5);
         infoflow.checkResults();
     }
 
@@ -1748,7 +1637,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -1787,7 +1676,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -1813,7 +1702,7 @@ public class AnalysisTest {
         infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -1839,7 +1728,7 @@ public class AnalysisTest {
         infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -1861,7 +1750,6 @@ public class AnalysisTest {
 
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-        this.checkInfoflow(infoflow, 9);
         infoflow.checkResults();
     }
 
@@ -1894,7 +1782,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -1926,7 +1814,7 @@ public class AnalysisTest {
         infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -1951,7 +1839,6 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
 
@@ -1977,7 +1864,6 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
 
@@ -2010,7 +1896,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 
@@ -2036,7 +1922,6 @@ public class AnalysisTest {
 
         infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-//        this.checkInfoflow(infoflow, 4);
         infoflow.checkResults();
     }
 
@@ -2069,7 +1954,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
     }
 }

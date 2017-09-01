@@ -26,6 +26,7 @@ import soot.toolkits.graph.ExceptionalUnitGraph;
 
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import soot.toolkits.graph.TaintflowUnitGraph;
 
 public abstract class AbstractJimpleBasedICFG implements BiDiInterproceduralCFG<Unit,SootMethod> {
 	
@@ -103,7 +104,8 @@ public abstract class AbstractJimpleBasedICFG implements BiDiInterproceduralCFG<
 	protected DirectedGraph<Unit> makeGraph(Body body) {
 		return enableExceptions
 				? new ExceptionalUnitGraph(body, UnitThrowAnalysis.v() ,true)
-				: new BriefUnitGraph(body);
+//				: new BriefUnitGraph(body);
+				: new TaintflowUnitGraph(body);
 	}
 
 	@Override

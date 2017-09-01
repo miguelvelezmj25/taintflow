@@ -9,7 +9,7 @@ import edu.cmu.cs.mvelezce.analysis.option.Source;
 
     There are no exception edges in this example
 
-    There are 6 results
+    There are 5 results
  */
 public class Interaction1 {
 

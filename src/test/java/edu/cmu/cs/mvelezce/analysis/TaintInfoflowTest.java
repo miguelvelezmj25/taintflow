@@ -9,7 +9,7 @@ public class TaintInfoflowTest {
     @Test
     public void aggregateInfoflowResultsTest() throws Exception {
         TaintInfoflow infoflow = new TaintInfoflow("running-example");
-        infoflow.aggregateInfoflowResults();
+        infoflow.aggregateInfoflowResults(3);
     }
 
 }

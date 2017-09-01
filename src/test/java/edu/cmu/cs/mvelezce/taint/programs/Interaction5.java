@@ -4,8 +4,7 @@ import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 /*
-    Try catch with a control flow decision that uses a tainted value. The compiler optimizes the bytecode an removes
-    the try catch since no statement can throw an exception.
+    The compiler optimizes the bytecode an removes the try catch since no statement can throw an exception.
 
     There are no exception edges in this example
 
