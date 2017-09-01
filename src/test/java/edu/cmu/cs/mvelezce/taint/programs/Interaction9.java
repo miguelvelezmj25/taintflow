@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /*
-    Object
+    Object reference is tainted with all vairables that tainted its fields
  */
 public class Interaction9 {
 

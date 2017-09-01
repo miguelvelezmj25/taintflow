@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /*
-    Equals and hashcode
+    Equals and hashcode are not called explicitly and do not show results
  */
 public class Interaction8 {
 

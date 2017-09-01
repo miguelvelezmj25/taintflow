@@ -4,7 +4,7 @@ import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 /*
-    Loops
+    Loops without exceptions are not tainted
  */
 public class Interaction7 {
 

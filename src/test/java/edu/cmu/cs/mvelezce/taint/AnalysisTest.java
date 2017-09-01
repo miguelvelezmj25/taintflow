@@ -9,16 +9,14 @@ import org.junit.Test;
 import soot.jimple.infoflow.InfoflowConfiguration;
 import soot.jimple.infoflow.config.IInfoflowConfig;
 import soot.jimple.infoflow.data.pathBuilders.DefaultPathBuilderFactory;
-import soot.jimple.infoflow.results.InfoflowResults;
 
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.fail;
 
 public class AnalysisTest {
 
@@ -665,7 +663,8 @@ public class AnalysisTest {
 
     @Test
     public void interaction6() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        TaintInfoflow infoflow = new TaintInfoflow("interaction6");
+        String systemName = "interaction6";
+        TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
@@ -689,13 +688,21 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(1);
+        infoflow.aggregateInfoflowResults(3);
         infoflow.saveJimpleFiles();
+        infoflow.saveDotStringFiles();
+
+        String root = "src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
     public void interaction7() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        TaintInfoflow infoflow = new TaintInfoflow("interaction7");
+        String systemName = "interaction7";
+        TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
@@ -709,7 +716,7 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction71: void main(java.lang.String[])>";
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction7: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -719,13 +726,21 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(1);
+        infoflow.aggregateInfoflowResults(2);
         infoflow.saveJimpleFiles();
+        infoflow.saveDotStringFiles();
+
+        String root = "src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
     public void interaction8() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        TaintInfoflow infoflow = new TaintInfoflow("interaction8");
+        String systemName = "interaction8";
+        TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
@@ -751,11 +766,57 @@ public class AnalysisTest {
 
         infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
+        infoflow.saveDotStringFiles();
+
+        String root = "src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+    }
+
+    @Test
+    public void interaction8_0() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        String systemName = "interaction8_0";
+        TaintInfoflow infoflow = new TaintInfoflow(systemName);
+
+        // Configure analysis
+        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
+        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
+
+        // Add taint wrapper
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        // Add entry points
+        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction8_0: void main(java.lang.String[])>";
+
+        List<String> entryPoints = new ArrayList<>();
+        entryPoints.add(entryPoint);
+
+        // Run
+        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint);
+//        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+//        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
+
+        infoflow.aggregateInfoflowResults(7);
+        infoflow.saveJimpleFiles();
+        infoflow.saveDotStringFiles();
+
+        String root = "src/test/java/edu/cmu/cs/mvelezce/taint/programs";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
     public void interaction9() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        TaintInfoflow infoflow = new TaintInfoflow("interaction9");
+        String systemName = "interaction9";
+        TaintInfoflow infoflow = new TaintInfoflow(systemName);
 
         // Configure analysis
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
@@ -779,105 +840,15 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(1);
+        infoflow.aggregateInfoflowResults(3);
         infoflow.saveJimpleFiles();
-    }
-
-    @Test
-    public void interaction10() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        TaintInfoflow infoflow = new TaintInfoflow("interaction10");
-
-        // Configure analysis
-        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
-        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
-//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
-//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
-
-        // Add taint wrapper
-//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
-//        infoflow.setTaintWrapper(easyWrapper);
-
-        // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction10: void main(java.lang.String[])>";
-
-        List<String> entryPoints = new ArrayList<>();
-        entryPoints.add(entryPoint);
-
-        // Run
-        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint);
-//        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-
-        infoflow.aggregateInfoflowResults(1);
-        infoflow.saveJimpleFiles();
-    }
-
-    @Test
-    public void interaction11() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        TaintInfoflow infoflow = new TaintInfoflow("interaction11");
-
-        // Configure analysis
-        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
-        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
-//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
-//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
-
-        // Add taint wrapper
-//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
-//        infoflow.setTaintWrapper(easyWrapper);
-
-        // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction11: void main(java.lang.String[])>";
-
-        List<String> entryPoints = new ArrayList<>();
-        entryPoints.add(entryPoint);
-
-        // Run
-        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint);
-//        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-
-        infoflow.aggregateInfoflowResults(1);
-        infoflow.saveJimpleFiles();
-    }
-
-    @Test
-    public void interaction12() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        String systemName = "interaction12";
-        TaintInfoflow infoflow = new TaintInfoflow(systemName);
-
-        // Configure analysis
-        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
-        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
-//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
-//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
-
-        // Add taint wrapper
-//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
-//        infoflow.setTaintWrapper(easyWrapper);
-
-        // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.taint.programs.Interaction12: void main(java.lang.String[])>";
-
-        List<String> entryPoints = new ArrayList<>();
-        entryPoints.add(entryPoint);
-
-        // Run
-        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint);
-//        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-//        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
-
-        infoflow.aggregateInfoflowResults(1);
-        infoflow.saveJimpleFiles();
-
+        infoflow.saveDotStringFiles();
 
         String root = "src/test/java/edu/cmu/cs/mvelezce/taint/programs";
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
+        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test

@@ -4,7 +4,7 @@ import edu.cmu.cs.mvelezce.analysis.option.Sink;
 import edu.cmu.cs.mvelezce.analysis.option.Source;
 
 /*
-    Loops and Exceptions
+    When an exception is thrown inside a loop based on a condition, the loop's condition depends on that condition
  */
 public class Interaction6 {
 
