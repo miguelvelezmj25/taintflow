@@ -5,11 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.cmu.cs.mvelezce.analysis.option.json.ControlFlowResult;
 import edu.cmu.cs.mvelezce.analysis.option.json.SourceToSinkPath;
-import edu.cmu.cs.mvelezce.format.instrument.methodnode.MethodTransformer;
-import edu.cmu.cs.mvelezce.format.sink.AddSinkBeforeControlFlowDecisionTransformer;
 import edu.cmu.cs.mvelezce.soot.jimple.jtp.ControlFlowSink;
-import edu.cmu.cs.mvelezce.soot.jimple.jtp.Nop;
-import edu.cmu.cs.mvelezce.soot.jimple.jtp.TryCatchLabelNop;
 import org.apache.commons.io.FileUtils;
 import soot.*;
 import soot.jimple.InvokeExpr;
@@ -31,7 +27,6 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 public class TaintInfoflow extends Infoflow {
@@ -283,6 +278,8 @@ public class TaintInfoflow extends Infoflow {
             String packageName = sinkAtClass.getPackageName();
             String className = sinkAtClass.getShortName();
             String methodSignature = sinkAtMethod.getBytecodeSignature();
+            methodSignature = methodSignature.substring(methodSignature.indexOf(":") + 1, methodSignature.length() - 1);
+            methodSignature = methodSignature.trim();
 
             List<Integer> bytecodeIndexes = new ArrayList<>();
 
