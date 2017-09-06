@@ -162,8 +162,8 @@ public class IFDSSolver<N,D extends FastSolverLinkedNode<D, N>,I extends BiDiInt
 		this.flowFunctions = flowFunctions;
 		this.initialSeeds = tabulationProblem.initialSeeds();
 		this.followReturnsPastSeeds = tabulationProblem.followReturnsPastSeeds();
-//		this.numThreads = Math.max(1,tabulationProblem.numThreads());
-		this.numThreads = 1;
+		this.numThreads = Math.max(1,tabulationProblem.numThreads());
+//		this.numThreads = 1;
 		this.executor = getExecutor();
 	}
 	
