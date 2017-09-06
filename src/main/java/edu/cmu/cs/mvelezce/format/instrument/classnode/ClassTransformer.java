@@ -12,9 +12,9 @@ import java.util.Set;
  */
 public interface ClassTransformer {
 
-    public void addToClassPath(String path) throws NoSuchMethodException, MalformedURLException, InvocationTargetException, IllegalAccessException;
+    public void addToClassPath(String pathToClass) throws NoSuchMethodException, MalformedURLException, InvocationTargetException, IllegalAccessException;
 
-//    public void transformClass(ClassNode classNode);
+    public String getPath();
 
     public Set<ClassNode> readClasses() throws IOException;
 

@@ -19,18 +19,18 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
-public abstract class ClassTransformerBase implements ClassTransformer {
+public abstract class BaseClassTransformer implements ClassTransformer {
 
     private String path;
 
-    public ClassTransformerBase(String path) throws NoSuchMethodException, MalformedURLException, IllegalAccessException, InvocationTargetException {
+    public BaseClassTransformer(String path) throws NoSuchMethodException, MalformedURLException, IllegalAccessException, InvocationTargetException {
         this.path = path;
         this.addToClassPath(path);
     }
 
     @Override
-    public void addToClassPath(String path) throws NoSuchMethodException, MalformedURLException, InvocationTargetException, IllegalAccessException {
-        File f = new File(path);
+    public void addToClassPath(String pathToClass) throws NoSuchMethodException, MalformedURLException, InvocationTargetException, IllegalAccessException {
+        File f = new File(pathToClass);
         URI u = f.toURI();
         URLClassLoader urlClassLoader = (URLClassLoader) ClassLoader.getSystemClassLoader();
         Class<URLClassLoader> urlClass = URLClassLoader.class;
@@ -94,6 +94,7 @@ public abstract class ClassTransformerBase implements ClassTransformer {
         output.close();
     }
 
+    @Override
     public String getPath() {
         return this.path;
     }

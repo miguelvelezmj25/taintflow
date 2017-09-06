@@ -1,6 +1,7 @@
 package edu.cmu.cs.mvelezce.format.instrument.methodnode;
 
-import edu.cmu.cs.mvelezce.format.instrument.classnode.ClassTransformerBase;
+import edu.cmu.cs.mvelezce.format.instrument.classnode.ClassTransformer;
+import edu.cmu.cs.mvelezce.format.instrument.classnode.DefaultBaseClassTransformer;
 import jdk.internal.org.objectweb.asm.tree.ClassNode;
 import jdk.internal.org.objectweb.asm.tree.MethodNode;
 
@@ -9,15 +10,30 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.util.Set;
 
-public abstract class MethodTransformerBase extends ClassTransformerBase implements MethodTransformer {
+public abstract class BaseMethodTransformer implements MethodTransformer {
 
-    public MethodTransformerBase(String path) throws NoSuchMethodException, MalformedURLException, IllegalAccessException, InvocationTargetException {
-        super(path);
+    private ClassTransformer classTransformer = null;
+
+////    public BaseMethodTransformer() {
+////
+////    }
+//
+//    public BaseMethodTransformer(String path) throws InvocationTargetException, NoSuchMethodException, MalformedURLException, IllegalAccessException {
+//        this.classTransformer = new DefaultBaseClassTransformer(path);
+//    }
+
+    public BaseMethodTransformer() { }
+
+    public ClassTransformer getClassTransformer() {
+        return classTransformer;
     }
 
-    @Override
+    public void setClassTransformer(ClassTransformer classTransformer) {
+        this.classTransformer = classTransformer;
+    }
+
     public void transformMethods() throws IOException {
-        Set<ClassNode> classNodes = this.readClasses();
+        Set<ClassNode> classNodes = this.classTransformer.readClasses();
         this.transformMethods(classNodes);
     }
 
@@ -36,7 +52,7 @@ public abstract class MethodTransformerBase extends ClassTransformerBase impleme
                 this.transformMethod(methodToInstrument);
             }
 
-            this.writeClass(classNode, this.getPath() + "/" + classNode.name);
+            this.classTransformer.writeClass(classNode, this.classTransformer.getPath() + "/" + classNode.name);
         }
     }
 }

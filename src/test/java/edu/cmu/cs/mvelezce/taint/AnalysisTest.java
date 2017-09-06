@@ -4,6 +4,7 @@ import edu.cmu.cs.mvelezce.analysis.TaintInfoflow;
 import edu.cmu.cs.mvelezce.soot.SootConfig;
 import edu.cmu.cs.mvelezce.visualization.HTMLOutputGenerator;
 import edu.cmu.cs.mvelezce.visualization.HTMLPathGenerator;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import soot.jimple.infoflow.InfoflowConfiguration;
@@ -28,8 +29,15 @@ public class AnalysisTest {
     protected static InfoflowConfiguration infoflowConfiguration;
     protected static IInfoflowConfig sootConfiguration;
 
-    @BeforeClass
-    public static void setUp() throws IOException {
+    @Before
+    public void resetSootAndStream() throws IOException {
+        soot.G.reset();
+        System.gc();
+
+    }
+
+    @Before
+    public void setUp() throws IOException {
         File f = new File(".");
         File testSrc1 = new File(f, "target" + File.separator + "classes");
         File testSrc2 = new File(f, "target" + File.separator + "test-classes");

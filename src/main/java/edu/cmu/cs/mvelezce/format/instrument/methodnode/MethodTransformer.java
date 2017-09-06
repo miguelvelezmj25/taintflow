@@ -12,7 +12,7 @@ public interface MethodTransformer {
 
     public void transformMethod(MethodNode methodNode);
 
-    void transformMethods() throws IOException;
+    public void transformMethods() throws IOException;
 
-    public void transformMethods(Set<ClassNode> classNodes) throws IOException;
+    void transformMethods(Set<ClassNode> classNodes) throws IOException;
 }
