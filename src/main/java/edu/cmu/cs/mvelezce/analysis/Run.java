@@ -23,19 +23,21 @@ public class Run {
     protected static IInfoflowConfig sootConfiguration;
 
     public static void main(String[] args) throws IOException {
+        soot.G.reset();
+        System.gc();
+
         File f = new File(".");
         File testSrc1 = new File(f, "target" + File.separator + "classes");
         File testSrc2 = new File(f, "target" + File.separator + "test-classes");
 
-        if(!(testSrc1.exists() || testSrc2.exists())) {
-            throw new RuntimeException("Test aborted - none of the test sources are available");
-        }
+//        f = new File("./soot-infoflow/");
+//        File testSrc3 = new File(f, "bin");
 
         appPath = testSrc1.getCanonicalPath() + sep + testSrc2.getCanonicalPath();//+ sep + testSrc3.getCanonicalPath();
         libPath = System.getProperty("java.home") + File.separator + "lib" + File.separator + "rt.jar"
                 + sep + System.getProperty("java.home") + File.separator + "lib" + File.separator + "jce.jar";
 
-// Config information flow
+        // Config information flow
         infoflowConfiguration = new InfoflowConfiguration();
 //        infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.CHA);
         infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.SPARK);
@@ -80,11 +82,14 @@ public class Run {
 //        infoflowConfiguration.setEnableExceptionTracking(true);
 //        InfoflowConfiguration.setOneResultPerAccessPath(true);
 
-
         // Config soot
         sootConfiguration = new SootConfig();
 
+
+
+
         File file = new File("/home/mvelezce/programming/java/projects/systems/original/berkeley-db/out/production/berkeley-db");
+//        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeley-db/out/production/berkeley-db");
         appPath = file + sep + appPath;
 
 //        file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeley-db/out/test/berkeley-db");
