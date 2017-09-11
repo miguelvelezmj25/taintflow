@@ -13,7 +13,7 @@ public class Basic4 {
     public static void foo(boolean x) {
         int i = 0;
 
-        if(Sink.getDecision(x)) {
+        if(x) {
             i++;
         }
     }

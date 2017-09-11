@@ -8,7 +8,7 @@ public class Basic3 {
     public static void main(String[] args) throws InterruptedException {
         boolean A = Source.getOptionA(Boolean.valueOf(args[0]));
 
-        if(Sink.getDecision(A)) {
+        if(A) {
             Basic3.foo();
         }
     }
@@ -16,7 +16,7 @@ public class Basic3 {
     public static void foo() {
         int x = 0;
 
-        if(Sink.getDecision(0 > 2)) {
+        if(0 > 2) {
             x++;
         }
     }

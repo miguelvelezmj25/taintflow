@@ -54,19 +54,19 @@ public class Basic14 {
         w.setB(b);
         w.setC(c);
 
-        if(Sink.getDecision(w == null)) {
+        if(w == null) {
             System.out.println(";");
         }
 
-        if(Sink.getDecision(w.isA())) {
+        if(w.isA()) {
             System.out.println(";");
         }
 
-        if(Sink.getDecision(w.isB())) {
+        if(w.isB()) {
             System.out.println(";");
         }
 
-        if(Sink.getDecision(w.isC())) {
+        if(w.isC()) {
             System.out.println(";");
         }
 
@@ -107,15 +107,15 @@ public class Basic14 {
         }
 
         public void analyze() {
-            if(Sink.getDecision(this.a)) {
+            if(this.a) {
                 System.out.println(":");
             }
 
-            if(Sink.getDecision(this.b)) {
+            if(this.b) {
                 System.out.println(":");
             }
 
-            if(Sink.getDecision(this.c)) {
+            if(this.c) {
                 System.out.println(":");
             }
         }

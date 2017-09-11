@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RangeEncoder.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; * RangeEncoder</div>
+<div>3&emsp;&emsp;&nbsp; *</div>
+<div>4&emsp;&emsp;&nbsp; * Authors: Lasse Collin &#60;lasse.collin@tukaani.org></div>
+<div>5&emsp;&emsp;&nbsp; *          Igor Pavlov &#60;http://7-zip.org/></div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; * This file has been put into the public domain.</div>
+<div>8&emsp;&emsp;&nbsp; * You can do whatever you want with this file.</div>
+<div>9&emsp;&emsp;&nbsp; */</div>
+<div>10&emsp;&emsp;</div>
+<div>11&emsp;&emsp;package org.tukaani.xz.rangecoder;</div>
+<div>12&emsp;&emsp;</div>
+<div>13&emsp;&emsp;import java.io.IOException;</div>
+<div>14&emsp;&emsp;</div>
+<div style="background-color:limegreen;">15&emsp;&emsp;<b>public abstract class RangeEncoder extends RangeCoder {&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>16&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final int MOVE_REDUCING_BITS = 4;</div>
+<div>17&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final int BIT_PRICE_SHIFT_BITS = 4;</div>
+<div>18&emsp;&emsp;</div>
+<div>19&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final int[] prices</div>
+<div>20&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            = new int[BIT_MODEL_TOTAL >>> MOVE_REDUCING_BITS];</div>
+<div>21&emsp;&emsp;</div>
+<div>22&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static {</div>
+<div style="background-color:limegreen;">23&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for(int i = (1 &#60;&#60; MOVE_REDUCING_BITS) / 2; i &#60; BIT_MODEL_TOTAL;&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>24&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            i += (1 &#60;&#60; MOVE_REDUCING_BITS)) {</div>
+<div>25&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int w = i;</div>
+<div>26&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int bitCount = 0;</div>
+<div>27&emsp;&emsp;</div>
+<div style="background-color:limegreen;">28&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            for(int j = 0; j &#60; BIT_PRICE_SHIFT_BITS; ++j) {&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>29&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                w *= w;</div>
+<div>30&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                bitCount &#60;&#60;= 1;</div>
+<div>31&emsp;&emsp;</div>
+<div style="background-color:limegreen;">32&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                while ((w & 0xFFFF0000) != 0) {&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>33&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    w >>>= 1;</div>
+<div>34&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    ++bitCount;</div>
+<div>35&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>36&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>37&emsp;&emsp;</div>
+<div>38&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            prices[i >> MOVE_REDUCING_BITS]</div>
+<div>39&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    = (BIT_MODEL_TOTAL_BITS &#60;&#60; BIT_PRICE_SHIFT_BITS)</div>
+<div>40&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    - 15 - bitCount;</div>
+<div>41&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>42&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>43&emsp;&emsp;</div>
+<div>44&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // NOTE: int is OK for LZMA2 because a compressed chunk</div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // is not more than 64 KiB, but with LZMA1 there is no chunking</div>
+<div>46&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // so in theory cacheSize can grow very big. To be very safe,</div>
+<div>47&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // use long instead of int since this code is used for LZMA1 too.</div>
+<div>48&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    long cacheSize;</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private long low;</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private int range;</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private byte cache;</div>
+<div>52&emsp;&emsp;</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static int getBitPrice(int prob, int bit) {</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // NOTE: Unlike in encodeBit(), here bit must be 0 or 1.</div>
+<div style="background-color:limegreen;">55&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        assert bit == 0 || bit == 1;&nbsp;&#8594; [GZIPCOMPRESSOR] & [GZIPCOMPRESSOR] & [GZIPCOMPRESSOR]</b></div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return prices[(prob ^ ((-bit) & (BIT_MODEL_TOTAL - 1)))</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                >>> MOVE_REDUCING_BITS];</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>59&emsp;&emsp;</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static int getBitTreePrice(short[] probs, int symbol) {</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int price = 0;</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        symbol |= probs.length;</div>
+<div>63&emsp;&emsp;</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        do {</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int bit = symbol & 1;</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            symbol >>>= 1;</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            price += getBitPrice(probs[symbol], bit);</div>
+<div style="background-color:limegreen;">68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        } while (symbol != 1);&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>69&emsp;&emsp;</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return price;</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>72&emsp;&emsp;</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static int getReverseBitTreePrice(short[] probs, int symbol) {</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int price = 0;</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int index = 1;</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        symbol |= probs.length;</div>
+<div>77&emsp;&emsp;</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        do {</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int bit = symbol & 1;</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            symbol >>>= 1;</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            price += getBitPrice(probs[index], bit);</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            index = (index &#60;&#60; 1) | bit;</div>
+<div style="background-color:limegreen;">83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        } while (symbol != 1);&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>84&emsp;&emsp;</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return price;</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>87&emsp;&emsp;</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static int getDirectBitsPrice(int count) {</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return count &#60;&#60; BIT_PRICE_SHIFT_BITS;</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>91&emsp;&emsp;</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void reset() {</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        low = 0;</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        range = 0xFFFFFFFF;</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        cache = 0x00;</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        cacheSize = 1;</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>98&emsp;&emsp;</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public int getPendingSize() {</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // This function is only needed by users of RangeEncoderToBuffer,</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // but providing a must-be-never-called version here makes</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // LZMAEncoder simpler.</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Error();</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>105&emsp;&emsp;</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public int finish() throws IOException {</div>
+<div style="background-color:limegreen;">107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for(int i = 0; i &#60; 5; ++i)&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            shiftLow();</div>
+<div>109&emsp;&emsp;</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // RangeEncoderToBuffer.finish() needs a return value to tell</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // how big the finished buffer is. RangeEncoderToStream has no</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // buffer and thus no return value is needed. Here we use a dummy</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // value which can be overriden in RangeEncoderToBuffer.finish().</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return -1;</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>116&emsp;&emsp;</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    abstract void writeByte(int b) throws IOException;</div>
+<div>118&emsp;&emsp;</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void shiftLow() throws IOException {</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int lowHi = (int) (low >>> 32);</div>
+<div>121&emsp;&emsp;</div>
+<div style="background-color:limegreen;">122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(lowHi != 0 || low &#60; 0xFF000000L) {&nbsp;&#8594; [GZIPCOMPRESSOR] & [GZIPCOMPRESSOR]</b></div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int temp = cache;</div>
+<div>124&emsp;&emsp;</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            do {</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                writeByte(temp + lowHi);</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                temp = 0xFF;</div>
+<div style="background-color:limegreen;">128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            } while (--cacheSize != 0);&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>129&emsp;&emsp;</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            cache = (byte) (low >>> 24);</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>132&emsp;&emsp;</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ++cacheSize;</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        low = (low & 0x00FFFFFF) &#60;&#60; 8;</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>136&emsp;&emsp;</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void encodeBit(short[] probs, int index, int bit)</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throws IOException {</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int prob = probs[index];</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int bound = (range >>> BIT_MODEL_TOTAL_BITS) * prob;</div>
+<div>141&emsp;&emsp;</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // NOTE: Any non-zero value for bit is taken as 1.</div>
+<div style="background-color:limegreen;">143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(bit == 0) {&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            range = bound;</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            probs[index] = (short) (</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    prob + ((BIT_MODEL_TOTAL - prob) >>> MOVE_BITS));</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            low += bound & 0xFFFFFFFFL;</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            range -= bound;</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            probs[index] = (short) (prob - (prob >>> MOVE_BITS));</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>153&emsp;&emsp;</div>
+<div style="background-color:limegreen;">154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if((range & TOP_MASK) == 0) {&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            range &#60;&#60;= SHIFT_BITS;</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            shiftLow();</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>159&emsp;&emsp;</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void encodeBitTree(short[] probs, int symbol) throws IOException {</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int index = 1;</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int mask = probs.length;</div>
+<div>163&emsp;&emsp;</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        do {</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            mask >>>= 1;</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int bit = symbol & mask;</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            encodeBit(probs, index, bit);</div>
+<div>168&emsp;&emsp;</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            index &#60;&#60;= 1;</div>
+<div style="background-color:limegreen;">170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(bit != 0) {&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                index |= 1;</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>173&emsp;&emsp;</div>
+<div style="background-color:limegreen;">174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        } while (mask != 1);&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>176&emsp;&emsp;</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void encodeReverseBitTree(short[] probs, int symbol)</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throws IOException {</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int index = 1;</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        symbol |= probs.length;</div>
+<div>181&emsp;&emsp;</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        do {</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int bit = symbol & 1;</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            symbol >>>= 1;</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            encodeBit(probs, index, bit);</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            index = (index &#60;&#60; 1) | bit;</div>
+<div style="background-color:limegreen;">187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        } while (symbol != 1);&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>189&emsp;&emsp;</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void encodeDirectBits(int value, int count) throws IOException {</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        do {</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            range >>>= 1;</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            low += range & (0 - ((value >>> --count) & 1));</div>
+<div>194&emsp;&emsp;</div>
+<div style="background-color:limegreen;">195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if((range & TOP_MASK) == 0) {&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                range &#60;&#60;= SHIFT_BITS;</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                shiftLow();</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div style="background-color:limegreen;">199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        } while (count != 0);&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>201&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

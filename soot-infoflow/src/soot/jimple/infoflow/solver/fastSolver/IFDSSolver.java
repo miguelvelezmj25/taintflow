@@ -163,6 +163,7 @@ public class IFDSSolver<N,D extends FastSolverLinkedNode<D, N>,I extends BiDiInt
 		this.initialSeeds = tabulationProblem.initialSeeds();
 		this.followReturnsPastSeeds = tabulationProblem.followReturnsPastSeeds();
 		this.numThreads = Math.max(1,tabulationProblem.numThreads());
+//		this.numThreads = 1;
 		this.executor = getExecutor();
 	}
 	
@@ -692,7 +693,8 @@ public class IFDSSolver<N,D extends FastSolverLinkedNode<D, N>,I extends BiDiInt
 		}
 
 		public void run() {
-			if(icfg.isCallStmt(edge.getTarget())) {
+//            System.out.println("Edge: " + this.edge);
+            if(icfg.isCallStmt(edge.getTarget())) {
 				processCall(edge);
 			} else {
 				//note that some statements, such as "throw" may be

@@ -56,17 +56,17 @@ public class Basic15 {
         w.addOption(b);
         w.addOption(c);
 
-        if(Sink.getDecision(w == null)) {
+        if(w == null) {
             System.out.println(";");
         }
 
 
-        if(Sink.getDecision(w.getOptions().isEmpty())) {
+        if(w.getOptions().isEmpty()) {
             System.out.println(";");
         }
 
 
-        if(Sink.getDecision(w.getOptions().iterator().next())) {
+        if(w.getOptions().iterator().next()) {
             System.out.println(";");
         }
 
@@ -90,25 +90,25 @@ public class Basic15 {
         }
 
         public void addOption(boolean option) {
-            if(Sink.getDecision(option)) {
+            if(option) {
                 System.out.println(":");
             }
 
             this.options.add(option);
 
-            if(Sink.getDecision(this.options.isEmpty())) {
+            if(this.options.isEmpty()) {
                 System.out.println(":");
             }
         }
 
         public void analyze() {
-            if(Sink.getDecision(this.options.isEmpty())) {
+            if(this.options.isEmpty()) {
                 System.out.println(":");
             }
 
 
             for(Boolean b : this.options) {
-                if(Sink.getDecision(b)) {
+                if(b) {
                     System.out.println(":");
                 }
             }

@@ -36,8 +36,8 @@ public class Basic16 {
         int y = x[i];
         int z = x[j];
 
-        Sink.getDecision(y == 0);
-        Sink.getDecision(z == 0);
+        Sink.sink(y == 0);
+        Sink.sink(z == 0);
     }
 
 }

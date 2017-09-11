@@ -16,14 +16,14 @@ public class Union0 {
         boolean a;
         boolean b;
 
-        if(Sink.getDecision(A)) {
+        if(A) {
             a = true;
         }
         else {
             a = false;
         }
 
-        if(Sink.getDecision(B)) {
+        if(B) {
             b = true;
         }
         else {
@@ -32,12 +32,12 @@ public class Union0 {
 
         Thread.sleep(1);
 
-        if(Sink.getDecision(a)) {
+        if(a) {
             Thread.sleep(2);
             m1();
         }
 
-        if(Sink.getDecision(b)) {
+        if(b) {
             Thread.sleep(3);
             m1();
         }

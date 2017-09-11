@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LZMACoder.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; * LZMACoder</div>
+<div>3&emsp;&emsp;&nbsp; *</div>
+<div>4&emsp;&emsp;&nbsp; * Authors: Lasse Collin &#60;lasse.collin@tukaani.org></div>
+<div>5&emsp;&emsp;&nbsp; *          Igor Pavlov &#60;http://7-zip.org/></div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; * This file has been put into the public domain.</div>
+<div>8&emsp;&emsp;&nbsp; * You can do whatever you want with this file.</div>
+<div>9&emsp;&emsp;&nbsp; */</div>
+<div>10&emsp;&emsp;</div>
+<div>11&emsp;&emsp;package org.tukaani.xz.lzma;</div>
+<div>12&emsp;&emsp;</div>
+<div>13&emsp;&emsp;import org.tukaani.xz.rangecoder.RangeCoder;</div>
+<div>14&emsp;&emsp;</div>
+<div>15&emsp;&emsp;abstract class LZMACoder {</div>
+<div>16&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static final int POS_STATES_MAX = 1 &#60;&#60; 4;</div>
+<div>17&emsp;&emsp;</div>
+<div>18&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static final int MATCH_LEN_MIN = 2;</div>
+<div>19&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static final int MATCH_LEN_MAX = MATCH_LEN_MIN + LengthCoder.LOW_SYMBOLS</div>
+<div>20&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + LengthCoder.MID_SYMBOLS</div>
+<div>21&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + LengthCoder.HIGH_SYMBOLS - 1;</div>
+<div>22&emsp;&emsp;</div>
+<div>23&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static final int DIST_STATES = 4;</div>
+<div>24&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static final int DIST_SLOTS = 1 &#60;&#60; 6;</div>
+<div>25&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static final int DIST_MODEL_START = 4;</div>
+<div>26&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static final int DIST_MODEL_END = 14;</div>
+<div>27&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static final int FULL_DISTANCES = 1 &#60;&#60; (DIST_MODEL_END / 2);</div>
+<div>28&emsp;&emsp;</div>
+<div>29&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static final int ALIGN_BITS = 4;</div>
+<div>30&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static final int ALIGN_SIZE = 1 &#60;&#60; ALIGN_BITS;</div>
+<div>31&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static final int ALIGN_MASK = ALIGN_SIZE - 1;</div>
+<div>32&emsp;&emsp;</div>
+<div>33&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static final int REPS = 4;</div>
+<div>34&emsp;&emsp;</div>
+<div>35&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final int posMask;</div>
+<div>36&emsp;&emsp;</div>
+<div>37&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final int[] reps = new int[REPS];</div>
+<div>38&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final State state = new State();</div>
+<div>39&emsp;&emsp;</div>
+<div>40&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final short[][] isMatch = new short[State.STATES][POS_STATES_MAX];</div>
+<div>41&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final short[] isRep = new short[State.STATES];</div>
+<div>42&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final short[] isRep0 = new short[State.STATES];</div>
+<div>43&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final short[] isRep1 = new short[State.STATES];</div>
+<div>44&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final short[] isRep2 = new short[State.STATES];</div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final short[][] isRep0Long = new short[State.STATES][POS_STATES_MAX];</div>
+<div>46&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final short[][] distSlots = new short[DIST_STATES][DIST_SLOTS];</div>
+<div>47&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final short[][] distSpecial = {new short[2], new short[2],</div>
+<div>48&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new short[4], new short[4],</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new short[8], new short[8],</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new short[16], new short[16],</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new short[32], new short[32]};</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final short[] distAlign = new short[ALIGN_SIZE];</div>
+<div>53&emsp;&emsp;</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    LZMACoder(int pb) {</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        posMask = (1 &#60;&#60; pb) - 1;</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>57&emsp;&emsp;</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static final int getDistState(int len) {</div>
+<div style="background-color:limegreen;">59&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return len &#60; DIST_STATES + MATCH_LEN_MIN&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                ? len - MATCH_LEN_MIN</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                : DIST_STATES - 1;</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>63&emsp;&emsp;</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    void reset() {</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        reps[0] = 0;</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        reps[1] = 0;</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        reps[2] = 0;</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        reps[3] = 0;</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        state.reset();</div>
+<div>70&emsp;&emsp;</div>
+<div style="background-color:limegreen;">71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for(int i = 0; i &#60; isMatch.length; ++i)&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            RangeCoder.initProbs(isMatch[i]);</div>
+<div>73&emsp;&emsp;</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        RangeCoder.initProbs(isRep);</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        RangeCoder.initProbs(isRep0);</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        RangeCoder.initProbs(isRep1);</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        RangeCoder.initProbs(isRep2);</div>
+<div>78&emsp;&emsp;</div>
+<div style="background-color:limegreen;">79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for(int i = 0; i &#60; isRep0Long.length; ++i)&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            RangeCoder.initProbs(isRep0Long[i]);</div>
+<div>81&emsp;&emsp;</div>
+<div style="background-color:limegreen;">82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for(int i = 0; i &#60; distSlots.length; ++i)&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            RangeCoder.initProbs(distSlots[i]);</div>
+<div>84&emsp;&emsp;</div>
+<div style="background-color:limegreen;">85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for(int i = 0; i &#60; distSpecial.length; ++i)&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            RangeCoder.initProbs(distSpecial[i]);</div>
+<div>87&emsp;&emsp;</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        RangeCoder.initProbs(distAlign);</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>90&emsp;&emsp;</div>
+<div>91&emsp;&emsp;</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    abstract class LiteralCoder {</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        private final int lc;</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        private final int literalPosMask;</div>
+<div>95&emsp;&emsp;</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LiteralCoder(int lc, int lp) {</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.lc = lc;</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.literalPosMask = (1 &#60;&#60; lp) - 1;</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>100&emsp;&emsp;</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final int getSubcoderIndex(int prevByte, int pos) {</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int low = prevByte >> (8 - lc);</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int high = (pos & literalPosMask) &#60;&#60; lc;</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return low + high;</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>106&emsp;&emsp;</div>
+<div>107&emsp;&emsp;</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        abstract class LiteralSubcoder {</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            final short[] probs = new short[0x300];</div>
+<div>110&emsp;&emsp;</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            void reset() {</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                RangeCoder.initProbs(probs);</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>116&emsp;&emsp;</div>
+<div>117&emsp;&emsp;</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    abstract class LengthCoder {</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        static final int LOW_SYMBOLS = 1 &#60;&#60; 3;</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        static final int MID_SYMBOLS = 1 &#60;&#60; 3;</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        static final int HIGH_SYMBOLS = 1 &#60;&#60; 8;</div>
+<div>122&emsp;&emsp;</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final short[] choice = new short[2];</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final short[][] low = new short[POS_STATES_MAX][LOW_SYMBOLS];</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final short[][] mid = new short[POS_STATES_MAX][MID_SYMBOLS];</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final short[] high = new short[HIGH_SYMBOLS];</div>
+<div>127&emsp;&emsp;</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        void reset() {</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            RangeCoder.initProbs(choice);</div>
+<div>130&emsp;&emsp;</div>
+<div style="background-color:limegreen;">131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            for(int i = 0; i &#60; low.length; ++i)&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                RangeCoder.initProbs(low[i]);</div>
+<div>133&emsp;&emsp;</div>
+<div style="background-color:limegreen;">134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            for(int i = 0; i &#60; low.length; ++i)&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                RangeCoder.initProbs(mid[i]);</div>
+<div>136&emsp;&emsp;</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            RangeCoder.initProbs(high);</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>140&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

@@ -56,7 +56,7 @@ public class BytecodeTests extends JUnitTests {
 	}
 	
 	/**
-	 * TODO4 method such that the analysis has an entry point
+	 * Dummy method such that the analysis has an entry point
 	 */
 	public static void dummy() {
 		// Make sure we have a reference to the container class

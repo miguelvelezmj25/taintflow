@@ -32,14 +32,14 @@ public class Basic17 {
             j = 0;
         }
 
-        Sink.getDecision(i == 0);
-        Sink.getDecision(j == 0);
+        Sink.sink(i == 0);
+        Sink.sink(j == 0);
 
         int[] x = new int[] {i, j};
 
-        Sink.getDecision(x == null);
-        Sink.getDecision(x[0] == 0);
-        Sink.getDecision(x[1] == 0);
+        Sink.sink(x == null);
+        Sink.sink(x[0] == 0);
+        Sink.sink(x[1] == 0);
     }
 
 }

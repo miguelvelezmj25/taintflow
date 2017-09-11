@@ -12,25 +12,26 @@ public class Sleep0 {
     public static boolean B;
 
     public static void main(String[] args) throws InterruptedException {
+        Sink.init();
         A = Source.getOptionA(Boolean.valueOf(args[0]));
         B = Source.getOptionB(Boolean.valueOf(args[0]));
 
-//        boolean a = Boolean.valueOf(args[0]);
-//        boolean b = Boolean.valueOf(args[1]);
-//        A = Boolean.valueOf(args[0]);
-//        B = Boolean.valueOf(args[1]);
+//        boolean a = Boolean.valueOf(args[0]));
+//        boolean b = Boolean.valueOf(args[1]));
+//        A = Boolean.valueOf(args[0]));
+//        B = Boolean.valueOf(args[1]));
 
         Integer a;
         Integer b;
 
-        if(Sink.getDecision(A)) {
+        if(A) {
             a = 0;
         }
         else {
             a = 5;
         }
 
-        if(Sink.getDecision(B)) {
+        if(B) {
             b = 0;
         }
         else {
@@ -39,14 +40,14 @@ public class Sleep0 {
 
         Thread.sleep(1);
 
-        if(Sink.getDecision(a > 10)) {
+        if(a > 10) {
             Thread.sleep(2);
             Sleep0.method1(a);
         }
 
         Thread.sleep(3);
 
-        if(Sink.getDecision(b > 10)) {
+        if(b > 10) {
             Thread.sleep(4);
             Sleep0.method2(b);
         }
@@ -56,7 +57,7 @@ public class Sleep0 {
     public static void method1(int a) throws InterruptedException {
         Thread.sleep(5);
 
-        if(Sink.getDecision(a > 0)) {
+        if(a > 0) {
             Thread.sleep(6);
         }
 
@@ -66,7 +67,7 @@ public class Sleep0 {
     public static void method2(int b) throws InterruptedException {
         Thread.sleep(8);
 
-        if(Sink.getDecision(b > 0)) {
+        if(b > 0) {
             Thread.sleep(9);
         }
 

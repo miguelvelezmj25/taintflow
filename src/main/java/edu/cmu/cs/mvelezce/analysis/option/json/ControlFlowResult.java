@@ -12,6 +12,10 @@ public class ControlFlowResult {
     private Set<String> options;
     private int optionCount;
 
+    private ControlFlowResult() {
+        ;
+    }
+
     public ControlFlowResult(String packageName, String className, String methodSignature, int bytecodeIndex, int javaLine, Set<String> options) {
         this.packageName = packageName;
         this.className = className;
@@ -76,5 +80,41 @@ public class ControlFlowResult {
 
     public void setOptions(Set<String> options) {
         this.options = options;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if(this == o) {
+            return true;
+        }
+        if(o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        ControlFlowResult that = (ControlFlowResult) o;
+
+        if(bytecodeIndex != that.bytecodeIndex) {
+            return false;
+        }
+        if(javaLine != that.javaLine) {
+            return false;
+        }
+        if(!packageName.equals(that.packageName)) {
+            return false;
+        }
+        if(!className.equals(that.className)) {
+            return false;
+        }
+        return methodSignature.equals(that.methodSignature);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = packageName.hashCode();
+        result = 31 * result + className.hashCode();
+        result = 31 * result + methodSignature.hashCode();
+        result = 31 * result + bytecodeIndex;
+        result = 31 * result + javaLine;
+        return result;
     }
 }

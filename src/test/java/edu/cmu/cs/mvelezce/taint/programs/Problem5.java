@@ -29,8 +29,8 @@ public class Problem5 {
             j = 0;
         }
 
-        Sink.getDecision(i == 0);
-        Sink.getDecision(j == 0);
+        Sink.sink(i == 0);
+        Sink.sink(j == 0);
 
         if(args != null) {
             main(null);

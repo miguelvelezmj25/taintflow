@@ -28,7 +28,7 @@ public class Problem3 {
             }
 
             // Tainted by A always
-            Sink.getDecision(i == 0);
+            Sink.sink(i == 0);
 
             throw new RuntimeException();
         } catch (Exception e) {
@@ -36,14 +36,14 @@ public class Problem3 {
         }
 
         // Tainted by A if exceptions are enabled
-        Sink.getDecision(i == 0);
+        Sink.sink(i == 0);
 
         if(b) {
             throw new RuntimeException();
         }
 
         // Tainted by B if exceptions are not enabled. Tainted by A and B if exceptions are enabled
-        Sink.getDecision(i == 0);
+        Sink.sink(i == 0);
     }
 
 }

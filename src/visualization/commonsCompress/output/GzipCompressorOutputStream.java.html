@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GzipCompressorOutputStream.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; * Licensed to the Apache Software Foundation (ASF) under one</div>
+<div>3&emsp;&emsp;&nbsp; * or more contributor license agreements.  See the NOTICE file</div>
+<div>4&emsp;&emsp;&nbsp; * distributed with this work for additional information</div>
+<div>5&emsp;&emsp;&nbsp; * regarding copyright ownership.  The ASF licenses this file</div>
+<div>6&emsp;&emsp;&nbsp; * to you under the Apache License, Version 2.0 (the</div>
+<div>7&emsp;&emsp;&nbsp; * "License"); you may not use this file except in compliance</div>
+<div>8&emsp;&emsp;&nbsp; * with the License.  You may obtain a copy of the License at</div>
+<div>9&emsp;&emsp;&nbsp; *</div>
+<div>10&emsp;&emsp;&nbsp; * http://www.apache.org/licenses/LICENSE-2.0</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; * Unless required by applicable law or agreed to in writing,</div>
+<div>13&emsp;&emsp;&nbsp; * software distributed under the License is distributed on an</div>
+<div>14&emsp;&emsp;&nbsp; * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY</div>
+<div>15&emsp;&emsp;&nbsp; * KIND, either express or implied.  See the License for the</div>
+<div>16&emsp;&emsp;&nbsp; * specific language governing permissions and limitations</div>
+<div>17&emsp;&emsp;&nbsp; * under the License.</div>
+<div>18&emsp;&emsp;&nbsp; */</div>
+<div>19&emsp;&emsp;package org.apache.commons.compress.compressors.gzip;</div>
+<div>20&emsp;&emsp;</div>
+<div>21&emsp;&emsp;import edu.cmu.cs.mvelezce.analysis.option.Sink;</div>
+<div>22&emsp;&emsp;import org.apache.commons.compress.compressors.CompressorOutputStream;</div>
+<div>23&emsp;&emsp;import org.apache.commons.compress.utils.CharsetNames;</div>
+<div>24&emsp;&emsp;</div>
+<div>25&emsp;&emsp;import java.io.IOException;</div>
+<div>26&emsp;&emsp;import java.io.OutputStream;</div>
+<div>27&emsp;&emsp;import java.nio.ByteBuffer;</div>
+<div>28&emsp;&emsp;import java.nio.ByteOrder;</div>
+<div>29&emsp;&emsp;import java.util.zip.CRC32;</div>
+<div>30&emsp;&emsp;import java.util.zip.Deflater;</div>
+<div>31&emsp;&emsp;import java.util.zip.GZIPInputStream;</div>
+<div>32&emsp;&emsp;import java.util.zip.GZIPOutputStream;</div>
+<div>33&emsp;&emsp;</div>
+<div>34&emsp;&emsp;/**</div>
+<div>35&emsp;&emsp;&nbsp; * Compressed output stream using the gzip format. This implementation improves</div>
+<div>36&emsp;&emsp;&nbsp; * over the standard {@link GZIPOutputStream} class by allowing</div>
+<div>37&emsp;&emsp;&nbsp; * the configuration of the compression level and the header metadata (filename,</div>
+<div>38&emsp;&emsp;&nbsp; * comment, modification time, operating system and extra flags).</div>
+<div>39&emsp;&emsp;&nbsp; *</div>
+<div>40&emsp;&emsp;&nbsp; * @see &#60;a href="http://tools.ietf.org/html/rfc1952">GZIP File Format Specification&#60;/a></div>
+<div>41&emsp;&emsp;&nbsp; */</div>
+<div>42&emsp;&emsp;public class GzipCompressorOutputStream extends CompressorOutputStream {</div>
+<div>43&emsp;&emsp;</div>
+<div>44&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Header flag indicating a file name follows the header</div>
+<div>46&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>47&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final int FNAME = 1 &#60;&#60; 3;</div>
+<div>48&emsp;&emsp;</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Header flag indicating a comment follows the header</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final int FCOMMENT = 1 &#60;&#60; 4;</div>
+<div>53&emsp;&emsp;</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The underlying stream</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final OutputStream out;</div>
+<div>58&emsp;&emsp;</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Deflater used to compress the data</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final Deflater deflater;</div>
+<div>63&emsp;&emsp;</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The buffer receiving the compressed data from the deflater</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final byte[] deflateBuffer = new byte[512];</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The checksum of the uncompressed data</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final CRC32 crc = new CRC32();</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Indicates if the stream has been closed</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean closed;</div>
+<div>76&emsp;&emsp;</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Creates a gzip compressed output stream with the default parameters.</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param out the stream to compress to</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if writing fails</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public GzipCompressorOutputStream(final OutputStream out) throws IOException {</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this(out, new GzipParameters());</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>86&emsp;&emsp;</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Creates a gzip compressed output stream with the specified parameters.</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param out        the stream to compress to</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param parameters the parameters to use</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if writing fails</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @since 1.7</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public GzipCompressorOutputStream(final OutputStream out, final GzipParameters parameters) throws IOException {</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.out = out;</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.deflater = new Deflater(parameters.getCompressionLevel(), true);</div>
+<div>98&emsp;&emsp;</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        writeHeader(parameters);</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>101&emsp;&emsp;</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void writeHeader(final GzipParameters parameters) throws IOException {</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final String filename = parameters.getFilename();</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final String comment = parameters.getComment();</div>
+<div>105&emsp;&emsp;</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final ByteBuffer buffer = ByteBuffer.allocate(10);</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        buffer.order(ByteOrder.LITTLE_ENDIAN);</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        buffer.putShort((short) GZIPInputStream.GZIP_MAGIC);</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        buffer.put((byte) Deflater.DEFLATED); // compression method (8: deflate)</div>
+<div style="background-color:limegreen;">110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        buffer.put((byte) ((filename != null ? FNAME : 0) | (comment != null ? FCOMMENT : 0))); // flags&nbsp;&#8594; [GZIPCOMPRESSOR] & [GZIPCOMPRESSOR]</b></div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        buffer.putInt((int) (parameters.getModificationTime() / 1000));</div>
+<div>112&emsp;&emsp;</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // extra flags</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final int compressionLevel = parameters.getCompressionLevel();</div>
+<div style="background-color:limegreen;">115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(compressionLevel == Deflater.BEST_COMPRESSION) {&nbsp;&#8594; [GZIPBESTCOMPRESSION, GZIPCOMPRESSOR]</b></div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            buffer.put((byte) 2);</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div style="background-color:limegreen;">118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        else if(compressionLevel == Deflater.BEST_SPEED) {&nbsp;&#8594; [GZIPBESTCOMPRESSION, GZIPCOMPRESSOR]</b></div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            buffer.put((byte) 4);</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            buffer.put((byte) 0);</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>124&emsp;&emsp;</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        buffer.put((byte) parameters.getOperatingSystem());</div>
+<div>126&emsp;&emsp;</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        out.write(buffer.array());</div>
+<div>128&emsp;&emsp;</div>
+<div style="background-color:limegreen;">129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(filename != null) {&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            out.write(filename.getBytes(CharsetNames.ISO_8859_1));</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            out.write(0);</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>133&emsp;&emsp;</div>
+<div style="background-color:limegreen;">134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(comment != null) {&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            out.write(comment.getBytes(CharsetNames.ISO_8859_1));</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            out.write(0);</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>139&emsp;&emsp;</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void writeTrailer() throws IOException {</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final ByteBuffer buffer = ByteBuffer.allocate(8);</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        buffer.order(ByteOrder.LITTLE_ENDIAN);</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        buffer.putInt((int) crc.getValue());</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        buffer.putInt(deflater.getTotalIn());</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        out.write(buffer.array());</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>147&emsp;&emsp;</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void write(final int b) throws IOException {</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        write(new byte[]{(byte) (b & 0xff)}, 0, 1);</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>152&emsp;&emsp;</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * {@inheritDoc}</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @since 1.1</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void write(final byte[] buffer) throws IOException {</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        write(buffer, 0, buffer.length);</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>162&emsp;&emsp;</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * {@inheritDoc}</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @since 1.1</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void write(final byte[] buffer, final int offset, final int length) throws IOException {</div>
+<div style="background-color:limegreen;">170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(deflater.finished()) {&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new IOException("Cannot write more data, the end of the compressed data stream has been reached");</div>
+<div>172&emsp;&emsp;</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div style="background-color:limegreen;">174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        else if(length > 0) {&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            deflater.setInput(buffer, offset, length);</div>
+<div style="background-color:limegreen;">176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            while (!deflater.needsInput()) {&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                deflate();</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>179&emsp;&emsp;</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            crc.update(buffer, offset, length);</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>183&emsp;&emsp;</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void deflate() throws IOException {</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final int length = deflater.deflate(deflateBuffer, 0, deflateBuffer.length);</div>
+<div style="background-color:limegreen;">186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(length > 0) {&nbsp;&#8594; [GZIPCOMPRESSOR]</b></div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            out.write(deflateBuffer, 0, length);</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>190&emsp;&emsp;</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Finishes writing compressed data to the underlying stream without closing it.</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException on error</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @since 1.7</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void finish() throws IOException {</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(!deflater.finished()) {</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            deflater.finish();</div>
+<div>200&emsp;&emsp;</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            while (!deflater.finished()) {</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                deflate();</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>204&emsp;&emsp;</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            writeTrailer();</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>208&emsp;&emsp;</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * {@inheritDoc}</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @since 1.7</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void flush() throws IOException {</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        out.flush();</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>218&emsp;&emsp;</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void close() throws IOException {</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(!closed) {</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            finish();</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            deflater.end();</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            out.close();</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            closed = true;</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>228&emsp;&emsp;</div>
+<div>229&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

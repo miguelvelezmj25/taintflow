@@ -107,7 +107,7 @@ public class LocalMustAliasAnalysis extends ForwardFlowAnalysis<Unit,HashMap<Val
      * Creates a new {@link LocalMustAliasAnalysis}. If tryTrackFieldAssignments,
      * we run an interprocedural side-effects analysis to determine which fields
      * are (transitively) written to by this method. All fields which that are not written
-     * to are tracked just as local variables. This semantics is sound for single-threaded programs.
+     * to are tracked just as local variables. This semantics is sound for single-threaded programs.  
      */
 	public LocalMustAliasAnalysis(UnitGraph g, boolean tryTrackFieldAssignments) {
         super(g);

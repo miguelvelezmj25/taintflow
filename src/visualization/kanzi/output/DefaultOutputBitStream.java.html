@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DefaultOutputBitStream.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;Copyright 2011-2017 Frederic Langlet</div>
+<div>3&emsp;&emsp;Licensed under the Apache License, Version 2.0 (the "License");</div>
+<div>4&emsp;&emsp;you may not use this file except in compliance with the License.</div>
+<div>5&emsp;&emsp;you may obtain a copy of the License at</div>
+<div>6&emsp;&emsp;</div>
+<div>7&emsp;&emsp;http://www.apache.org/licenses/LICENSE-2.0</div>
+<div>8&emsp;&emsp;</div>
+<div>9&emsp;&emsp;Unless required by applicable law or agreed to in writing, software</div>
+<div>10&emsp;&emsp;distributed under the License is distributed on an "AS IS" BASIS,</div>
+<div>11&emsp;&emsp;WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</div>
+<div>12&emsp;&emsp;See the License for the specific language governing permissions and</div>
+<div>13&emsp;&emsp;limitations under the License.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;package kanzi.bitstream;</div>
+<div>17&emsp;&emsp;</div>
+<div>18&emsp;&emsp;import kanzi.BitStreamException;</div>
+<div>19&emsp;&emsp;import kanzi.OutputBitStream;</div>
+<div>20&emsp;&emsp;</div>
+<div>21&emsp;&emsp;import java.io.IOException;</div>
+<div>22&emsp;&emsp;import java.io.OutputStream;</div>
+<div>23&emsp;&emsp;</div>
+<div>24&emsp;&emsp;</div>
+<div>25&emsp;&emsp;public final class DefaultOutputBitStream implements OutputBitStream {</div>
+<div>26&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final OutputStream os;</div>
+<div>27&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private byte[] buffer;</div>
+<div>28&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean closed;</div>
+<div>29&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private int position;  // index of current byte in buffer</div>
+<div>30&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private int bitIndex;  // index of current bit to write in current</div>
+<div>31&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private long written;</div>
+<div>32&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private long current;  // cached bits</div>
+<div>33&emsp;&emsp;</div>
+<div>34&emsp;&emsp;</div>
+<div>35&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public DefaultOutputBitStream(OutputStream os, int bufferSize) {</div>
+<div style="background-color:limegreen;">36&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(os == null) {&nbsp;&#8594; [FORCE, BLOCK, TRANSFORM, LEVEL, ENTROPY]</b></div>
+<div>37&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new NullPointerException("Invalid null output stream parameter");</div>
+<div>38&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>39&emsp;&emsp;</div>
+<div style="background-color:limegreen;">40&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(bufferSize &#60; 1024) {&nbsp;&#8594; [FORCE, BLOCK, TRANSFORM, LEVEL, ENTROPY]</b></div>
+<div>41&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new IllegalArgumentException("Invalid buffer size (must be at least 1024)");</div>
+<div>42&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>43&emsp;&emsp;</div>
+<div style="background-color:limegreen;">44&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(bufferSize > 1 &#60;&#60; 28) {&nbsp;&#8594; [FORCE, BLOCK, TRANSFORM, LEVEL, ENTROPY]</b></div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new IllegalArgumentException("Invalid buffer size (must be at most 268435456)");</div>
+<div>46&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>47&emsp;&emsp;</div>
+<div style="background-color:limegreen;">48&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if((bufferSize & 7) != 0) {&nbsp;&#8594; [FORCE, BLOCK, TRANSFORM, LEVEL, ENTROPY]</b></div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new IllegalArgumentException("Invalid buffer size (must be a multiple of 8)");</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>51&emsp;&emsp;</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.os = os;</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.buffer = new byte[bufferSize];</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.bitIndex = 63;</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>56&emsp;&emsp;</div>
+<div>57&emsp;&emsp;</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Write least significant bit of the input integer. Trigger exception if stream is closed</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void writeBit(int bit) {</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(this.bitIndex &#60;= 0) // bitIndex = -1 if stream is closed => force pushCurrent()</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        {</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.current |= (bit & 1);</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.pushCurrent();</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.current |= ((long) (bit & 1) &#60;&#60; this.bitIndex);</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.bitIndex--;</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>71&emsp;&emsp;</div>
+<div>72&emsp;&emsp;</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Write 'count' (in [1..64]) bits. Trigger exception if stream is closed</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public int writeBits(long value, int count) {</div>
+<div style="background-color:limegreen;">76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(count == 0) {&nbsp;&#8594; [CHECKSUM, FORCE, BLOCK, TRANSFORM, LEVEL, ENTROPY]</b></div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return 0;</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>79&emsp;&emsp;</div>
+<div style="background-color:limegreen;">80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(count > 64) {&nbsp;&#8594; [CHECKSUM, FORCE, BLOCK, TRANSFORM, LEVEL, ENTROPY]</b></div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new IllegalArgumentException("Invalid length: " + count + " (must be in [1..64])");</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>83&emsp;&emsp;</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        value &= (-1L >>> -count);</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final int remaining = this.bitIndex + 1 - count;</div>
+<div>86&emsp;&emsp;</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Pad the current position in buffer</div>
+<div style="background-color:limegreen;">88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(remaining > 0) {&nbsp;&#8594; [CHECKSUM, FORCE, BLOCK, TRANSFORM, LEVEL, ENTROPY]</b></div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // Enough spots available in 'current'</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.current |= (value &#60;&#60; remaining);</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.bitIndex -= count;</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // Not enough spots available in 'current'</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.current |= (value >>> -remaining);</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.pushCurrent();</div>
+<div>97&emsp;&emsp;</div>
+<div style="background-color:limegreen;">98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(remaining != 0) {&nbsp;&#8594; [CHECKSUM, FORCE, BLOCK, TRANSFORM, LEVEL, ENTROPY]</b></div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                this.current = (value &#60;&#60; remaining);</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                this.bitIndex += remaining;</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>103&emsp;&emsp;</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return count;</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>106&emsp;&emsp;</div>
+<div>107&emsp;&emsp;</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Push 64 bits of current value into buffer.</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void pushCurrent() {</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.buffer[this.position] = (byte) (this.current >>> 56);</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.buffer[this.position + 1] = (byte) (this.current >>> 48);</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.buffer[this.position + 2] = (byte) (this.current >>> 40);</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.buffer[this.position + 3] = (byte) (this.current >>> 32);</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.buffer[this.position + 4] = (byte) (this.current >>> 24);</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.buffer[this.position + 5] = (byte) (this.current >>> 16);</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.buffer[this.position + 6] = (byte) (this.current >>> 8);</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.buffer[this.position + 7] = (byte) (this.current);</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.bitIndex = 63;</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.current = 0;</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.position += 8;</div>
+<div>121&emsp;&emsp;</div>
+<div style="background-color:limegreen;">122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(this.position >= this.buffer.length) {&nbsp;&#8594; [CHECKSUM, FORCE, BLOCK, TRANSFORM, LEVEL, ENTROPY]</b></div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.flush();</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>126&emsp;&emsp;</div>
+<div>127&emsp;&emsp;</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Write buffer to underlying stream</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void flush() throws BitStreamException {</div>
+<div style="background-color:limegreen;">130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(this.isClosed() == true) {&nbsp;&#8594; [CHECKSUM, FORCE, BLOCK, TRANSFORM, LEVEL, ENTROPY]</b></div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new BitStreamException("Stream closed", BitStreamException.STREAM_CLOSED);</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>133&emsp;&emsp;</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div style="background-color:limegreen;">135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(this.position > 0) {&nbsp;&#8594; [CHECKSUM, FORCE, BLOCK, TRANSFORM, LEVEL, ENTROPY]</b></div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                this.os.write(this.buffer, 0, this.position);</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                this.written += (this.position &#60;&#60; 3);</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                this.position = 0;</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (IOException e) {</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new BitStreamException(e.getMessage(), BitStreamException.INPUT_OUTPUT);</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>144&emsp;&emsp;</div>
+<div>145&emsp;&emsp;</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void close() {</div>
+<div style="background-color:limegreen;">148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(this.isClosed() == true) {&nbsp;&#8594; [CHECKSUM, FORCE, BLOCK, TRANSFORM, LEVEL, ENTROPY]</b></div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return;</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>151&emsp;&emsp;</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final int savedBitIndex = this.bitIndex;</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final int savedPosition = this.position;</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final long savedCurrent = this.current;</div>
+<div>155&emsp;&emsp;</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // Push last bytes (the very last byte may be incomplete)</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            final int size = ((63 - this.bitIndex) + 7) >> 3;</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.pushCurrent();</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.position -= (8 - size);</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.flush();</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (BitStreamException e) {</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // Revert fields to allow subsequent attempts in case of transient failure</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.position = savedPosition;</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.bitIndex = savedBitIndex;</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.current = savedCurrent;</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw e;</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>169&emsp;&emsp;</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.os.flush();</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (IOException e) {</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new BitStreamException(e, BitStreamException.INPUT_OUTPUT);</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>175&emsp;&emsp;</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.closed = true;</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.position = 0;</div>
+<div>178&emsp;&emsp;</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Reset fields to force a flush() and trigger an exception</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // on writeBit() or writeBits()</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.bitIndex = -1;</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.buffer = new byte[8];</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.written -= 64; // adjust for method written()</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>185&emsp;&emsp;</div>
+<div>186&emsp;&emsp;</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Return number of bits written so far</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public long written() {</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Number of bits flushed + bytes written in memory + bits written in memory</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return this.written + (this.position &#60;&#60; 3) + (63 - this.bitIndex);</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>193&emsp;&emsp;</div>
+<div>194&emsp;&emsp;</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isClosed() {</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return this.closed;</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>198&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

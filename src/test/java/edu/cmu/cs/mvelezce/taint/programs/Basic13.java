@@ -42,9 +42,9 @@ public class Basic13 {
             c = false;
         }
 
-        Sink.getDecision(a);
-        Sink.getDecision(b);
-        Sink.getDecision(c);
+        Sink.sink(a);
+        Sink.sink(b);
+        Sink.sink(c);
 
         new Basic13(a, b, c);
     }
@@ -54,19 +54,19 @@ public class Basic13 {
         // Object w is tainted with all 3 sources
         W w = new W(a, b, c);
 
-        if(Sink.getDecision(w == null)) {
+        if(w == null) {
             System.out.println(";");
         }
 
-        if(Sink.getDecision(w.isA())) {
+        if(w.isA()) {
             System.out.println(";");
         }
 
-        if(Sink.getDecision(w.isB())) {
+        if(w.isB()) {
             System.out.println(";");
         }
 
-        if(Sink.getDecision(w.isC())) {
+        if(w.isC()) {
             System.out.println(";");
         }
 
@@ -109,15 +109,15 @@ public class Basic13 {
         }
 
         public void analyze() {
-            if(Sink.getDecision(this.a)) {
+            if(this.a) {
                 System.out.println(":");
             }
 
-            if(Sink.getDecision(this.b)) {
+            if(this.b) {
                 System.out.println(":");
             }
 
-            if(Sink.getDecision(this.c)) {
+            if(this.c) {
                 System.out.println(":");
             }
         }

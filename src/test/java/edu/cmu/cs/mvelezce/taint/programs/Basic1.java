@@ -9,15 +9,15 @@ public class Basic1 {
         boolean A = Source.getOptionA(Boolean.valueOf(args[0]));
         int x = 0;
 
-        if(Sink.getDecision(x == 0)) {
+        if(x == 0) {
             x++;
         }
 
-        if(Sink.getDecision(A)) {
+        if(A) {
             x++;
         }
 
-        if(Sink.getDecision(x == 0)) {
+        if(x == 0) {
             x++;
         }
 

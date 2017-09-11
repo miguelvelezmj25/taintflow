@@ -106,6 +106,7 @@ public class Infoflow extends AbstractInfoflow {
 	private Set<Stmt> collectedSinks = null;
 
 	protected SootMethod dummyMainMethod = null;
+
 	protected IInfoflowCFG iCfg = null;
 
 	/**
@@ -209,7 +210,6 @@ public class Infoflow extends AbstractInfoflow {
 
 		// Run the analysis
 		runAnalysis(sourcesSinks, seeds);
-//		runAnalysis(sourcesSinks, null);
 	}
 
 	/**
@@ -291,6 +291,9 @@ public class Infoflow extends AbstractInfoflow {
 				return;
 
 			logger.info("Starting Taint Analysis");
+//			IInfoflowCFG iCfg = icfgFactory.buildBiDirICFG(config.getCallgraphAlgorithm(),
+//					config.getEnableExceptionTracking());
+
 			this.iCfg = icfgFactory.buildBiDirICFG(config.getCallgraphAlgorithm(),
 					config.getEnableExceptionTracking());
 
@@ -608,7 +611,8 @@ public class Infoflow extends AbstractInfoflow {
 			maxMemoryConsumption = Math.max(maxMemoryConsumption, getUsedMemory());
 			System.out.println("Maximum memory consumption: " + maxMemoryConsumption / 1E6 + " MB");
 		} catch (Exception ex) {
-			results.addException(ex.getClass().getName() + ": " + ex.getMessage());
+//			results.addException(ex.getClass().getName() + ": " + ex.getMessage());
+			ex.printStackTrace();
 		}
 	}
 
@@ -977,13 +981,13 @@ public class Infoflow extends AbstractInfoflow {
 					forwardProblem.addInitialSeeds(u, Collections.singleton(forwardProblem.zeroValue()));
 					if (getConfig().getLogSourcesAndSinks())
 						collectedSources.add(s);
-					logger.info("Source found: {}", u);
+					logger.debug("Source found: {}", u);
 				}
 				if (sourcesSinks.isSink(s, manager, null)) {
 					sinkCount++;
 					if (getConfig().getLogSourcesAndSinks())
 						collectedSinks.add(s);
-					logger.info("Sink found: {}", u);
+					logger.debug("Sink found: {}", u);
 				}
 			}
 

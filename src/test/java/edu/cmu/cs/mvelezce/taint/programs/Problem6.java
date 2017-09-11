@@ -18,13 +18,13 @@ public class Problem6 {
         X x = new X(A, B);
 
         // Tainted by A and B
-        Sink.getDecision(x == null);
+        Sink.sink(x == null);
         // Not tainted
-        Sink.getDecision(x.some() == 0);
+        Sink.sink(x.some() == 0);
         // Tainted by A
-        Sink.getDecision(x.a);
+        Sink.sink(x.a);
         // Tainted by B
-        Sink.getDecision(x.b);
+        Sink.sink(x.b);
     }
 
     public static class X {

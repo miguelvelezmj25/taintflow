@@ -7,6 +7,8 @@ import soot.jimple.infoflow.data.pathBuilders.DefaultPathBuilderFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 
 public class Run {
@@ -33,23 +35,22 @@ public class Run {
         libPath = System.getProperty("java.home") + File.separator + "lib" + File.separator + "rt.jar"
                 + sep + System.getProperty("java.home") + File.separator + "lib" + File.separator + "jce.jar";
 
-        // Config information flow
+// Config information flow
         infoflowConfiguration = new InfoflowConfiguration();
 //        infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.CHA);
         infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.SPARK);
         infoflowConfiguration.setEnableImplicitFlows(true);
         infoflowConfiguration.setCodeEliminationMode(InfoflowConfiguration.CodeEliminationMode.NoCodeElimination);
-        infoflowConfiguration.setInspectSources(true);
-        infoflowConfiguration.setInspectSinks(true);
+//        infoflowConfiguration.setInspectSources(true);
+        infoflowConfiguration.setInspectSinks(false);
         infoflowConfiguration.setAccessPathLength(10_000);
-//        infoflowConfiguration.setAccessPathLength(1);
         infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.ContextFlowSensitive);
 
-        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
-        infoflowConfiguration.setFlowSensitiveAliasing(true);
-
 //        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
-//        infoflowConfiguration.setFlowSensitiveAliasing(false);
+//        infoflowConfiguration.setFlowSensitiveAliasing(true);
+
+        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
+        infoflowConfiguration.setFlowSensitiveAliasing(false);
 
 //        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
 //        infoflowConfiguration.setFlowSensitiveAliasing(true);
@@ -62,41 +63,61 @@ public class Run {
 
 //        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.PtsBased);
 //        infoflowConfiguration.setFlowSensitiveAliasing(false);
-
 
         infoflowConfiguration.setStopAfterFirstFlow(false);
         infoflowConfiguration.setEnableStaticFieldTracking(true);
-        infoflowConfiguration.setEnableExceptionTracking(true);
-        infoflowConfiguration.setMaxThreadNum(8);
-
+        infoflowConfiguration.setEnableExceptionTracking(false);
+        infoflowConfiguration.setMaxThreadNum(1);
         infoflowConfiguration.setOneSourceAtATime(true);
+
+//        infoflowConfiguration.setSequentialPathProcessing(true);
 
 //        infoflowConfiguration.setWriteOutputFiles(true);
 //        infoflowConfiguration.setUseThisChainReduction(true);
 //        infoflowConfiguration.setUseRecursiveAccessPaths(true);
 //        infoflowConfiguration.setExcludeSootLibraryClasses(false);
-//        InfoflowConfiguration.setPathAgnosticResults(true);
+//        InfoflowConfiguration.setPathAgnosticResults(false);
 //        infoflowConfiguration.setEnableExceptionTracking(true);
 //        InfoflowConfiguration.setOneResultPerAccessPath(true);
-//        InfoflowConfiguration.setPathAgnosticResults(true);
 
 
         // Config soot
         sootConfiguration = new SootConfig();
 
-        File file = new File("/home/mvelezce/programming/java/projects/systems/original/pngtastic-counter/out/production/pngtastic-counter");
+        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeley-db/out/production/berkeley-db");
         appPath = file + sep + appPath;
 
-        TaintInfoflow infoflow = new TaintInfoflow("pngtasticColorCounter");
+//        file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeley-db/out/test/berkeley-db");
+//        appPath = file + sep + appPath;
+
+        String systemName = "berkeley-db";
+        TaintInfoflow infoflow = new TaintInfoflow(systemName);
+
+        // Configure analysis
         infoflow.setConfig(infoflowConfiguration);
         infoflow.setSootConfig(sootConfiguration);
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
 
-        String entryPoint = "<com.googlecode.pngtastic.Run: void main(java.lang.String[])>";
+        // Add taint wrapper
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
 
-        infoflow.computeInfoflow(appPath, libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
-        infoflow.checkResults();
-        System.out.println("Number of results: " + infoflow.getResults().size());
+        // Add entry points
+        String entryPoint = "<persist.gettingStarted.ExampleInventoryRead: void main(java.lang.String[])>";
+
+        List<String> entryPoints = new ArrayList<>();
+        entryPoints.add(entryPoint);
+
+        // Run
+        infoflow.computeInfoflowOneSourceAtATime(appPath, libPath, entryPoint);
+//        infoflow.computeInfoflowOneSourceAtATime(appPath, libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+//        infoflow.computeInfoflow(appPath, libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
+
+        infoflow.aggregateInfoflowResults(0);
+        infoflow.saveJimpleFiles();
+        infoflow.saveDotStringFiles();
     }
 
 

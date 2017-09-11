@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * PLDI example
+ * System libraries are not tainteds
  */
 public class Problem10 {
 
@@ -18,13 +18,13 @@ public class Problem10 {
         as.add(new A());
 
         for(A a : as) {
-            if(Sink.getDecision(!a.isB())) {
+            if(!a.isB()) {
                 a.setB(b);
             }
         }
 
         for(A a : as) {
-            if(Sink.getDecision(a.isB())) {
+            if(a.isB()) {
                 System.out.println("");
             }
         }

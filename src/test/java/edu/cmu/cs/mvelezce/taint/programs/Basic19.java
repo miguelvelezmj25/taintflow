@@ -28,13 +28,13 @@ public class Basic19 {
 
         X work = new X(a, log);
 
-        Sink.getDecision(work == null);
-        Sink.getDecision(work.a == 0);
-        Sink.getDecision(work.b == null);
+        Sink.sink(work == null);
+        Sink.sink(work.a == 0);
+        Sink.sink(work.b == null);
 
         work.work();
 
-        Sink.getDecision(work.integer() == 0);
+        Sink.sink(work.integer() == 0);
     }
 
     public static class X {
@@ -63,7 +63,7 @@ public class Basic19 {
         }
 
         public void error() {
-            Sink.getDecision(this.l.isEmpty());
+            Sink.sink(this.l.isEmpty());
         }
 
     }

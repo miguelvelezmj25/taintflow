@@ -12,7 +12,7 @@ public class Problem9 {
         A a = new A();
         B b = a.g;
         foo(a);
-        Sink.getDecision(b.f);
+        Sink.sink(b.f);
     }
 
     private static void foo(A z) {
