@@ -18,6 +18,8 @@
  */
 
 package soot.util;
+import jasmin.Main;
+
 import java.io.*;
 
 /**
@@ -32,7 +34,7 @@ public class JasminOutputStream extends ByteArrayOutputStream {
     }
     public void flush() {
         ByteArrayInputStream bais = new ByteArrayInputStream(this.toByteArray());
-        jasmin.Main.assemble(bais, out, false);
+        Main.assemble(bais, out, false);
     }
 
     @Override
