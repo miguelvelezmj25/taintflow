@@ -16,25 +16,16 @@ public class Interaction0 {
         Sink.init();
 
         boolean A = Source.getOptionA(true);
-        boolean B = Source.getOptionB(true);
 
-        long l1 = 0;
-        long l2 = 0;
+        int l = 0;
+
 
         if(A) {
-            l1 = 10;
+            l = 10;
         }
 
-        if(B) {
-            l2 = 20;
-        }
 
-        foo(l1);
-        foo(l2);
-    }
-
-    public static void foo(long l) {
-        if(l > 10) {
+        for(int i = 0; i < l; i++) {
             System.out.println("");
         }
     }
