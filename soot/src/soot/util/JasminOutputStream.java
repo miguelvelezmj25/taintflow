@@ -18,6 +18,7 @@
  */
 
 package soot.util;
+
 import jasmin.Main;
 
 import java.io.*;

@@ -60,12 +60,12 @@ public class TaintInfoflow extends Infoflow {
             MethodOrMethodContext m = iter.next();
             SootMethod method = m.method();
 //
-//            String methodPackage = method.getDeclaringClass().getPackageName();
+            String methodPackage = method.getDeclaringClass().getPackageName();
 
             for(String packageName : this.packages) {
-                if((!method.getDeclaringClass().isJavaLibraryClass() || !method.getDeclaringClass().isPhantomClass())
-                    /*&& methodPackage.contains(packageName)*/ && method.hasActiveBody()) {
-//                if(methodPackage.contains(packageName) && method.hasActiveBody()) {
+//                if((!method.getDeclaringClass().isJavaLibraryClass() || !method.getDeclaringClass().isPhantomClass())
+//                    /*&& methodPackage.contains(packageName)*/ && method.hasActiveBody()) {
+                if(methodPackage.contains(packageName) && method.hasActiveBody()) {
                     PackManager.v().getPack("jtp").apply(method.getActiveBody());
                 }
             }
