@@ -1,11 +1,14 @@
 package soot.toolkits.graph;
 
-import soot.*;
+import soot.Body;
+import soot.PatchingChain;
+import soot.Trap;
+import soot.Unit;
 import soot.jimple.internal.JIdentityStmt;
 import soot.jimple.internal.JThrowStmt;
-import soot.util.Chain;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 public class TaintflowUnitGraph extends BriefUnitGraph {
@@ -29,7 +32,6 @@ public class TaintflowUnitGraph extends BriefUnitGraph {
             return;
         }
 
-
         PatchingChain<Unit> units = body.getUnits();
 
         for(Unit unit : units) {
@@ -37,40 +39,69 @@ public class TaintflowUnitGraph extends BriefUnitGraph {
                 continue;
             }
 
-            JThrowStmt throwStmt = (JThrowStmt) unit;
-            Value op = throwStmt.getOp();
-            RefType thrownType = (RefType) op.getType();
-            SootClass thrownExceptionClass = thrownType.getSootClass();
-
-            FastHierarchy fh = Scene.v().getFastHierarchy();
-            Chain<Trap> traps = body.getTraps();
-
-            for(Trap trap : traps) {
+            for(Trap trap : body.getTraps()) {
                 Unit handlerUnit = trap.getHandlerUnit();
 
                 if(!(handlerUnit instanceof JIdentityStmt)) {
                     throw new RuntimeException("We expect a JIdentityStmt, but got " + handlerUnit.getClass());
                 }
 
-                JIdentityStmt identityStmt = (JIdentityStmt) handlerUnit;
-                RefType catchType = (RefType) identityStmt.leftBox.getValue().getType();
-                SootClass catchExceptionClass = catchType.getSootClass();
+                Unit beginUnit = trap.getBeginUnit();
+                Unit endUnit = trap.getEndUnit();
 
-                if(fh.isSubclass(thrownExceptionClass, catchExceptionClass)) {
-                    if(this.getSuccsOf(unit).isEmpty()) {
-                        List<Unit> succs = new ArrayList<>();
-                        this.unitToSuccs.put(unit, succs);
+                Iterator<Unit> unitsIter = body.getUnits().iterator();
+                boolean handled = false;
+
+                while (unitsIter.hasNext()) {
+                    Unit candidateBegin = unitsIter.next();
+
+                    if(candidateBegin == unit || candidateBegin == endUnit) {
+                        break;
                     }
 
-                    this.getSuccsOf(unit).add(handlerUnit);
-
-                    if(this.getPredsOf(handlerUnit).isEmpty()) {
-                        List<Unit> preds = new ArrayList<>();
-                        this.unitToPreds.put(handlerUnit, preds);
+                    if(candidateBegin == beginUnit) {
+                        handled = true;
+                        break;
                     }
-
-                    this.getPredsOf(handlerUnit).add(unit);
                 }
+
+                if(!handled) {
+                    continue;
+                }
+
+                handled = false;
+
+                while (unitsIter.hasNext()) {
+                    Unit candidateHandled = unitsIter.next();
+
+                    if(candidateHandled == endUnit) {
+                        break;
+                    }
+
+                    if(candidateHandled == unit) {
+                        handled = true;
+                        break;
+                    }
+
+                }
+
+                if(!handled) {
+                    continue;
+                }
+
+                if(this.getSuccsOf(unit).isEmpty()) {
+                    List<Unit> succs = new ArrayList<>();
+                    this.unitToSuccs.put(unit, succs);
+                }
+
+                this.getSuccsOf(unit).add(handlerUnit);
+
+                if(this.getPredsOf(handlerUnit).isEmpty()) {
+                    List<Unit> preds = new ArrayList<>();
+                    this.unitToPreds.put(handlerUnit, preds);
+                }
+
+                this.getPredsOf(handlerUnit).add(unit);
             }
         }
     }
