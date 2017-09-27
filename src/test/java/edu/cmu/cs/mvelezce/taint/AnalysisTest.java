@@ -1858,13 +1858,7 @@ public class AnalysisTest {
 
     @Test
     public void prevaylerTest() throws IOException {
-        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/prevayler/demos/demo1/target/classes");
-        AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
-
-        file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/prevayler/factory/target/classes");
-        AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
-
-        file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/prevayler/core/target/classes");
+        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/prevayler/target/classes");
         AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
 
         String systemName = "prevayler";
@@ -1892,7 +1886,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(72);
+        infoflow.aggregateInfoflowResults(70);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
