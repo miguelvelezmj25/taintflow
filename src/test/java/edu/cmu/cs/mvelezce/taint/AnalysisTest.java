@@ -1890,11 +1890,11 @@ public class AnalysisTest {
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
-//        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/running-example/src/main/java";
-//
-//        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
-//        generator.generateHTMLPage();
-//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/prevayler/src/main/java";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test

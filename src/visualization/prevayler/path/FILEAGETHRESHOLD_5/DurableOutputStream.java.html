@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>FILEAGETHRESHOLD_5_DurableOutputStream.java</title>
+    <link rel="stylesheet" type="text/css" href="../../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;//Prevayler(TM) - The Free-Software Prevalence Layer.</div>
+<div>2&emsp;&emsp;//Copyright (C) 2001-2005 Klaus Wuestefeld</div>
+<div>3&emsp;&emsp;//This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.</div>
+<div>4&emsp;&emsp;</div>
+<div>5&emsp;&emsp;package org.prevayler.foundation;</div>
+<div>6&emsp;&emsp;</div>
+<div>7&emsp;&emsp;import java.io.ByteArrayOutputStream;</div>
+<div>8&emsp;&emsp;import java.io.File;</div>
+<div>9&emsp;&emsp;import java.io.FileOutputStream;</div>
+<div>10&emsp;&emsp;import java.io.IOException;</div>
+<div>11&emsp;&emsp;import java.nio.ByteBuffer;</div>
+<div>12&emsp;&emsp;import java.nio.channels.FileChannel;</div>
+<div>13&emsp;&emsp;</div>
+<div>14&emsp;&emsp;public class DurableOutputStream {</div>
+<div>15&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static final int JOURNAL_PREALLOCATE_LENGTH = 1024 * 1024;</div>
+<div>16&emsp;&emsp;</div>
+<div>17&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>18&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * These two locks allow the two main activities of this class,</div>
+<div>19&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * serializing transactions to a buffer on the one hand and flushing</div>
+<div>20&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the buffer and syncing to disk on the other hand, to proceed</div>
+<div>21&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * concurrently. Note that where both locks are required, we always</div>
+<div>22&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * acquire the _syncLock before acquiring the _writeLock to avoid</div>
+<div>23&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * deadlock.</div>
+<div>24&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>25&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final Object _writeLock = new Object();</div>
+<div>26&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final Object _syncLock = new Object();</div>
+<div>27&emsp;&emsp;</div>
+<div>28&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>29&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The File object is only stashed for the sake of the file() getter.</div>
+<div>30&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>31&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final File _file;</div>
+<div>32&emsp;&emsp;</div>
+<div>33&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>34&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * All access guarded by _syncLock.</div>
+<div>35&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>36&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final FileOutputStream _fileOutputStream;</div>
+<div>37&emsp;&emsp;</div>
+<div>38&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>39&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * All access guarded by _syncLock.</div>
+<div>40&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>41&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final FileChannel _fileChannel;</div>
+<div>42&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final int _preallocateLength;</div>
+<div>43&emsp;&emsp;</div>
+<div>44&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Immutable.</div>
+<div>46&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>47&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final boolean _journalDiskSync;</div>
+<div>48&emsp;&emsp;</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * All access guarded by _writeLock.</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private ByteArrayOutputStream _active = new ByteArrayOutputStream();</div>
+<div>53&emsp;&emsp;</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * All access guarded by _syncLock.</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private ByteArrayOutputStream _inactive = new ByteArrayOutputStream();</div>
+<div>58&emsp;&emsp;</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * All access guarded by _writeLock.</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean _closed = false;</div>
+<div>63&emsp;&emsp;</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * All access guarded by _writeLock.</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private int _objectsWritten = 0;</div>
+<div>68&emsp;&emsp;</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * All access guarded by _syncLock.</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private int _objectsSynced = 0;</div>
+<div>73&emsp;&emsp;</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * All access guarded by _syncLock.</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private int _fileSyncCount = 0;</div>
+<div>78&emsp;&emsp;</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public DurableOutputStream(File file, boolean journalDiskSync, long journalSizeThreshold) throws IOException {</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _file = file;</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _fileOutputStream = new FileOutputStream(file);</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _fileChannel = _fileOutputStream.getChannel();</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _preallocateLength = journalSizeThreshold == 0 ?</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                JOURNAL_PREALLOCATE_LENGTH :</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                (int) Math.min(journalSizeThreshold - 1, JOURNAL_PREALLOCATE_LENGTH);</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _journalDiskSync = journalDiskSync;</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>88&emsp;&emsp;</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void preallocate() throws IOException {</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        assert _fileChannel != null : "_fileChannel is null";</div>
+<div>91&emsp;&emsp;</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long position = _fileChannel.position();</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long size = _fileChannel.size();</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int bufSize = _inactive.size();</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long need = bufSize - (size - position);</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(need <= 0) {</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return;</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        while (need > 0) {</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ByteBuffer buf = ByteBuffer.allocateDirect(_preallocateLength);</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int written = _fileChannel.write(buf, size);</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            assert written == _preallocateLength : "incomplete write";</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            need -= written;</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _fileChannel.force(true);</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>107&emsp;&emsp;</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void sync(Guided guide) throws IOException {</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int thisWrite;</div>
+<div>110&emsp;&emsp;</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // When a thread arrives here, all we care about at first is that it</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // gets properly sequenced according to its turn.</div>
+<div>113&emsp;&emsp;</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        guide.startTurn();</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            thisWrite = writeObject(guide);</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } finally {</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            guide.endTurn();</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>120&emsp;&emsp;</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Now, having ended the turn, the next thread is allowed to come in</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // and try to write its object before we get to the sync.</div>
+<div>123&emsp;&emsp;</div>
+<div style="background-color:orange;">124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        waitUntilSynced(thisWrite);&nbsp; &#8594; 48</b></div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>126&emsp;&emsp;</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private int writeObject(Guided guide) throws IOException {</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        synchronized (_writeLock) {</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(_closed) {</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw new IOException("already closed");</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>132&emsp;&emsp;</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            try {</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                guide.writeTo(_active);</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } catch (IOException exception) {</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                internalClose();</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw exception;</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>139&emsp;&emsp;</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            _objectsWritten++;</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return _objectsWritten;</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>144&emsp;&emsp;</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void waitUntilSynced(int thisWrite) throws IOException {</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Here's the real magic. If this thread is the first to have written</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // an object after a period of inactivity, and there are no other</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // threads coming in, then thisWrite is trivially one greater than</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // _objectsSynced, so this thread goes right ahead to sync its own</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // object alone. But then, if another thread comes along and writes</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // another object while this thread is syncing, it will write to the</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // _active buffer and then promply block on the _syncLock until this</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // thread finishes the sync. If threads continue to come in at just</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // about the rate that syncs can happen, each thread will wait for the</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // previous sync to complete and then initiate its own sync. The</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // latency for the first thread is exactly the time for one sync, which</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // is the minimum possible latency; the latency for any later thread is</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // somewhere between that minimum and a maximum of two syncs, with the</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // average being closer to the minimum end.</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        //</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Now, consider the steady state under heavy load. Some thread will</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // always be syncing the _inactive buffer to disk, so every thread that</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // arrives will write its object to the _active buffer and then wait</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // here on the _syncLock. If 10 threads arrive during a given sync</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // operation, then _active will hold 10 objects when that sync</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // completes. As soon as that earlier thread releases _syncLock, one of</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // those 10 new threads will acquire the lock and notice that its</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // object has not yet been synced; it will then swap the buffers and</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // flush and sync all 10 objects at once. Each of the 10 threads will</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // acquire _syncLock in turn and now see that their object has already</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // been synced and do nothing.</div>
+<div>172&emsp;&emsp;</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        synchronized (_syncLock) {</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(_objectsSynced < thisWrite) {</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                int objectsWritten;</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                synchronized (_writeLock) {</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    if(_closed) {</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        throw new IOException("already closed");</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    }</div>
+<div>180&emsp;&emsp;</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    ByteArrayOutputStream swap = _active;</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    _active = _inactive;</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    _inactive = swap;</div>
+<div>184&emsp;&emsp;</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    objectsWritten = _objectsWritten;</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>187&emsp;&emsp;</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                try {</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    // preallocate more disk space if needed</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    preallocate();</div>
+<div>191&emsp;&emsp;</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    // Resetting the buffer clears its contents but keeps the</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    // allocated space. Therefore the buffers should quickly</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    // reach a steady state of an appropriate size and then not</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    // need to grow any more.</div>
+<div>196&emsp;&emsp;</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    _inactive.writeTo(_fileOutputStream);</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    _inactive.reset();</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    _fileOutputStream.flush();</div>
+<div>200&emsp;&emsp;</div>
+<div style="background-color:orange;">201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                    if(_journalDiskSync) {&nbsp; &#8594; 49 &#8594; 50</b></div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        _fileChannel.force(false);</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    }</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                } catch (IOException exception) {</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    internalClose();</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    throw exception;</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>208&emsp;&emsp;</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                _objectsSynced = objectsWritten;</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                _fileSyncCount++;</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>214&emsp;&emsp;</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void close() throws IOException {</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        synchronized (_syncLock) {</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            synchronized (_writeLock) {</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if(_closed) {</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    return;</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>221&emsp;&emsp;</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                internalClose();</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                // remove preallocated bytes from the journal</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if(_fileChannel != null && _fileChannel.isOpen()) {</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    _fileChannel.truncate(_fileChannel.position());</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                _fileOutputStream.close();</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>231&emsp;&emsp;</div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void internalClose() {</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        synchronized (_writeLock) {</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            _closed = true;</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            _active = null;</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            _inactive = null;</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>239&emsp;&emsp;</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public File file() {</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return _file;</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>243&emsp;&emsp;</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public synchronized int fileSyncCount() {</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        synchronized (_syncLock) {</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return _fileSyncCount;</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>249&emsp;&emsp;</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean reallyClosed() {</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        synchronized (_writeLock) {</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return _closed;</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>255&emsp;&emsp;}</div>
+</div>
+    </div>
+</body>
+</html>

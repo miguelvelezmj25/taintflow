@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TRANSIENTMODE_46_PersistentJournal.java</title>
+    <link rel="stylesheet" type="text/css" href="../../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;//Prevayler(TM) - The Free-Software Prevalence Layer.</div>
+<div>2&emsp;&emsp;//Copyright (C) 2001-2004 Klaus Wuestefeld</div>
+<div>3&emsp;&emsp;//This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.</div>
+<div>4&emsp;&emsp;//Contributions: Carlos Villela.</div>
+<div>5&emsp;&emsp;</div>
+<div>6&emsp;&emsp;package org.prevayler.implementation.journal;</div>
+<div>7&emsp;&emsp;</div>
+<div>8&emsp;&emsp;import org.prevayler.foundation.*;</div>
+<div>9&emsp;&emsp;import org.prevayler.foundation.monitor.Monitor;</div>
+<div>10&emsp;&emsp;import org.prevayler.implementation.PrevaylerDirectory;</div>
+<div>11&emsp;&emsp;import org.prevayler.implementation.TransactionGuide;</div>
+<div>12&emsp;&emsp;import org.prevayler.implementation.TransactionTimestamp;</div>
+<div>13&emsp;&emsp;import org.prevayler.implementation.publishing.TransactionSubscriber;</div>
+<div>14&emsp;&emsp;</div>
+<div>15&emsp;&emsp;import java.io.EOFException;</div>
+<div>16&emsp;&emsp;import java.io.File;</div>
+<div>17&emsp;&emsp;import java.io.IOException;</div>
+<div>18&emsp;&emsp;</div>
+<div>19&emsp;&emsp;</div>
+<div>20&emsp;&emsp;/**</div>
+<div>21&emsp;&emsp;&nbsp; * A Journal that will write all transactions to .journal files.</div>
+<div>22&emsp;&emsp;&nbsp; */</div>
+<div>23&emsp;&emsp;public class PersistentJournal implements Journal {</div>
+<div>24&emsp;&emsp;</div>
+<div>25&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final PrevaylerDirectory _directory;</div>
+<div>26&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final long _journalSizeThresholdInBytes;</div>
+<div>27&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final long _journalAgeThresholdInMillis;</div>
+<div>28&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final boolean _journalDiskSync;</div>
+<div>29&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final String _journalSuffix;</div>
+<div>30&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private DurableOutputStream _outputJournal;</div>
+<div>31&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private StopWatch _journalAgeTimer;</div>
+<div>32&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private long _nextTransaction;</div>
+<div>33&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean _nextTransactionInitialized = false;</div>
+<div>34&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private Monitor _monitor;</div>
+<div>35&emsp;&emsp;</div>
+<div>36&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>37&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param directory</div>
+<div>38&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param journalSizeThresholdInBytes Size of the current journal file beyond which it is closed and a new one started. Zero indicates no size threshold. This is useful journal backup purposes.</div>
+<div>39&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param journalAgeThresholdInMillis Age of the current journal file beyond which it is closed and a new one started. Zero indicates no age threshold. This is useful journal backup purposes.</div>
+<div>40&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>41&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public PersistentJournal(PrevaylerDirectory directory, long journalSizeThresholdInBytes, long journalAgeThresholdInMillis,</div>
+<div>42&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                             boolean journalDiskSync, String journalSuffix, Monitor monitor) throws IOException {</div>
+<div>43&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        PrevaylerDirectory.checkValidJournalSuffix(journalSuffix);</div>
+<div>44&emsp;&emsp;</div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _monitor = monitor;</div>
+<div>46&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _directory = directory;</div>
+<div>47&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _directory.produceDirectory();</div>
+<div>48&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _journalSizeThresholdInBytes = journalSizeThresholdInBytes;</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _journalAgeThresholdInMillis = journalAgeThresholdInMillis;</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _journalDiskSync = journalDiskSync;</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _journalSuffix = journalSuffix;</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>53&emsp;&emsp;</div>
+<div>54&emsp;&emsp;</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void append(TransactionGuide guide) {</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(!_nextTransactionInitialized) {</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new IllegalStateException("Journal.update() has to be called at least once before Journal.append().");</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>59&emsp;&emsp;</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        DurableOutputStream myOutputJournal;</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        DurableOutputStream outputJournalToClose = null;</div>
+<div>62&emsp;&emsp;</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        guide.startTurn();</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            guide.checkSystemVersion(_nextTransaction);</div>
+<div>66&emsp;&emsp;</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(!isOutputJournalStillValid()) {</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                outputJournalToClose = _outputJournal;</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                _outputJournal = createOutputJournal(_nextTransaction, guide);</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                _journalAgeTimer = StopWatch.start();</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>72&emsp;&emsp;</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            _nextTransaction++;</div>
+<div>74&emsp;&emsp;</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            myOutputJournal = _outputJournal;</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } finally {</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            guide.endTurn();</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>79&emsp;&emsp;</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            myOutputJournal.sync(guide);</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (Exception exception) {</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            abort(exception, _outputJournal.file(), "writing to", guide);</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>85&emsp;&emsp;</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        guide.startTurn();</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            try {</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if(outputJournalToClose != null) {</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    outputJournalToClose.close();</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } catch (Exception exception) {</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                abort(exception, outputJournalToClose.file(), "closing", guide);</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } finally {</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            guide.endTurn();</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>99&emsp;&emsp;</div>
+<div>100&emsp;&emsp;</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean isOutputJournalStillValid() {</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return _outputJournal != null</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                && !isOutputJournalTooBig()</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                && !isOutputJournalTooOld();</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>106&emsp;&emsp;</div>
+<div>107&emsp;&emsp;</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean isOutputJournalTooOld() {</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return _journalAgeThresholdInMillis != 0</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                && _journalAgeTimer.millisEllapsed() >= _journalAgeThresholdInMillis;</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>112&emsp;&emsp;</div>
+<div>113&emsp;&emsp;</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean isOutputJournalTooBig() {</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return _journalSizeThresholdInBytes != 0</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                && _outputJournal.file().length() >= _journalSizeThresholdInBytes;</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>118&emsp;&emsp;</div>
+<div>119&emsp;&emsp;</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private DurableOutputStream createOutputJournal(long transactionNumber, Guided guide) {</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        File file = _directory.journalFile(transactionNumber, _journalSuffix);</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return new DurableOutputStream(file, _journalDiskSync, _journalSizeThresholdInBytes);</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (Exception exception) {</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            abort(exception, file, "creating", guide);</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return null;</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>129&emsp;&emsp;</div>
+<div>130&emsp;&emsp;</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * IMPORTANT: This method cannot be called while the log() method is being called in another thread.</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * If there are no journal files in the directory (when a snapshot is taken and all journal files are manually deleted, for example), the initialTransaction parameter in the first call to this method will define what the next transaction number will be. We have to find clearer/simpler semantics.</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void update(TransactionSubscriber subscriber, long initialTransactionWanted) throws IOException, ClassNotFoundException {</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        File initialJournal = _directory.findInitialJournalFile(initialTransactionWanted);</div>
+<div>137&emsp;&emsp;</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(initialJournal == null) {</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            initializeNextTransaction(initialTransactionWanted, 1);</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return;</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>142&emsp;&emsp;</div>
+<div style="background-color:orange;">143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        long nextTransaction = recoverPendingTransactions(subscriber, initialTransactionWanted, initialJournal);&nbsp; &#8594; 26</b></div>
+<div>144&emsp;&emsp;</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        initializeNextTransaction(initialTransactionWanted, nextTransaction);</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>147&emsp;&emsp;</div>
+<div>148&emsp;&emsp;</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void initializeNextTransaction(long initialTransactionWanted, long nextTransaction) throws IOException {</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(_nextTransactionInitialized) {</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(_nextTransaction < initialTransactionWanted) {</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw new IOException("The transaction log has not yet reached transaction " + initialTransactionWanted + ". The last logged transaction was " + (_nextTransaction - 1) + ".");</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(nextTransaction < _nextTransaction) {</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw new IOException("Unable to find journal file containing transaction " + nextTransaction + ". Might have been manually deleted.");</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(nextTransaction > _nextTransaction) {</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw new IllegalStateException();</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return;</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _nextTransactionInitialized = true;</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _nextTransaction = initialTransactionWanted > nextTransaction</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                ? initialTransactionWanted</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                : nextTransaction;</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>167&emsp;&emsp;</div>
+<div>168&emsp;&emsp;</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private long recoverPendingTransactions(TransactionSubscriber subscriber, long initialTransaction, File initialJournal) throws IOException {</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long recoveringTransaction = PrevaylerDirectory.journalVersion(initialJournal);</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        File journal = initialJournal;</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        DurableInputStream input = new DurableInputStream(journal, _monitor);</div>
+<div>173&emsp;&emsp;</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        while (true) {</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            try {</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                Chunk chunk = input.readChunk();</div>
+<div>177&emsp;&emsp;</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if(recoveringTransaction >= initialTransaction) {</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    if(!journal.getName().endsWith(_journalSuffix)) {</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        throw new IOException("There are transactions needing to be recovered from " +</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                journal + ", but only " + _journalSuffix + " files are supported");</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    }</div>
+<div>183&emsp;&emsp;</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    TransactionTimestamp entry = TransactionTimestamp.fromChunk(chunk);</div>
+<div>185&emsp;&emsp;</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    if(entry.systemVersion() != recoveringTransaction) {</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        throw new IOException("Expected " + recoveringTransaction + " but was " + entry.systemVersion());</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    }</div>
+<div>189&emsp;&emsp;</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    subscriber.receive(entry);</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>192&emsp;&emsp;</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                recoveringTransaction++;</div>
+<div>194&emsp;&emsp;</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } catch (EOFException eof) {</div>
+<div style="background-color:orange;">196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                File nextFile = _directory.journalFile(recoveringTransaction, _journalSuffix);&nbsp; &#8594; 27 &#8594; 28</b></div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if(journal.equals(nextFile)) {</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    PrevaylerDirectory.renameUnusedFile(journal);  //The first transaction in this log file is incomplete. We need to reuse this file name.</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                journal = nextFile;</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if(!journal.exists()) {</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    break;</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                input = new DurableInputStream(journal, _monitor);</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return recoveringTransaction;</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>209&emsp;&emsp;</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void abort(Exception exception, File journal, String action, Guided guide) {</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        guide.abortTurn("All transaction processing is now aborted. An IOException was thrown while " + action + " a .journal file.", exception);</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>213&emsp;&emsp;</div>
+<div>214&emsp;&emsp;</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void close() throws IOException {</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(_outputJournal != null) {</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            _outputJournal.close();</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>220&emsp;&emsp;</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public long nextTransaction() {</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(!_nextTransactionInitialized) {</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new IllegalStateException("update() must be called at least once");</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return _nextTransaction;</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>227&emsp;&emsp;</div>
+<div>228&emsp;&emsp;}</div>
+</div>
+    </div>
+</body>
+</html>
