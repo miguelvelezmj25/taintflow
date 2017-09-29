@@ -7,9 +7,14 @@ import edu.cmu.cs.mvelezce.visualization.HTMLPathGenerator;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import soot.MethodOrMethodContext;
 import soot.jimple.infoflow.InfoflowConfiguration;
 import soot.jimple.infoflow.config.IInfoflowConfig;
 import soot.jimple.infoflow.data.pathBuilders.DefaultPathBuilderFactory;
+import soot.jimple.toolkits.callgraph.CallGraph;
+import soot.jimple.toolkits.callgraph.Edge;
+import soot.util.dot.DotGraph;
+import soot.util.queue.QueueReader;
 
 import java.io.File;
 import java.io.IOException;
@@ -1845,7 +1850,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(4);
+        infoflow.aggregateInfoflowResults(3);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
