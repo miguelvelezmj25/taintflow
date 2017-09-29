@@ -61,21 +61,22 @@ public class AnalysisTest {
 
         // Config information flow
         AnalysisTest.infoflowConfiguration = new InfoflowConfiguration();
-//        AnalysisTest.infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.CHA);
         AnalysisTest.infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.SPARK);
         AnalysisTest.infoflowConfiguration.setEnableImplicitFlows(true);
-        AnalysisTest.infoflowConfiguration.setCodeEliminationMode(InfoflowConfiguration.CodeEliminationMode.NoCodeElimination);
+
+        AnalysisTest.infoflowConfiguration.setCodeEliminationMode(InfoflowConfiguration.CodeEliminationMode.RemoveSideEffectFreeCode);
+        AnalysisTest.infoflowConfiguration.setAccessPathLength(1);
+        AnalysisTest.infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.FlowInsensitive);
+//        AnalysisTest.infoflowConfiguration.setMaxThreadNum(1);
+
         AnalysisTest.infoflowConfiguration.setInspectSources(false);
         AnalysisTest.infoflowConfiguration.setInspectSinks(false);
-        AnalysisTest.infoflowConfiguration.setAccessPathLength(10);
-        AnalysisTest.infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.ContextFlowSensitive);
         AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
         AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(false);
         AnalysisTest.infoflowConfiguration.setStopAfterFirstFlow(false);
         AnalysisTest.infoflowConfiguration.setEnableStaticFieldTracking(true);
         AnalysisTest.infoflowConfiguration.setEnableExceptionTracking(false);
         AnalysisTest.infoflowConfiguration.setOneSourceAtATime(true);
-        AnalysisTest.infoflowConfiguration.setMaxThreadNum(1);
 
         AnalysisTest.infoflowConfiguration.setSingleJoinPointAbstraction(true);
         AnalysisTest.infoflowConfiguration.setEnableArraySizeTainting(false);
@@ -1929,11 +1930,11 @@ public class AnalysisTest {
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
-//        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/running-example/src/main/java";
-//
-//        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
-//        generator.generateHTMLPage();
-//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeley-db/src";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
