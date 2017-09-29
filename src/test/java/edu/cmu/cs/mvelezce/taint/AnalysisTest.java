@@ -7,9 +7,15 @@ import edu.cmu.cs.mvelezce.visualization.HTMLPathGenerator;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import soot.MethodOrMethodContext;
 import soot.jimple.infoflow.InfoflowConfiguration;
 import soot.jimple.infoflow.config.IInfoflowConfig;
 import soot.jimple.infoflow.data.pathBuilders.DefaultPathBuilderFactory;
+import soot.jimple.infoflow.problems.InfoflowProblem;
+import soot.jimple.toolkits.callgraph.CallGraph;
+import soot.jimple.toolkits.callgraph.Edge;
+import soot.util.dot.DotGraph;
+import soot.util.queue.QueueReader;
 
 import java.io.File;
 import java.io.IOException;
@@ -55,49 +61,37 @@ public class AnalysisTest {
 
         // Config information flow
         AnalysisTest.infoflowConfiguration = new InfoflowConfiguration();
-//        AnalysisTest.infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.CHA);
         AnalysisTest.infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.SPARK);
         AnalysisTest.infoflowConfiguration.setEnableImplicitFlows(true);
+
         AnalysisTest.infoflowConfiguration.setCodeEliminationMode(InfoflowConfiguration.CodeEliminationMode.NoCodeElimination);
-//        AnalysisTest.infoflowConfiguration.setInspectSources(true);
+        AnalysisTest.infoflowConfiguration.setAccessPathLength(1);
+        AnalysisTest.infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.FlowInsensitive);
+//        AnalysisTest.infoflowConfiguration.setMaxThreadNum(1);
+
+        AnalysisTest.infoflowConfiguration.setInspectSources(false);
         AnalysisTest.infoflowConfiguration.setInspectSinks(false);
-        AnalysisTest.infoflowConfiguration.setAccessPathLength(10_000);
-        AnalysisTest.infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.ContextFlowSensitive);
-
-//        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
-//        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(true);
-
         AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
         AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(false);
-
-//        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
-//        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(true);
-
-//        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
-//        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(false);
-
-//        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.PtsBased);
-//        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(true);
-
-//        AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.PtsBased);
-//        AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(false);
-
         AnalysisTest.infoflowConfiguration.setStopAfterFirstFlow(false);
         AnalysisTest.infoflowConfiguration.setEnableStaticFieldTracking(true);
         AnalysisTest.infoflowConfiguration.setEnableExceptionTracking(false);
-        AnalysisTest.infoflowConfiguration.setMaxThreadNum(1);
         AnalysisTest.infoflowConfiguration.setOneSourceAtATime(true);
 
-//        AnalysisTest.infoflowConfiguration.setSequentialPathProcessing(true);
+        AnalysisTest.infoflowConfiguration.setSingleJoinPointAbstraction(true);
+        AnalysisTest.infoflowConfiguration.setEnableArraySizeTainting(false);
+        AnalysisTest.infoflowConfiguration.setEnableTypeChecking(false);
+        InfoflowConfiguration.setMergeNeighbors(true);
 
-//        AnalysisTest.infoflowConfiguration.setWriteOutputFiles(true);
-//        AnalysisTest.infoflowConfiguration.setUseThisChainReduction(true);
-//        AnalysisTest.infoflowConfiguration.setUseRecursiveAccessPaths(true);
-//        AnalysisTest.infoflowConfiguration.setExcludeSootLibraryClasses(false);
-//        InfoflowConfiguration.setPathAgnosticResults(false);
-//        AnalysisTest.infoflowConfiguration.setEnableExceptionTracking(true);
-//        InfoflowConfiguration.setOneResultPerAccessPath(true);
 
+        AnalysisTest.infoflowConfiguration.setSequentialPathProcessing(true);
+//        AnalysisTest.infoflowConfiguration.setDataFlowTimeout(300);
+
+
+
+        // Incorrect results
+//        AnalysisTest.infoflowConfiguration.setIgnoreFlowsInSystemPackages(true);
+//        AnalysisTest.infoflowConfiguration.setExcludeSootLibraryClasses(true);
 
         // Config soot
         AnalysisTest.sootConfiguration = new SootConfig();
@@ -621,7 +615,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(6);
+        infoflow.aggregateInfoflowResults(2);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -629,6 +623,7 @@ public class AnalysisTest {
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
+        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
@@ -1675,7 +1670,7 @@ public class AnalysisTest {
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, false));
 
         // Add taint wrapper
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
@@ -1714,8 +1709,8 @@ public class AnalysisTest {
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, false));
 
         // Add taint wrapper
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
@@ -1740,6 +1735,7 @@ public class AnalysisTest {
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
+        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
@@ -1828,7 +1824,7 @@ public class AnalysisTest {
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, false));
 
         // Add taint wrapper
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
@@ -1845,7 +1841,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(4);
+        infoflow.aggregateInfoflowResults(3);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -1918,8 +1914,8 @@ public class AnalysisTest {
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, false));
 
         // Add taint wrapper
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
@@ -1940,16 +1936,16 @@ public class AnalysisTest {
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
-//        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/running-example/src/main/java";
-//
-//        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
-//        generator.generateHTMLPage();
-//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/prevayler/src/main/java";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
     public void berkeleyDBTest() throws IOException {
-        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeley-db/out/production/berkeley-db");
+        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeleydb/target/classes");
         AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
 
 //        file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeley-db/out/test/berkeley-db");
@@ -1962,15 +1958,15 @@ public class AnalysisTest {
         infoflow.setConfig(AnalysisTest.infoflowConfiguration);
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
 
         // Add taint wrapper
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<persist.gettingStarted.ExampleInventoryRead: void main(java.lang.String[])>";
+        String entryPoint = "<berkeley.persist.gettingStarted.ExampleInventoryRead: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -1980,15 +1976,15 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(0);
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
-//        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/running-example/src/main/java";
-//
-//        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
-//        generator.generateHTMLPage();
-//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeleydb/src/main/java";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test

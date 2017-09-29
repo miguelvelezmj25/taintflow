@@ -39,53 +39,42 @@ public class Run {
 
         // Config information flow
         infoflowConfiguration = new InfoflowConfiguration();
-//        infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.CHA);
         infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.SPARK);
         infoflowConfiguration.setEnableImplicitFlows(true);
+
         infoflowConfiguration.setCodeEliminationMode(InfoflowConfiguration.CodeEliminationMode.NoCodeElimination);
-//        infoflowConfiguration.setInspectSources(true);
+        infoflowConfiguration.setAccessPathLength(1);
+        infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.FlowInsensitive);
+//        infoflowConfiguration.setMaxThreadNum(1);
+
+        infoflowConfiguration.setInspectSources(false);
         infoflowConfiguration.setInspectSinks(false);
-        infoflowConfiguration.setAccessPathLength(10_000);
-        infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.ContextFlowSensitive);
-
-//        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
-//        infoflowConfiguration.setFlowSensitiveAliasing(true);
-
         infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
         infoflowConfiguration.setFlowSensitiveAliasing(false);
-
-//        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
-//        infoflowConfiguration.setFlowSensitiveAliasing(true);
-
-//        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.FlowSensitive);
-//        infoflowConfiguration.setFlowSensitiveAliasing(false);
-
-//        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.PtsBased);
-//        infoflowConfiguration.setFlowSensitiveAliasing(true);
-
-//        infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.PtsBased);
-//        infoflowConfiguration.setFlowSensitiveAliasing(false);
-
         infoflowConfiguration.setStopAfterFirstFlow(false);
         infoflowConfiguration.setEnableStaticFieldTracking(true);
         infoflowConfiguration.setEnableExceptionTracking(false);
-        infoflowConfiguration.setMaxThreadNum(1);
         infoflowConfiguration.setOneSourceAtATime(true);
 
-//        infoflowConfiguration.setSequentialPathProcessing(true);
+        infoflowConfiguration.setSingleJoinPointAbstraction(true);
+        infoflowConfiguration.setEnableArraySizeTainting(false);
+        infoflowConfiguration.setEnableTypeChecking(false);
+        InfoflowConfiguration.setMergeNeighbors(true);
 
-//        infoflowConfiguration.setWriteOutputFiles(true);
-//        infoflowConfiguration.setUseThisChainReduction(true);
-//        infoflowConfiguration.setUseRecursiveAccessPaths(true);
-//        infoflowConfiguration.setExcludeSootLibraryClasses(false);
-//        InfoflowConfiguration.setPathAgnosticResults(false);
-//        infoflowConfiguration.setEnableExceptionTracking(true);
-//        InfoflowConfiguration.setOneResultPerAccessPath(true);
+
+        infoflowConfiguration.setSequentialPathProcessing(true);
+//        infoflowConfiguration.setDataFlowTimeout(300);
+
+
+
+        // Incorrect results
+//        infoflowConfiguration.setIgnoreFlowsInSystemPackages(true);
+//        infoflowConfiguration.setExcludeSootLibraryClasses(true);
 
         // Config soot
         sootConfiguration = new SootConfig();
 
-        File file = new File("/home/mvelezce/programming/java/projects/systems/original/berkeley-db/out/production/berkeley-db");
+        File file = new File("/home/mvelezce/programming/java/projects/systems/original/berkeleydb/target/classes");
 //        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeley-db/out/production/berkeley-db");
         appPath = file + sep + appPath;
 
@@ -99,15 +88,15 @@ public class Run {
         infoflow.setConfig(infoflowConfiguration);
         infoflow.setSootConfig(sootConfiguration);
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
 
         // Add taint wrapper
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<persist.gettingStarted.ExampleInventoryRead: void main(java.lang.String[])>";
+        String entryPoint = "<berkeley.persist.gettingStarted.ExampleInventoryRead: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -117,7 +106,7 @@ public class Run {
 //        infoflow.computeInfoflowOneSourceAtATime(appPath, libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(appPath, libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(0);
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
     }

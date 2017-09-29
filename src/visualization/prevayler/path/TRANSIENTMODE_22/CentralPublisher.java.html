@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TRANSIENTMODE_22_CentralPublisher.java</title>
+    <link rel="stylesheet" type="text/css" href="../../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;//Prevayler(TM) - The Free-Software Prevalence Layer.</div>
+<div>2&emsp;&emsp;//Copyright (C) 2001-2003 Klaus Wuestefeld</div>
+<div>3&emsp;&emsp;//This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.</div>
+<div>4&emsp;&emsp;</div>
+<div>5&emsp;&emsp;package org.prevayler.implementation.publishing;</div>
+<div>6&emsp;&emsp;</div>
+<div>7&emsp;&emsp;import org.prevayler.Clock;</div>
+<div>8&emsp;&emsp;import org.prevayler.foundation.Cool;</div>
+<div>9&emsp;&emsp;import org.prevayler.foundation.Turn;</div>
+<div>10&emsp;&emsp;import org.prevayler.implementation.Capsule;</div>
+<div>11&emsp;&emsp;import org.prevayler.implementation.TransactionGuide;</div>
+<div>12&emsp;&emsp;import org.prevayler.implementation.TransactionTimestamp;</div>
+<div>13&emsp;&emsp;import org.prevayler.implementation.clock.PausableClock;</div>
+<div>14&emsp;&emsp;import org.prevayler.implementation.journal.Journal;</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;import java.io.IOException;</div>
+<div>17&emsp;&emsp;</div>
+<div>18&emsp;&emsp;public class CentralPublisher extends AbstractPublisher {</div>
+<div>19&emsp;&emsp;</div>
+<div>20&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final PausableClock _pausableClock;</div>
+<div>21&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final Journal _journal;</div>
+<div>22&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final Object _pendingPublicationsMonitor = new Object();</div>
+<div>23&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final Object _nextTurnMonitor = new Object();</div>
+<div>24&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private volatile int _pendingPublications = 0;</div>
+<div>25&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private Turn _nextTurn = Turn.first();</div>
+<div>26&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private long _nextTransaction;</div>
+<div>27&emsp;&emsp;</div>
+<div>28&emsp;&emsp;</div>
+<div>29&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public CentralPublisher(Clock clock, Journal journal) {</div>
+<div>30&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        super(new PausableClock(clock));</div>
+<div>31&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _pausableClock = (PausableClock) _clock; //This is just to avoid casting the inherited _clock every time.</div>
+<div>32&emsp;&emsp;</div>
+<div style="background-color:orange;">33&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        _journal = journal;&nbsp; &#8594; 16</b></div>
+<div style="background-color:orange;">34&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    }&nbsp; &#8594; 17</b></div>
+<div>35&emsp;&emsp;</div>
+<div>36&emsp;&emsp;</div>
+<div>37&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void publish(Capsule capsule) {</div>
+<div>38&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        synchronized (_pendingPublicationsMonitor) {  //Blocks all new subscriptions until the publication is over.</div>
+<div>39&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(_pendingPublications == 0) {</div>
+<div>40&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                _pausableClock.pause();</div>
+<div>41&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>42&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            _pendingPublications++;</div>
+<div>43&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>44&emsp;&emsp;</div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>46&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            publishWithoutWorryingAboutNewSubscriptions(capsule);  // Suggestions for a better method name are welcome.  :)</div>
+<div>47&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } finally {</div>
+<div>48&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            synchronized (_pendingPublicationsMonitor) {</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                _pendingPublications--;</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if(_pendingPublications == 0) {</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    _pausableClock.resume();</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    _pendingPublicationsMonitor.notifyAll();</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>57&emsp;&emsp;</div>
+<div>58&emsp;&emsp;</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void publishWithoutWorryingAboutNewSubscriptions(Capsule capsule) {</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        TransactionGuide guide = guideFor(capsule);</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _journal.append(guide);</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        notifySubscribers(guide);</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>64&emsp;&emsp;</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private TransactionGuide guideFor(Capsule capsule) {</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        synchronized (_nextTurnMonitor) {</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            TransactionTimestamp timestamp = new TransactionTimestamp(capsule, _nextTransaction, _pausableClock.realTime());</div>
+<div>68&emsp;&emsp;</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // Count this transaction</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Turn turn = _nextTurn;</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            _nextTurn = _nextTurn.next();</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            _nextTransaction++;</div>
+<div>73&emsp;&emsp;</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return new TransactionGuide(timestamp, turn);</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>77&emsp;&emsp;</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void notifySubscribers(TransactionGuide guide) {</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        guide.startTurn();</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            _pausableClock.advanceTo(guide.executionTime());</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            notifySubscribers(guide.timestamp());</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } finally {</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            guide.endTurn();</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>87&emsp;&emsp;</div>
+<div>88&emsp;&emsp;</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void subscribe(TransactionSubscriber subscriber, long initialTransaction) throws IOException, ClassNotFoundException {</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        synchronized (_pendingPublicationsMonitor) {</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            while (_pendingPublications != 0) Cool.wait(_pendingPublicationsMonitor);</div>
+<div>92&emsp;&emsp;</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            _journal.update(subscriber, initialTransaction);</div>
+<div>94&emsp;&emsp;</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            synchronized (_nextTurnMonitor) {</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                _nextTransaction = _journal.nextTransaction();</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>98&emsp;&emsp;</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            super.addSubscriber(subscriber);</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>102&emsp;&emsp;</div>
+<div>103&emsp;&emsp;</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void close() throws IOException {</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        _journal.close();</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>107&emsp;&emsp;</div>
+<div>108&emsp;&emsp;}</div>
+</div>
+    </div>
+</body>
+</html>

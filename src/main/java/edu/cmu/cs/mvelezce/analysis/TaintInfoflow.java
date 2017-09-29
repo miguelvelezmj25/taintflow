@@ -30,8 +30,8 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class TaintInfoflow extends Infoflow {
-//    private static final String CONFIG_FILE = "/home/mvelezce/programming/java/projects/taint-analysis/src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
-        public static final String CONFIG_FILE = "src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
+    private static final String CONFIG_FILE = "/home/mvelezce/programming/java/projects/taint-analysis/src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
+//        public static final String CONFIG_FILE = "src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
     public static final String OUTPUT_DIR = "src/main/resources/output/";
     public static final String PATHS_DIR = "src/main/resources/paths/";
 
@@ -52,25 +52,25 @@ public class TaintInfoflow extends Infoflow {
     protected void constructCallgraph() {
         super.constructCallgraph();
 
-        Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
-        PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink", ControlFlowSink.v()));
+//        Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
+//        PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink", ControlFlowSink.v()));
 ////        PackManager.v().getPack("jtp").add(new Transform("jtp.trycatchlabelnop", TryCatchLabelNop.v()));
 ////        PackManager.v().getPack("jtp").add(new Transform("jtp.nop", Nop.v()));
 //
-        while (iter.hasNext()) {
-            MethodOrMethodContext m = iter.next();
-            SootMethod method = m.method();
-
-            String methodPackage = method.getDeclaringClass().getPackageName();
-
-            for(String packageName : this.packages) {
-//                if((!method.getDeclaringClass().isJavaLibraryClass() || !method.getDeclaringClass().isPhantomClass())
-//                    /*&& methodPackage.contains(packageName)*/ && method.hasActiveBody()) {
-                if(methodPackage.contains(packageName) && method.hasActiveBody()) {
-                    PackManager.v().getPack("jtp").apply(method.getActiveBody());
-                }
-            }
-        }
+//        while (iter.hasNext()) {
+//            MethodOrMethodContext m = iter.next();
+//            SootMethod method = m.method();
+////
+//            String methodPackage = method.getDeclaringClass().getPackageName();
+//
+//            for(String packageName : this.packages) {
+////                if((!method.getDeclaringClass().isJavaLibraryClass() || !method.getDeclaringClass().isPhantomClass())
+////                    /*&& methodPackage.contains(packageName)*/ && method.hasActiveBody()) {
+//                if(methodPackage.contains(packageName) && method.hasActiveBody()) {
+//                    PackManager.v().getPack("jtp").apply(method.getActiveBody());
+//                }
+//            }
+//        }
     }
 
     public void aggregateInfoflowResults(int count) throws IOException {
@@ -186,11 +186,11 @@ public class TaintInfoflow extends Infoflow {
 
             this.computeInfoflow(libPath, appPath, entryPoints, intermediateSources, sinks);
 
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+//            try {
+//                Thread.sleep(1000);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
 
             // TODO check for exceptions thrown while the analysis executed
             this.saveResults(currentOption);
@@ -201,11 +201,11 @@ public class TaintInfoflow extends Infoflow {
 
             System.out.println("############## Option " + currentOption + " results size " + this.getResults().size());
 
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+//            try {
+//                Thread.sleep(1000);
+//            } catch (InterruptedException e) {
+//                e.printStackTrace();
+//            }
 
         }
     }
