@@ -4,7 +4,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 import soot.Unit;
+import soot.jimple.Stmt;
 import soot.jimple.infoflow.InfoflowManager;
+import soot.jimple.infoflow.collect.ConcurrentHashSet;
 import soot.jimple.infoflow.collect.MyConcurrentHashMap;
 import soot.jimple.infoflow.data.Abstraction;
 import soot.jimple.infoflow.data.AbstractionAtSink;
@@ -35,6 +37,7 @@ public class TaintPropagationResults {
 	}
 	
 	protected final InfoflowManager manager;
+	protected final Set<Stmt> sinks = new ConcurrentHashSet<>();
 	protected final MyConcurrentHashMap<AbstractionAtSink, Abstraction> results =
 			new MyConcurrentHashMap<AbstractionAtSink, Abstraction>();
 	
@@ -79,11 +82,12 @@ public class TaintPropagationResults {
 		Abstraction newAbs = this.results.putIfAbsentElseGet
 				(resultAbs, resultAbs.getAbstraction());
 
-		if(!this.results.isEmpty()) {
-			System.out.println(resultAbs);
-			System.out.println("Results size: " + this.results.size());
-			System.out.println();
-		}
+		this.sinks.add(resultAbs.getSinkStmt());
+//		if(!this.results.isEmpty()) {
+//			System.out.println(resultAbs);
+//			System.out.println("Results size: " + this.results.size());
+//			System.out.println();
+//		}
 
 		if (newAbs != resultAbs.getAbstraction())
 			newAbs.addNeighbor(resultAbs.getAbstraction());
@@ -113,7 +117,11 @@ public class TaintPropagationResults {
 	public Set<AbstractionAtSink> getResults() {
 		return this.results.keySet();
 	}
-	
+
+	public Set<Stmt> getSinks() {
+		return sinks;
+	}
+
 	/**
 	 * Adds a new handler that is invoked when a new data flow result is added
 	 * to this data object

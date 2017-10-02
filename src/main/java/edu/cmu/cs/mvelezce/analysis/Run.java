@@ -45,7 +45,7 @@ public class Run {
         infoflowConfiguration.setCodeEliminationMode(InfoflowConfiguration.CodeEliminationMode.NoCodeElimination);
         infoflowConfiguration.setAccessPathLength(1);
         infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.FlowInsensitive);
-//        infoflowConfiguration.setMaxThreadNum(1);
+        infoflowConfiguration.setMaxThreadNum(1);
 
         infoflowConfiguration.setInspectSources(false);
         infoflowConfiguration.setInspectSinks(false);
@@ -75,8 +75,8 @@ public class Run {
 //        infoflowConfiguration.setStopAfterFirstKFlows(2);
         sootConfiguration = new SootConfig();
 
-        File file = new File("/home/mvelezce/programming/java/projects/systems/original/berkeleydb/target/classes");
-//        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeleydb/target/classes");
+//        File file = new File("/home/mvelezce/programming/java/projects/systems/original/berkeleydb/target/classes");
+        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeleydb/target/classes");
         appPath = file + sep + appPath;
 
 //        file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeley-db/out/test/berkeley-db");

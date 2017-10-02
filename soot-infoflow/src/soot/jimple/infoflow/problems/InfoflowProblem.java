@@ -60,6 +60,9 @@ import soot.jimple.infoflow.util.ByReferenceBoolean;
 import soot.jimple.infoflow.util.TypeUtils;
 
 public class InfoflowProblem extends AbstractInfoflowProblem {
+
+	public int sinkCount = 0;
+
 	
 	private final Aliasing aliasing;
 	private final IAliasingStrategy aliasingStrategy;
@@ -107,6 +110,10 @@ public class InfoflowProblem extends AbstractInfoflowProblem {
 				public Set<Abstraction> computeTargets(Abstraction d1, Abstraction source) {
 					if (1 <= manager.getConfig().getStopAfterFirstKFlows() && manager.getConfig().getStopAfterFirstKFlows() <= results.getResults().size())
 						return Collections.emptySet();
+
+					if(results.getSinks().size() == sinkCount) {
+						return Collections.emptySet();
+					}
 
 					// Notify the handler if we have one
 					if (taintPropagationHandler != null)

@@ -287,6 +287,8 @@ public class Infoflow extends AbstractInfoflow {
 			if (config.getCallgraphAlgorithm() != CallgraphAlgorithm.OnDemand)
 				logger.info("Callgraph has {} edges", Scene.v().getCallGraph().size());
 
+//			this.config.setDataFlowTimeout(300);
+
 			if (!config.isTaintAnalysisEnabled())
 				return;
 
@@ -413,8 +415,10 @@ public class Infoflow extends AbstractInfoflow {
 					logger.info("Source lookup done, found {} sources and {} sinks.",
 							forwardProblem.getInitialSeeds().size(), sinkCount);
 
-					this.config.setStopAfterFirstKFlows(2 * sinkCount);
-//					this.config.setStopAfterFirstKFlows(3);
+					forwardProblem.sinkCount = sinkCount;
+					int stopAfterFlows = 2 * sinkCount;
+					logger.info("Stop after {} flows", stopAfterFlows);
+					this.config.setStopAfterFirstKFlows(stopAfterFlows);
 
 					// Initialize the taint wrapper if we have one
 					if (taintWrapper != null)

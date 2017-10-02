@@ -40,25 +40,6 @@ public abstract class ConcurrentAbstractionPathBuilder extends AbstractAbstracti
             return;
         }
 
-        for(AbstractionAtSink aas : res) {
-            System.out.println(aas);
-
-            Abstraction abs = aas.getAbstraction();
-            Stmt curStmt = abs.getCurrentStmt();
-            System.out.println(curStmt);
-
-            Abstraction pred = abs.getPredecessor();
-
-            while (pred != null) {
-                curStmt = pred.getCurrentStmt();
-                System.out.println(curStmt);
-
-                pred = pred.getPredecessor();
-            }
-
-            System.out.println();
-        }
-
         logger.info("Obtainted {} connections between sources and sinks", res.size());
 
         // Notify the listeners that the solver has been started
