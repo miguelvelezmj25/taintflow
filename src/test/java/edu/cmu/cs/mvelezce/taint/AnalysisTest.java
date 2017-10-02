@@ -93,7 +93,7 @@ public class AnalysisTest {
 //        AnalysisTest.infoflowConfiguration.setIgnoreFlowsInSystemPackages(true);
 //        AnalysisTest.infoflowConfiguration.setExcludeSootLibraryClasses(true);
 
-        InfoflowConfiguration.setOneResultPerAccessPath(true);
+//        InfoflowConfiguration.setOneResultPerAccessPath(true);
 //        AnalysisTest.infoflowConfiguration.setStopAfterFirstKFlows(2);
         // Config soot
         AnalysisTest.sootConfiguration = new SootConfig();

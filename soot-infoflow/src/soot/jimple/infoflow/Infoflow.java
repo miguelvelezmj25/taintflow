@@ -413,6 +413,9 @@ public class Infoflow extends AbstractInfoflow {
 					logger.info("Source lookup done, found {} sources and {} sinks.",
 							forwardProblem.getInitialSeeds().size(), sinkCount);
 
+					this.config.setStopAfterFirstKFlows(10 * sinkCount);
+//					this.config.setStopAfterFirstKFlows(3);
+
 					// Initialize the taint wrapper if we have one
 					if (taintWrapper != null)
 						taintWrapper.initialize(manager);
