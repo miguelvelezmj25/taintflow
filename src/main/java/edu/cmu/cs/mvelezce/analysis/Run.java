@@ -72,7 +72,7 @@ public class Run {
 //        infoflowConfiguration.setExcludeSootLibraryClasses(true);
 
         // Config soot
-        infoflowConfiguration.setStopAfterFirstKFlows(2);
+//        infoflowConfiguration.setStopAfterFirstKFlows(2);
         sootConfiguration = new SootConfig();
 
         File file = new File("/home/mvelezce/programming/java/projects/systems/original/berkeleydb/target/classes");
