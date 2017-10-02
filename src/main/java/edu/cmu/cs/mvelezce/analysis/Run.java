@@ -62,7 +62,7 @@ public class Run {
         InfoflowConfiguration.setMergeNeighbors(true);
 
 
-        infoflowConfiguration.setSequentialPathProcessing(true);
+//        infoflowConfiguration.setSequentialPathProcessing(true);
 //        infoflowConfiguration.setDataFlowTimeout(300);
 
 
@@ -72,10 +72,11 @@ public class Run {
 //        infoflowConfiguration.setExcludeSootLibraryClasses(true);
 
         // Config soot
+        infoflowConfiguration.setStopAfterFirstKFlows(2);
         sootConfiguration = new SootConfig();
 
         File file = new File("/home/mvelezce/programming/java/projects/systems/original/berkeleydb/target/classes");
-//        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeley-db/out/production/berkeley-db");
+//        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeleydb/target/classes");
         appPath = file + sep + appPath;
 
 //        file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeley-db/out/test/berkeley-db");

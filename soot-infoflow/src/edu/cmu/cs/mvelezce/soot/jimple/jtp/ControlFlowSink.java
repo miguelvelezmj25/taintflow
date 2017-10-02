@@ -79,7 +79,7 @@ public class ControlFlowSink extends BodyTransformer {
         }
 
         SootClass sootClass = Scene.v().loadClassAndSupport("edu.cmu.cs.mvelezce.analysis.option.Sink");
-        SootMethod sootMethod = sootClass.getMethod("void sink(java.lang.Object)");
+        SootMethod sootMethod = sootClass.getMethod("void sink(int)");
 
         for(Map.Entry<Unit, List<Value>> unitToValues : unitsToValues.entrySet()) {
             for(Value value : unitToValues.getValue()) {

@@ -78,6 +78,13 @@ public class TaintPropagationResults {
 		resultAbs = new AbstractionAtSink(abs, resultAbs.getSinkStmt());
 		Abstraction newAbs = this.results.putIfAbsentElseGet
 				(resultAbs, resultAbs.getAbstraction());
+
+		if(!this.results.isEmpty()) {
+			System.out.println(resultAbs);
+			System.out.println("Results size: " + this.results.size());
+			System.out.println();
+		}
+
 		if (newAbs != resultAbs.getAbstraction())
 			newAbs.addNeighbor(resultAbs.getAbstraction());
 		
