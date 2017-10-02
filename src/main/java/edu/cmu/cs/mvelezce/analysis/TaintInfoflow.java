@@ -30,8 +30,8 @@ import java.io.PrintWriter;
 import java.util.*;
 
 public class TaintInfoflow extends Infoflow {
-    private static final String CONFIG_FILE = "/home/mvelezce/programming/java/projects/taint-analysis/src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
-//        public static final String CONFIG_FILE = "src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
+        private static final String CONFIG_FILE = "/home/mvelezce/programming/java/projects/taint-analysis/src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
+//    public static final String CONFIG_FILE = "src/main/java/edu/cmu/cs/mvelezce/analysis/option/config.json";
     public static final String OUTPUT_DIR = "src/main/resources/output/";
     public static final String PATHS_DIR = "src/main/resources/paths/";
 

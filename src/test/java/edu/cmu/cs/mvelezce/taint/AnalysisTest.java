@@ -2255,7 +2255,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(2);
+//        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
