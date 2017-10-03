@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ALLOWCREATE_9_EntityStore.java</title>
+    <link rel="stylesheet" type="text/css" href="../../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*-</div>
+<div>2&emsp;&emsp;&nbsp; * Copyright (C) 2002, 2017, Oracle and/or its affiliates. All rights reserved.</div>
+<div>3&emsp;&emsp;&nbsp; *</div>
+<div>4&emsp;&emsp;&nbsp; * This file was distributed by Oracle as part of a version of Oracle Berkeley</div>
+<div>5&emsp;&emsp;&nbsp; * DB Java Edition made available at:</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; * http://www.oracle.com/technetwork/database/database-technologies/berkeleydb/downloads/index.html</div>
+<div>8&emsp;&emsp;&nbsp; *</div>
+<div>9&emsp;&emsp;&nbsp; * Please see the LICENSE file included in the top-level directory of the</div>
+<div>10&emsp;&emsp;&nbsp; * appropriate version of Oracle Berkeley DB Java Edition for a copy of the</div>
+<div>11&emsp;&emsp;&nbsp; * license and additional information.</div>
+<div>12&emsp;&emsp;&nbsp; */</div>
+<div>13&emsp;&emsp;</div>
+<div>14&emsp;&emsp;package berkeley.com.sleepycat.persist;</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;import java.io.Closeable;</div>
+<div>17&emsp;&emsp;import java.util.Set;</div>
+<div>18&emsp;&emsp;</div>
+<div>19&emsp;&emsp;import berkeley.com.sleepycat.je.Database; // for javadoc</div>
+<div>20&emsp;&emsp;import berkeley.com.sleepycat.je.DatabaseConfig;</div>
+<div>21&emsp;&emsp;import berkeley.com.sleepycat.je.DatabaseException;</div>
+<div>22&emsp;&emsp;import berkeley.com.sleepycat.je.Environment;</div>
+<div>23&emsp;&emsp;/* <!-- begin JE only --> */</div>
+<div>24&emsp;&emsp;import berkeley.com.sleepycat.je.EnvironmentFailureException ; // for javadoc</div>
+<div>25&emsp;&emsp;import berkeley.com.sleepycat.je.OperationFailureException ; // for javadoc</div>
+<div>26&emsp;&emsp;/* <!-- end JE only --> */</div>
+<div>27&emsp;&emsp;import berkeley.com.sleepycat.je.SecondaryConfig;</div>
+<div>28&emsp;&emsp;import berkeley.com.sleepycat.je.Sequence;</div>
+<div>29&emsp;&emsp;import berkeley.com.sleepycat.je.SequenceConfig;</div>
+<div>30&emsp;&emsp;import berkeley.com.sleepycat.je.Transaction;</div>
+<div>31&emsp;&emsp;import berkeley.com.sleepycat.persist.evolve.EvolveConfig;</div>
+<div>32&emsp;&emsp;import berkeley.com.sleepycat.persist.evolve.EvolveStats;</div>
+<div>33&emsp;&emsp;import berkeley.com.sleepycat.persist.evolve.IncompatibleClassException;</div>
+<div>34&emsp;&emsp;import berkeley.com.sleepycat.persist.evolve.Mutations;</div>
+<div>35&emsp;&emsp;import berkeley.com.sleepycat.persist.impl.Store;</div>
+<div>36&emsp;&emsp;import berkeley.com.sleepycat.persist.model.DeleteAction;</div>
+<div>37&emsp;&emsp;import berkeley.com.sleepycat.persist.model.Entity; // for javadoc</div>
+<div>38&emsp;&emsp;import berkeley.com.sleepycat.persist.model.EntityModel;</div>
+<div>39&emsp;&emsp;import berkeley.com.sleepycat.persist.model.PrimaryKey;</div>
+<div>40&emsp;&emsp;import berkeley.com.sleepycat.persist.model.SecondaryKey;</div>
+<div>41&emsp;&emsp;</div>
+<div>42&emsp;&emsp;/**</div>
+<div>43&emsp;&emsp;&nbsp; * A store for managing persistent entity objects.</div>
+<div>44&emsp;&emsp;&nbsp; *</div>
+<div>45&emsp;&emsp;&nbsp; * <p>{@code EntityStore} objects are thread-safe.  Multiple threads may safely</div>
+<div>46&emsp;&emsp;&nbsp; * call the methods of a shared {@code EntityStore} object.</p></div>
+<div>47&emsp;&emsp;&nbsp; *</div>
+<div>48&emsp;&emsp;&nbsp; * <p>See the <a href="package-summary.html#example">package</div>
+<div>49&emsp;&emsp;&nbsp; * summary example</a> for an example of using an {@code EntityStore}.</p></div>
+<div>50&emsp;&emsp;&nbsp; *</div>
+<div>51&emsp;&emsp;&nbsp; * <p>Before creating an <code>EntityStore</code> you must create an {@link</div>
+<div>52&emsp;&emsp;&nbsp; * Environment} object using the Berkeley DB engine API.  The environment may</div>
+<div>53&emsp;&emsp;&nbsp; * contain any number of entity stores and their associated databases, as well</div>
+<div>54&emsp;&emsp;&nbsp; * as other databases not associated with an entity store.</p></div>
+<div>55&emsp;&emsp;&nbsp; *</div>
+<div>56&emsp;&emsp;&nbsp; * <p>An entity store is based on an {@link EntityModel}: a data model which</div>
+<div>57&emsp;&emsp;&nbsp; * defines persistent classes (<em>entity classes</em>), primary keys,</div>
+<div>58&emsp;&emsp;&nbsp; * secondary keys, and relationships between entities.  A primary index is</div>
+<div>59&emsp;&emsp;&nbsp; * created for each entity class.  An associated secondary index is created for</div>
+<div>60&emsp;&emsp;&nbsp; * each secondary key.  The {@link Entity}, {@link PrimaryKey} and {@link</div>
+<div>61&emsp;&emsp;&nbsp; * SecondaryKey} annotations may be used to define entities and keys.</p></div>
+<div>62&emsp;&emsp;&nbsp; *</div>
+<div>63&emsp;&emsp;&nbsp; * <p>To use an <code>EntityStore</code>, first obtain {@link PrimaryIndex} and</div>
+<div>64&emsp;&emsp;&nbsp; * {@link SecondaryIndex} objects by calling {@link #getPrimaryIndex</div>
+<div>65&emsp;&emsp;&nbsp; * getPrimaryIndex} and {@link #getSecondaryIndex getSecondaryIndex}.  Then use</div>
+<div>66&emsp;&emsp;&nbsp; * these indices to store and access entity records by key.</p></div>
+<div>67&emsp;&emsp;&nbsp; *</div>
+<div>68&emsp;&emsp;&nbsp; * <p>Although not normally needed, you can also use the entity store along</div>
+<div>69&emsp;&emsp;&nbsp; * with the {@link com.sleepycat.je Base API}.  Methods in the {@link</div>
+<div>70&emsp;&emsp;&nbsp; * PrimaryIndex} and {@link SecondaryIndex} classes may be used to obtain</div>
+<div>71&emsp;&emsp;&nbsp; * databases and bindings.  The databases may be used directly for accessing</div>
+<div>72&emsp;&emsp;&nbsp; * entity records.  The bindings should be called explicitly to translate</div>
+<div>73&emsp;&emsp;&nbsp; * between {@link com.sleepycat.je.DatabaseEntry} objects and entity model</div>
+<div>74&emsp;&emsp;&nbsp; * objects.</p></div>
+<div>75&emsp;&emsp;&nbsp; *</div>
+<div>76&emsp;&emsp;&nbsp; * <p>Each primary and secondary index is associated internally with a {@link</div>
+<div>77&emsp;&emsp;&nbsp; * Database}.  With any of the above mentioned use cases, methods are provided</div>
+<div>78&emsp;&emsp;&nbsp; * that may be used for database performance tuning.  The {@link</div>
+<div>79&emsp;&emsp;&nbsp; * #setPrimaryConfig setPrimaryConfig} and {@link #setSecondaryConfig</div>
+<div>80&emsp;&emsp;&nbsp; * setSecondaryConfig} methods may be called anytime before a database is</div>
+<div>81&emsp;&emsp;&nbsp; * opened via {@link #getPrimaryIndex getPrimaryIndex} or {@link</div>
+<div>82&emsp;&emsp;&nbsp; * #getSecondaryIndex getSecondaryIndex}.  The {@link #setSequenceConfig</div>
+<div>83&emsp;&emsp;&nbsp; * setSequenceConfig} method may be called anytime before {@link #getSequence</div>
+<div>84&emsp;&emsp;&nbsp; * getSequence} is called or {@link #getPrimaryIndex getPrimaryIndex} is called</div>
+<div>85&emsp;&emsp;&nbsp; * for a primary index associated with that sequence.</p></div>
+<div>86&emsp;&emsp;&nbsp; *</div>
+<div>87&emsp;&emsp;&nbsp; * <!-- begin JE only --></div>
+<div>88&emsp;&emsp;&nbsp; * <h3>Database Names</h3></div>
+<div>89&emsp;&emsp;&nbsp; *</div>
+<div>90&emsp;&emsp;&nbsp; * <p>The database names of primary and secondary indices are designed to be</div>
+<div>91&emsp;&emsp;&nbsp; * unique within the environment and identifiable for debugging and use with</div>
+<div>92&emsp;&emsp;&nbsp; * tools such as {@link com.sleepycat.je.util.DbDump} and {@link</div>
+<div>93&emsp;&emsp;&nbsp; * com.sleepycat.je.util.DbLoad}.</p></div>
+<div>94&emsp;&emsp;&nbsp; *</div>
+<div>95&emsp;&emsp;&nbsp; * <p>The syntax of a primary index database name is:</p></div>
+<div>96&emsp;&emsp;&nbsp; * <pre>   persist#STORE_NAME#ENTITY_CLASS</pre></div>
+<div>97&emsp;&emsp;&nbsp; * <p>Where STORE_NAME is the name parameter passed to {@link #EntityStore</div>
+<div>98&emsp;&emsp;&nbsp; * EntityStore} and ENTITY_CLASS is name of the class passed to {@link</div>
+<div>99&emsp;&emsp;&nbsp; * #getPrimaryIndex getPrimaryIndex}.</p></div>
+<div>100&emsp;&emsp;&nbsp; *</div>
+<div>101&emsp;&emsp;&nbsp; * <p>The syntax of a secondary index database name is:</p></div>
+<div>102&emsp;&emsp;&nbsp; * <pre>   persist#STORE_NAME#ENTITY_CLASS#KEY_NAME</pre></div>
+<div>103&emsp;&emsp;&nbsp; * <p>Where KEY_NAME is the secondary key name passed to {@link</div>
+<div>104&emsp;&emsp;&nbsp; * #getSecondaryIndex getSecondaryIndex}.</p></div>
+<div>105&emsp;&emsp;&nbsp; *</div>
+<div>106&emsp;&emsp;&nbsp; * <p>Although you should never have to construct these names manually,</div>
+<div>107&emsp;&emsp;&nbsp; * understanding their syntax is useful for several reasons:</p></div>
+<div>108&emsp;&emsp;&nbsp; * <ul></div>
+<div>109&emsp;&emsp;&nbsp; * <li>Exception messages sometimes contain the database name, from which you</div>
+<div>110&emsp;&emsp;&nbsp; * can identify the entity class and secondary key.</li></div>
+<div>111&emsp;&emsp;&nbsp; * <li>If you create other databases in the same environment that are not</div>
+<div>112&emsp;&emsp;&nbsp; * part of an <code>EntityStore</code>, to avoid naming conflicts the other</div>
+<div>113&emsp;&emsp;&nbsp; * database names should not begin with <code>"persist#"</code>.</li></div>
+<div>114&emsp;&emsp;&nbsp; * <li>If you are using {@link com.sleepycat.je.util.DbDump} or {@link</div>
+<div>115&emsp;&emsp;&nbsp; * com.sleepycat.je.util.DbLoad} to perform a backup or copy databases between</div>
+<div>116&emsp;&emsp;&nbsp; * environments, knowing the database names can be useful.  Normally you will</div>
+<div>117&emsp;&emsp;&nbsp; * dump or load all database names starting with</div>
+<div>118&emsp;&emsp;&nbsp; * <code>"persist#STORE_NAME#"</code>.</li></div>
+<div>119&emsp;&emsp;&nbsp; * </ul></div>
+<div>120&emsp;&emsp;&nbsp; *</div>
+<div>121&emsp;&emsp;&nbsp; * <p>If you are copying all databases in a store as mentioned in the last</div>
+<div>122&emsp;&emsp;&nbsp; * point above, there is one further consideration.  There are two internal</div>
+<div>123&emsp;&emsp;&nbsp; * databases that must be kept with the other databases in the store in order</div>
+<div>124&emsp;&emsp;&nbsp; * for the store to be used.  These contain the data formats and sequences for</div>
+<div>125&emsp;&emsp;&nbsp; * the store:</p></div>
+<div>126&emsp;&emsp;&nbsp; * <pre>   persist#STORE_NAME#com.sleepycat.persist.formats</pre></div>
+<div>127&emsp;&emsp;&nbsp; * <pre>   persist#STORE_NAME#com.sleepycat.persist.sequences</pre></div>
+<div>128&emsp;&emsp;&nbsp; * <p>These databases must normally be included with copies of other databases</div>
+<div>129&emsp;&emsp;&nbsp; * in the store.  They should not be modified by the application.</p></div>
+<div>130&emsp;&emsp;&nbsp; *</div>
+<div>131&emsp;&emsp;&nbsp; * <p>For example, the following code snippet removes all databases for a given</div>
+<div>132&emsp;&emsp;&nbsp; * store in a single transaction.</p></div>
+<div>133&emsp;&emsp;&nbsp; * <pre class="code"></div>
+<div>134&emsp;&emsp;&nbsp; *  Environment env = ...</div>
+<div>135&emsp;&emsp;&nbsp; *  EntityStore store = ...</div>
+<div>136&emsp;&emsp;&nbsp; *  Transaction txn = env.beginTransaction(null, null);</div>
+<div>137&emsp;&emsp;&nbsp; *  String prefix = "persist#" + store.getStoreName() + "#";</div>
+<div>138&emsp;&emsp;&nbsp; *  for (String dbName : env.getDatabaseNames()) {</div>
+<div>139&emsp;&emsp;&nbsp; *      if (dbName.startsWith(prefix)) {</div>
+<div>140&emsp;&emsp;&nbsp; *          env.removeDatabase(txn, dbName);</div>
+<div>141&emsp;&emsp;&nbsp; *      }</div>
+<div>142&emsp;&emsp;&nbsp; *  }</div>
+<div>143&emsp;&emsp;&nbsp; *  txn.commit();</pre></div>
+<div>144&emsp;&emsp;&nbsp; *</div>
+<div>145&emsp;&emsp;&nbsp; * <!-- end JE only --></div>
+<div>146&emsp;&emsp;&nbsp; *</div>
+<div>147&emsp;&emsp;&nbsp; * @author Mark Hayes</div>
+<div>148&emsp;&emsp;&nbsp; */</div>
+<div>149&emsp;&emsp;public class EntityStore</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* <!-- begin JE only --> */</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    implements Closeable</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* <!-- end JE only --> */</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    {</div>
+<div>154&emsp;&emsp;</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private Store store;</div>
+<div>156&emsp;&emsp;</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Opens an entity store in a given environment.</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param env an open Berkeley DB Environment.</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param storeName the name of the entity store within the given</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * environment.  An empty string is allowed.  Named stores may be used to</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * distinguish multiple sets of persistent entities for the same entity</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * classes in a single environment.  Underlying database names are prefixed</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * with the store name.</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param config the entity store configuration, or null to use default</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * configuration properties.</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws StoreExistsException when the {@link</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * StoreConfig#setExclusiveCreate ExclusiveCreate} configuration parameter</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * is true and the store's internal catalog database already exists.</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws StoreNotFoundException when when the {@link</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * StoreConfig#setAllowCreate AllowCreate} configuration parameter is false</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * and the store's internal catalog database does not exist.</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IncompatibleClassException if an incompatible class change has</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * been made and mutations are not configured for handling the change.  See</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * {@link com.sleepycat.persist.evolve Class Evolution} for more</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * information.</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- begin JE only --></div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws OperationFailureException if one of the <a</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * href="../je/OperationFailureException.html#readFailures">Read Operation</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Failures</a> occurs. If the store does not exist and the {@link</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * StoreConfig#setAllowCreate AllowCreate} parameter is true, then one of</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the <a href="../je/OperationFailureException.html#writeFailures">Write</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Operation Failures</a> may also occur.</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws EnvironmentFailureException if an unexpected, internal or</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * environment-wide failure occurs.</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- end JE only --></div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws DatabaseException the base class for all BDB exceptions.</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public EntityStore(Environment env, String storeName, StoreConfig config)</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws StoreExistsException,</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;               StoreNotFoundException,</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;               IncompatibleClassException,</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;               DatabaseException {</div>
+<div>203&emsp;&emsp;</div>
+<div style="background-color:orange;">204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        store = new Store(env, storeName, config, false /*rawAccess*/);&nbsp; &#8594; 11</b></div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>206&emsp;&emsp;</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the environment associated with this store.</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the environment.</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Environment getEnvironment() {</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return store.getEnvironment();</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>215&emsp;&emsp;</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns a copy of the entity store configuration.</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the config.</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public StoreConfig getConfig() {</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return store.getConfig();</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>224&emsp;&emsp;</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the name of this store.</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the name.</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String getStoreName() {</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return store.getStoreName();</div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>233&emsp;&emsp;</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* <!-- begin JE only --> */</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the names of all entity stores in the given environment.</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the store names.  An empty set is returned if no stores are</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * present.</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws OperationFailureException if one of the <a</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * href="../je/OperationFailureException.html#readFailures">Read Operation</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Failures</a> occurs.</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws EnvironmentFailureException if an unexpected, internal or</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * environment-wide failure occurs.</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws DatabaseException the base class for all BDB exceptions.</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static Set<String> getStoreNames(Environment env)</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>252&emsp;&emsp;</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Store.getStoreNames(env);</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* <!-- end JE only --> */</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* <!-- begin JE only --> */</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @hidden</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For internal use only.</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isReplicaUpgradeMode() {</div>
+<div>263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return store.isReplicaUpgradeMode();</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* <!-- end JE only --> */</div>
+<div>266&emsp;&emsp;</div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the current entity model for this store.  The current model is</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * derived from the configured entity model and the live entity class</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * definitions.</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the model.</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public EntityModel getModel() {</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return store.getModel();</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>277&emsp;&emsp;</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the set of mutations that were configured when the store was</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * opened, or if none were configured, the set of mutations that were</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * configured and stored previously.</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the mutations.</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Mutations getMutations() {</div>
+<div>286&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return store.getMutations();</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>288&emsp;&emsp;</div>
+<div>289&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the primary index for a given entity class, opening it if</div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * necessary.</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>If they are not already open, the primary and secondary databases for</div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the entity class are created/opened together in a single internal</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * transaction.  When the secondary indices are opened, that can cascade to</div>
+<div>296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * open other related primary indices.</p></div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param primaryKeyClass the class of the entity's primary key field, or</div>
+<div>299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the corresponding primitive wrapper class if the primary key field type</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * is a primitive.</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param entityClass the entity class for which to open the primary index.</div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param <PK> the primary key class.</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param <E> the entity class.</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>308&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the primary index.</div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IllegalArgumentException if the entity class or classes</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * referenced by it are not persistent, or the primary key class does not</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * match the entity's primary key field, or if metadata for the entity or</div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * primary key is invalid.</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- begin JE only --></div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IndexNotAvailableException in a replicated environment if this</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Replica's persistent classes have been upgraded to define a new index,</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * but the Master has not yet been upgraded.</div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws OperationFailureException if one of the <a</div>
+<div>321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * href="../je/OperationFailureException.html#readFailures">Read Operation</div>
+<div>322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Failures</a> occurs. If the index does not exist and the {@link</div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * StoreConfig#setReadOnly ReadOnly} parameter is false, then one of the <a</div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * href="../je/OperationFailureException.html#writeFailures">Write</div>
+<div>325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Operation Failures</a> may also occur.</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws EnvironmentFailureException if an unexpected, internal or</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * environment-wide failure occurs.</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- end JE only --></div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws DatabaseException the base class for all BDB exceptions.</div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public <PK, E> PrimaryIndex<PK, E></div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getPrimaryIndex(Class<PK> primaryKeyClass, Class<E> entityClass)</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>336&emsp;&emsp;</div>
+<div>337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return store.getPrimaryIndex</div>
+<div>339&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                (primaryKeyClass, primaryKeyClass.getName(),</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                 entityClass, entityClass.getName());</div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (IndexNotAvailableException e) {</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (!store.attemptRefresh()) {</div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw e;</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return store.getPrimaryIndex</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                (primaryKeyClass, primaryKeyClass.getName(),</div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                 entityClass, entityClass.getName());</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>350&emsp;&emsp;</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns a secondary index for a given primary index and secondary key,</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * opening it if necessary.</div>
+<div>354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p><em>NOTE:</em> If the secondary key field is declared in a subclass</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * of the entity class, use {@link #getSubclassIndex} instead.</p></div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>If a {@link SecondaryKey#relatedEntity} is used and the primary index</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * for the related entity is not already open, it will be opened by this</div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * method.  That will, in turn, open its secondary indices, which can</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * cascade to open other primary indices.</p></div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param primaryIndex the primary index associated with the returned</div>
+<div>364&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * secondary index.  The entity class of the primary index, or one of its</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * superclasses, must contain a secondary key with the given secondary key</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * class and key name.</div>
+<div>367&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param keyClass the class of the secondary key field, or the</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * corresponding primitive wrapper class if the secondary key field type is</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * a primitive.</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param keyName the name of the secondary key field, or the {@link</div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * SecondaryKey#name} if this name annotation property was specified.</div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param <SK> the secondary key class.</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>377&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param <PK> the primary key class.</div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param <E> the entity class.</div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the secondary index.</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IllegalArgumentException if the entity class or one of its</div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * superclasses does not contain a key field of the given key class and key</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * name, or if the metadata for the secondary key is invalid.</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- begin JE only --></div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IndexNotAvailableException in a replicated environment if this</div>
+<div>389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Replica's persistent classes have been upgraded to define a new index,</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * but the Master has not yet been upgraded.</div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>392&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws OperationFailureException if one of the <a</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * href="../je/OperationFailureException.html#readFailures">Read Operation</div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Failures</a> occurs. If the index does not exist and the {@link</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * StoreConfig#setReadOnly ReadOnly} parameter is false, then one of the <a</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * href="../je/OperationFailureException.html#writeFailures">Write</div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Operation Failures</a> may also occur.</div>
+<div>398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws EnvironmentFailureException if an unexpected, internal or</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * environment-wide failure occurs.</div>
+<div>401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- end JE only --></div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws DatabaseException the base class for all BDB exceptions.</div>
+<div>404&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public <SK, PK, E> SecondaryIndex<SK, PK, E></div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getSecondaryIndex(PrimaryIndex<PK, E> primaryIndex,</div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                          Class<SK> keyClass,</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                          String keyName)</div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>410&emsp;&emsp;</div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return store.getSecondaryIndex</div>
+<div>413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                (primaryIndex, primaryIndex.getEntityClass(),</div>
+<div>414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                 primaryIndex.getEntityClass().getName(),</div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                 keyClass, keyClass.getName(), keyName);</div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (IndexNotAvailableException e) {</div>
+<div>417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (!store.attemptRefresh()) {</div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw e;</div>
+<div>419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return store.getSecondaryIndex</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                (primaryIndex, primaryIndex.getEntityClass(),</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                 primaryIndex.getEntityClass().getName(),</div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                 keyClass, keyClass.getName(), keyName);</div>
+<div>424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>426&emsp;&emsp;</div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns a secondary index for a secondary key in an entity subclass,</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * opening it if necessary.</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>431&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>If a {@link SecondaryKey#relatedEntity} is used and the primary index</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * for the related entity is not already open, it will be opened by this</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * method.  That will, in turn, open its secondary indices, which can</div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * cascade to open other primary indices.</p></div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param primaryIndex the primary index associated with the returned</div>
+<div>437&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * secondary index.  The entity class of the primary index, or one of its</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * superclasses, must contain a secondary key with the given secondary key</div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * class and key name.</div>
+<div>440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param entitySubclass a subclass of the entity class for the primary</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * index.  The entity subclass must contain a secondary key with the given</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * secondary key class and key name.</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param keyClass the class of the secondary key field, or the</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * corresponding primitive wrapper class if the secondary key field type is</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * a primitive.</div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param keyName the name of the secondary key field, or the {@link</div>
+<div>450&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * SecondaryKey#name} if this name annotation property was specified.</div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param <SK> the secondary key class.</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param <PK> the primary key class.</div>
+<div>455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param <E1> the entity class.</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param <E2> the entity sub-class.</div>
+<div>459&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the secondary index.</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IllegalArgumentException if the given entity subclass does not</div>
+<div>463&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * contain a key field of the given key class and key name, or if the</div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * metadata for the secondary key is invalid.</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- begin JE only --></div>
+<div>467&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IndexNotAvailableException in a replicated environment if this</div>
+<div>468&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Replica's persistent classes have been upgraded to define a new index,</div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * but the Master has not yet been upgraded.</div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws OperationFailureException if one of the <a</div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * href="../je/OperationFailureException.html#readFailures">Read Operation</div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Failures</a> occurs. If the index does not exist and the {@link</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * StoreConfig#setReadOnly ReadOnly} parameter is false, then one of the <a</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * href="../je/OperationFailureException.html#writeFailures">Write</div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Operation Failures</a> may also occur.</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>478&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws EnvironmentFailureException if an unexpected, internal or</div>
+<div>479&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * environment-wide failure occurs.</div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- end JE only --></div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws DatabaseException the base class for all BDB exceptions.</div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public <SK, PK, E1, E2 extends E1> SecondaryIndex<SK, PK, E2></div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getSubclassIndex(PrimaryIndex<PK, E1> primaryIndex,</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         Class<E2> entitySubclass,</div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         Class<SK> keyClass,</div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         String keyName)</div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>490&emsp;&emsp;</div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Make subclass metadata available before getting the index. */</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getModel().getClassMetadata(entitySubclass.getName());</div>
+<div>493&emsp;&emsp;</div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return store.getSecondaryIndex</div>
+<div>496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                (primaryIndex, entitySubclass,</div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                 primaryIndex.getEntityClass().getName(),</div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                 keyClass, keyClass.getName(), keyName);</div>
+<div>499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (IndexNotAvailableException e) {</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (!store.attemptRefresh()) {</div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw e;</div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>503&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return store.getSecondaryIndex</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                (primaryIndex, entitySubclass,</div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                 primaryIndex.getEntityClass().getName(),</div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                 keyClass, keyClass.getName(), keyName);</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>509&emsp;&emsp;</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Performs conversion of unevolved objects in order to reduce lazy</div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * conversion overhead.  Evolution may be performed concurrently with</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * normal access to the store.</div>
+<div>514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>Conversion is performed one entity class at a time.  An entity class</div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * is converted only if it has {@link Mutations} associated with it via</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * {@link StoreConfig#setMutations StoreConfig.setMutations}.</p></div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>Conversion of an entity class is performed by reading each entity,</div>
+<div>520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * converting it if necessary, and updating it if conversion was performed.</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * When all instances of an entity class are converted, references to the</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * appropriate {@link Mutations} are deleted.  Therefore, if this method is</div>
+<div>523&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * called twice successfully without changing class definitions, the second</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * call will do nothing.</p></div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>526&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param config the EvolveConfig.</div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>528&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the EvolveStats.</div>
+<div>529&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>530&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- begin JE only --></div>
+<div>531&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws OperationFailureException if one of the <a</div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * href="../je/OperationFailureException.html#writeFailures">Write</div>
+<div>533&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Operation Failures</a> occurs.</div>
+<div>534&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>535&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws EnvironmentFailureException if an unexpected, internal or</div>
+<div>536&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * environment-wide failure occurs.</div>
+<div>537&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- end JE only --></div>
+<div>538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws DatabaseException the base class for all BDB exceptions.</div>
+<div>540&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @see com.sleepycat.persist.evolve Class Evolution</div>
+<div>542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>543&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public EvolveStats evolve(EvolveConfig config)</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>545&emsp;&emsp;</div>
+<div>546&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return store.evolve(config);</div>
+<div>547&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>548&emsp;&emsp;</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>550&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Deletes all instances of this entity class and its (non-entity)</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * subclasses.</div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>553&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>The primary database for the given entity class will be truncated and</div>
+<div>554&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * all secondary databases will be removed.  The primary and secondary</div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * databases associated with the entity class must not be open except by</div>
+<div>556&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * this store, since database truncation/removal is only possible when the</div>
+<div>557&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * database is not open.</p></div>
+<div>558&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>The primary and secondary databases for the entity class will be</div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * closed by this operation and the existing {@link PrimaryIndex} and</div>
+<div>561&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * {@link SecondaryIndex} objects will be invalidated.  To access the</div>
+<div>562&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * indexes, the user must call {@link #getPrimaryIndex} and {@link</div>
+<div>563&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * #getSecondaryIndex} after this operation is complete.</p></div>
+<div>564&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>Auto-commit is used implicitly if the store is transactional.</p></div>
+<div>566&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>567&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param entityClass the entity class whose instances are to be deleted.</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>569&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- begin JE only --></div>
+<div>570&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws OperationFailureException if one of the <a</div>
+<div>571&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * href="../je/OperationFailureException.html#writeFailures">Write</div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Operation Failures</a> occurs.</div>
+<div>573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>574&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws EnvironmentFailureException if an unexpected, internal or</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * environment-wide failure occurs.</div>
+<div>576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- end JE only --></div>
+<div>577&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws DatabaseException the base class for all BDB exceptions.</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void truncateClass(Class entityClass)</div>
+<div>581&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>582&emsp;&emsp;</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        store.truncateClass(null, entityClass);</div>
+<div>584&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>585&emsp;&emsp;</div>
+<div>586&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>587&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Deletes all instances of this entity class and its (non-entity)</div>
+<div>588&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * subclasses.</div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>590&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>The primary database for the given entity class will be truncated and</div>
+<div>591&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * all secondary databases will be removed.  The primary and secondary</div>
+<div>592&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * databases associated with the entity class must not be open except by</div>
+<div>593&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * this store, since database truncation/removal is only possible when the</div>
+<div>594&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * database is not open.</p></div>
+<div>595&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>596&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>The primary and secondary databases for the entity class will be</div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * closed by this operation and the existing {@link PrimaryIndex} and</div>
+<div>598&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * {@link SecondaryIndex} objects will be invalidated.  To access the</div>
+<div>599&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * indexes, the user must call {@link #getPrimaryIndex} and {@link</div>
+<div>600&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * #getSecondaryIndex} after this operation is complete.</p></div>
+<div>601&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>602&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param txn the transaction used to protect this operation, null to use</div>
+<div>603&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * auto-commit, or null if the store is non-transactional.</div>
+<div>604&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param entityClass the entity class whose instances are to be deleted.</div>
+<div>606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- begin JE only --></div>
+<div>608&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws OperationFailureException if one of the <a</div>
+<div>609&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * href="../je/OperationFailureException.html#writeFailures">Write</div>
+<div>610&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Operation Failures</a> occurs.</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>612&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws EnvironmentFailureException if an unexpected, internal or</div>
+<div>613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * environment-wide failure occurs.</div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- end JE only --></div>
+<div>615&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws DatabaseException the base class for all BDB exceptions.</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>618&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void truncateClass(Transaction txn, Class entityClass)</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>620&emsp;&emsp;</div>
+<div>621&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        store.truncateClass(txn, entityClass);</div>
+<div>622&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>623&emsp;&emsp;</div>
+<div>624&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* <!-- begin JE only --> */</div>
+<div>625&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>626&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Flushes each modified index to disk that was opened in deferred-write</div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * mode.</div>
+<div>628&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>629&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>All indexes are opened in deferred-write mode if true was passed to</div>
+<div>630&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * {@link StoreConfig#setDeferredWrite} for the store.</p></div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>632&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>Alternatively, individual databases may be configured for deferred</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * write using {@link DatabaseConfig#setDeferredWrite} along with {@link</div>
+<div>634&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * #getPrimaryConfig} and {@link #setPrimaryConfig}.  Caution should be</div>
+<div>635&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * used when configuring only some databases for deferred-write, since</div>
+<div>636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * durability will be different for these databases than for other</div>
+<div>637&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * databases in the same store.</p></div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>This method is equivalent to calling {@link Database#sync} for each </div>
+<div>640&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * deferred-write index Database that is open for this store.  </div>
+<div>641&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>642&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>Instead of calling this method, {@link Environment#sync} may be used.</div>
+<div>643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The difference is that this method will only flush the databases for</div>
+<div>644&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * this store, while {@link Environment#sync} will sync all deferred-write</div>
+<div>645&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * databases currently open for the environment and will also perform a</div>
+<div>646&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * full checkpoint.  This method is therefore less expensive than a full</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * sync of the environment.</p></div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>649&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws DatabaseException the base class for all BDB exceptions.</div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>651&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void sync()</div>
+<div>652&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>653&emsp;&emsp;</div>
+<div>654&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        store.sync();</div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>656&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* <!-- end JE only --> */</div>
+<div>657&emsp;&emsp;</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>659&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Closes the primary and secondary databases for the given entity class</div>
+<div>660&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * that were opened via this store.  The caller must ensure that the</div>
+<div>661&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * primary and secondary indices for the entity class are no longer in</div>
+<div>662&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * use.</div>
+<div>663&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>664&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>The primary and secondary databases for the entity class will be</div>
+<div>665&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * closed by this operation and the existing {@link PrimaryIndex} and</div>
+<div>666&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * {@link SecondaryIndex} objects will be invalidated.  To access the</div>
+<div>667&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * indexes, the user must call {@link #getPrimaryIndex} and {@link</div>
+<div>668&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * #getSecondaryIndex} after this operation is complete.</p></div>
+<div>669&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>670&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param entityClass the entity class whose databases are to be closed.</div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>672&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws DatabaseException the base class for all BDB exceptions.</div>
+<div>673&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>674&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void closeClass(Class entityClass)</div>
+<div>675&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>676&emsp;&emsp;</div>
+<div>677&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        store.closeClass(entityClass);</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>679&emsp;&emsp;</div>
+<div>680&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Closes all databases and sequences that were opened via this store.  The</div>
+<div>682&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * caller must ensure that no databases opened via this store are in use.</div>
+<div>683&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>684&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- begin JE only --></div>
+<div>685&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>WARNING: To prevent memory leaks, the application must call this</div>
+<div>686&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * method even when the Environment has become invalid.  While this is not</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * necessary for Database objects, it is necessary for EntityStore objects</div>
+<div>688&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * to prevent the accumulation of memory in the global DPL metadata cache.</div>
+<div>689&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- end JE only --></div>
+<div>690&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>691&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>WARNING: To guard against memory leaks, the application should</div>
+<div>692&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * discard all references to the closed handle.  While BDB makes an effort</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * to discard references from closed objects to the allocated memory for an</div>
+<div>694&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * environment, this behavior is not guaranteed.  The safe course of action</div>
+<div>695&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * for an application is to discard all references to closed BDB</div>
+<div>696&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * objects.</p></div>
+<div>697&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>698&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws DatabaseException the base class for all BDB exceptions.</div>
+<div>699&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>700&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void close()</div>
+<div>701&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>702&emsp;&emsp;</div>
+<div>703&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        store.close();</div>
+<div>704&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>705&emsp;&emsp;</div>
+<div>706&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>707&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns a named sequence for using Berkeley DB engine API directly,</div>
+<div>708&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * opening it if necessary.</div>
+<div>709&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>710&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param name the sequence name, which is normally defined using the</div>
+<div>711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * {@link PrimaryKey#sequence} annotation property.</div>
+<div>712&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the open sequence for the given sequence name.</div>
+<div>714&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws DatabaseException the base class for all BDB exceptions.</div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>717&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Sequence getSequence(String name)</div>
+<div>718&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>719&emsp;&emsp;</div>
+<div>720&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return store.getSequence(name);</div>
+<div>721&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>722&emsp;&emsp;</div>
+<div>723&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>724&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the default Berkeley DB engine API configuration for a named key</div>
+<div>725&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * sequence.</div>
+<div>726&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>727&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>The returned configuration is as follows.  All other properties have</div>
+<div>728&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * default values.</p></div>
+<div>729&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <ul></div>
+<div>730&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>The {@link SequenceConfig#setInitialValue InitialValue} is one.</li></div>
+<div>731&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>The {@link SequenceConfig#setRange Range} minimum is one.</li></div>
+<div>732&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>The {@link SequenceConfig#setCacheSize CacheSize} is 100.</li></div>
+<div>733&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link SequenceConfig#setAutoCommitNoSync AutoCommitNoSync} is</div>
+<div>734&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * true.</li></div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link SequenceConfig#setAllowCreate AllowCreate} is set to the</div>
+<div>736&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * inverse of the store {@link StoreConfig#setReadOnly ReadOnly}.</div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * setting.</li></div>
+<div>738&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </ul></div>
+<div>739&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>740&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param name the sequence name, which is normally defined using the</div>
+<div>741&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * {@link PrimaryKey#sequence} annotation property.</div>
+<div>742&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>743&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the default configuration for the given sequence name.</div>
+<div>744&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>745&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public SequenceConfig getSequenceConfig(String name) {</div>
+<div>746&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return store.getSequenceConfig(name);</div>
+<div>747&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>748&emsp;&emsp;</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>750&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Configures a named key sequence using the Berkeley DB engine API.</div>
+<div>751&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>752&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>To be compatible with the entity model and the Direct Persistence</div>
+<div>753&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Layer, the configuration should be retrieved using {@link</div>
+<div>754&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * #getSequenceConfig getSequenceConfig}, modified, and then passed to this</div>
+<div>755&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * method.  The following configuration properties may not be changed:</p></div>
+<div>756&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <ul></div>
+<div>757&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link SequenceConfig#setExclusiveCreate ExclusiveCreate}</li></div>
+<div>758&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </ul></div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>In addition, {@link SequenceConfig#setAllowCreate AllowCreate} must be</div>
+<div>760&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the inverse of {@code ReadOnly}</p></div>
+<div>761&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>762&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>If the range is changed to include the value zero, see {@link</div>
+<div>763&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * PrimaryKey} for restrictions.</p></div>
+<div>764&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>765&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param name the sequence name, which is normally defined using the</div>
+<div>766&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * {@link PrimaryKey#sequence} annotation property.</div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>768&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param config the configuration to use for the given sequence name.</div>
+<div>769&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>770&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IllegalArgumentException if the configuration is incompatible</div>
+<div>771&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * with the entity model or the Direct Persistence Layer.</div>
+<div>772&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>773&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IllegalStateException if the sequence has already been opened.</div>
+<div>774&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>775&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void setSequenceConfig(String name, SequenceConfig config) {</div>
+<div>776&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        store.setSequenceConfig(name, config);</div>
+<div>777&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>778&emsp;&emsp;</div>
+<div>779&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>780&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the default primary database Berkeley DB engine API</div>
+<div>781&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * configuration for an entity class.</div>
+<div>782&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>783&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>The returned configuration is as follows.  All other properties have</div>
+<div>784&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * default values.</p></div>
+<div>785&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <ul></div>
+<div>786&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setTransactional Transactional} is set to</div>
+<div>787&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * match {@link StoreConfig#setTransactional StoreConfig}.</li></div>
+<div>788&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setAllowCreate AllowCreate} is set to the</div>
+<div>789&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * inverse of the store {@link StoreConfig#setReadOnly ReadOnly}.</div>
+<div>790&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * setting.</li></div>
+<div>791&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setReadOnly ReadOnly} is set to match</div>
+<div>792&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * {@link StoreConfig#setReadOnly StoreConfig}.</li></div>
+<div>793&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- begin JE only --> *</div>
+<div>794&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setDeferredWrite DeferredWrite} is set to</div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * match {@link StoreConfig#setDeferredWrite StoreConfig}.</li></div>
+<div>796&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setTemporary Temporary} is set to</div>
+<div>797&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * match {@link StoreConfig#setTemporary StoreConfig}.</li></div>
+<div>798&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- end JE only --> *</div>
+<div>799&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setBtreeComparator BtreeComparator} is set to</div>
+<div>800&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * an internal class if a key comparator is used.</li></div>
+<div>801&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </ul></div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>803&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param entityClass the entity class identifying the primary database.</div>
+<div>804&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>805&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the default configuration for the given entity class.</div>
+<div>806&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>807&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public DatabaseConfig getPrimaryConfig(Class entityClass) {</div>
+<div>808&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return store.getPrimaryConfig(entityClass);</div>
+<div>809&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>810&emsp;&emsp;</div>
+<div>811&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>812&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Configures the primary database for an entity class using the Berkeley</div>
+<div>813&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * DB engine API.</div>
+<div>814&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>815&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>To be compatible with the entity model and the Direct Persistence</div>
+<div>816&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Layer, the configuration should be retrieved using {@link</div>
+<div>817&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * #getPrimaryConfig getPrimaryConfig}, modified, and then passed to this</div>
+<div>818&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * method.  The following configuration properties may not be changed:</p></div>
+<div>819&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <ul></div>
+<div>820&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setExclusiveCreate ExclusiveCreate}</li></div>
+<div>821&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setSortedDuplicates SortedDuplicates}</li></div>
+<div>822&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- begin JE only --> *</div>
+<div>823&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setTemporary Temporary}</li></div>
+<div>824&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- end JE only --> *</div>
+<div>825&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setBtreeComparator BtreeComparator}</li></div>
+<div>826&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </ul></div>
+<div>827&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>In addition, {@link DatabaseConfig#setAllowCreate AllowCreate} must be</div>
+<div>828&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the inverse of {@code ReadOnly}</p></div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>830&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param entityClass the entity class identifying the primary database.</div>
+<div>831&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>832&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param config the configuration to use for the given entity class.</div>
+<div>833&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>834&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IllegalArgumentException if the configuration is incompatible</div>
+<div>835&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * with the entity model or the Direct Persistence Layer.</div>
+<div>836&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>837&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IllegalStateException if the database has already been opened.</div>
+<div>838&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>839&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void setPrimaryConfig(Class entityClass, DatabaseConfig config) {</div>
+<div>840&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        store.setPrimaryConfig(entityClass, config);</div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>842&emsp;&emsp;</div>
+<div>843&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the default secondary database Berkeley DB engine API</div>
+<div>845&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * configuration for an entity class and key name.</div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>847&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>The returned configuration is as follows.  All other properties have</div>
+<div>848&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * default values.</p></div>
+<div>849&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <ul></div>
+<div>850&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setTransactional Transactional} is set to</div>
+<div>851&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * match the primary database.</li></div>
+<div>852&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setAllowCreate AllowCreate} is set to the</div>
+<div>853&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * inverse of the primary database {@link DatabaseConfig#setReadOnly</div>
+<div>854&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ReadOnly} setting.</li></div>
+<div>855&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setReadOnly ReadOnly} is set to match</div>
+<div>856&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the primary database.</li></div>
+<div>857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- begin JE only --> *</div>
+<div>858&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setDeferredWrite DeferredWrite} is set to</div>
+<div>859&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * match the primary database.</li></div>
+<div>860&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setTemporary Temporary} is set to</div>
+<div>861&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * match {@link StoreConfig#setTemporary StoreConfig}.</li></div>
+<div>862&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- end JE only --> *</div>
+<div>863&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setBtreeComparator BtreeComparator} is set to</div>
+<div>864&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * an internal class if a key comparator is used.</li></div>
+<div>865&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setSortedDuplicates SortedDuplicates} is set</div>
+<div>866&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * according to {@link SecondaryKey#relate}.</li></div>
+<div>867&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link SecondaryConfig#setAllowPopulate AllowPopulate} is set to</div>
+<div>868&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * true when a secondary key is added to an existing primary index.</li></div>
+<div>869&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link SecondaryConfig#setKeyCreator KeyCreator} or {@link</div>
+<div>870&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * SecondaryConfig#setMultiKeyCreator MultiKeyCreator} is set to an</div>
+<div>871&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * internal instance.</li></div>
+<div>872&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link SecondaryConfig#setForeignMultiKeyNullifier</div>
+<div>873&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ForeignMultiKeyNullifier} is set to an internal instance if {@link</div>
+<div>874&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * SecondaryKey#onRelatedEntityDelete} is {@link DeleteAction#NULLIFY}.</li></div>
+<div>875&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </ul></div>
+<div>876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>877&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param entityClass the entity class containing the given secondary key</div>
+<div>878&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * name.</div>
+<div>879&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>880&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param keyName the name of the secondary key field, or the {@link</div>
+<div>881&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * SecondaryKey#name} if this name annotation property was specified.</div>
+<div>882&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>883&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the default configuration for the given secondary key.</div>
+<div>884&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>885&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public SecondaryConfig getSecondaryConfig(Class entityClass,</div>
+<div>886&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                              String keyName) {</div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return store.getSecondaryConfig(entityClass, keyName);</div>
+<div>888&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>889&emsp;&emsp;</div>
+<div>890&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>891&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Configures a secondary database for an entity class and key name using</div>
+<div>892&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the Berkeley DB engine API.</div>
+<div>893&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>894&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>To be compatible with the entity model and the Direct Persistence</div>
+<div>895&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Layer, the configuration should be retrieved using {@link</div>
+<div>896&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * #getSecondaryConfig getSecondaryConfig}, modified, and then passed to</div>
+<div>897&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * this method.  The following configuration properties may not be</div>
+<div>898&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * changed:</p></div>
+<div>899&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <ul></div>
+<div>900&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setExclusiveCreate ExclusiveCreate}</li></div>
+<div>901&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setSortedDuplicates SortedDuplicates}</li></div>
+<div>902&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setBtreeComparator BtreeComparator}</li></div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setDuplicateComparator</div>
+<div>904&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * DuplicateComparator}</li></div>
+<div>905&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- begin JE only --> *</div>
+<div>906&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link DatabaseConfig#setTemporary Temporary}</li></div>
+<div>907&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <!-- end JE only --> *</div>
+<div>908&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link SecondaryConfig#setAllowPopulate AllowPopulate}</li></div>
+<div>909&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link SecondaryConfig#setKeyCreator KeyCreator}</li></div>
+<div>910&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link SecondaryConfig#setMultiKeyCreator MultiKeyCreator}</li></div>
+<div>911&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link SecondaryConfig#setForeignKeyNullifier</div>
+<div>912&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ForeignKeyNullifier}</li></div>
+<div>913&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link SecondaryConfig#setForeignMultiKeyNullifier</div>
+<div>914&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ForeignMultiKeyNullifier}</li></div>
+<div>915&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link SecondaryConfig#setForeignKeyDeleteAction</div>
+<div>916&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ForeignKeyDeleteAction}</li></div>
+<div>917&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <li>{@link SecondaryConfig#setForeignKeyDatabase</div>
+<div>918&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ForeignKeyDatabase}</li></div>
+<div>919&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </ul></div>
+<div>920&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * <p>In addition, {@link DatabaseConfig#setAllowCreate AllowCreate} must be</div>
+<div>921&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the inverse of {@code ReadOnly}</p></div>
+<div>922&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>923&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param entityClass the entity class containing the given secondary key</div>
+<div>924&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * name.</div>
+<div>925&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>926&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param keyName the name of the secondary key field, or the {@link</div>
+<div>927&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * SecondaryKey#name} if this name annotation property was specified.</div>
+<div>928&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>929&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param config the configuration to use for the given secondary key.</div>
+<div>930&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>931&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IllegalArgumentException if the configuration is incompatible</div>
+<div>932&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * with the entity model or the Direct Persistence Layer.</div>
+<div>933&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>934&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IllegalStateException if the database has already been opened.</div>
+<div>935&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>936&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void setSecondaryConfig(Class entityClass,</div>
+<div>937&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                   String keyName,</div>
+<div>938&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                   SecondaryConfig config) {</div>
+<div>939&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        store.setSecondaryConfig(entityClass, keyName, config);</div>
+<div>940&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>941&emsp;&emsp;}</div>
+</div>
+    </div>
+</body>
+</html>
