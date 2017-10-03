@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LogEntryType.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*-</div>
+<div>2&emsp;&emsp;&nbsp; * Copyright (C) 2002, 2017, Oracle and/or its affiliates. All rights reserved.</div>
+<div>3&emsp;&emsp;&nbsp; *</div>
+<div>4&emsp;&emsp;&nbsp; * This file was distributed by Oracle as part of a version of Oracle Berkeley</div>
+<div>5&emsp;&emsp;&nbsp; * DB Java Edition made available at:</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; * http://www.oracle.com/technetwork/database/database-technologies/berkeleydb/downloads/index.html</div>
+<div>8&emsp;&emsp;&nbsp; *</div>
+<div>9&emsp;&emsp;&nbsp; * Please see the LICENSE file included in the top-level directory of the</div>
+<div>10&emsp;&emsp;&nbsp; * appropriate version of Oracle Berkeley DB Java Edition for a copy of the</div>
+<div>11&emsp;&emsp;&nbsp; * license and additional information.</div>
+<div>12&emsp;&emsp;&nbsp; */</div>
+<div>13&emsp;&emsp;</div>
+<div>14&emsp;&emsp;package berkeley.com.sleepycat.je.log;</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;import java.util.HashSet;</div>
+<div>17&emsp;&emsp;import java.util.Set;</div>
+<div>18&emsp;&emsp;</div>
+<div>19&emsp;&emsp;import berkeley.com.sleepycat.je.DatabaseException;</div>
+<div>20&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.AbortLogEntry;</div>
+<div>21&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.BINDeltaLogEntry;</div>
+<div>22&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.CommitLogEntry;</div>
+<div>23&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.DeletedDupLNLogEntry;</div>
+<div>24&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.FileHeaderEntry;</div>
+<div>25&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.INLogEntry;</div>
+<div>26&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.LNLogEntry;</div>
+<div>27&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.LogEntry;</div>
+<div>28&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.MatchpointLogEntry;</div>
+<div>29&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.NameLNLogEntry;</div>
+<div>30&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.OldBINDeltaLogEntry;</div>
+<div>31&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.ReplicableLogEntry;</div>
+<div>32&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.SingleItemEntry;</div>
+<div>33&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.TraceLogEntry;</div>
+<div>34&emsp;&emsp;</div>
+<div>35&emsp;&emsp;/**</div>
+<div>36&emsp;&emsp;&nbsp; * LogEntryType is an enumeration of all log entry types.</div>
+<div>37&emsp;&emsp;&nbsp; *</div>
+<div>38&emsp;&emsp;&nbsp; * &#60;p>Log entries are versioned. When changing the persistent form of a log</div>
+<div>39&emsp;&emsp;&nbsp; * entry in any way that is incompatible with prior releases, make sure the</div>
+<div>40&emsp;&emsp;&nbsp; * LogEntry instance is capable of reading in older versions from the log and</div>
+<div>41&emsp;&emsp;&nbsp; * be sure to increment LOG_VERSION.  The LogEntry.readEntry and</div>
+<div>42&emsp;&emsp;&nbsp; * Loggable.readFromLog methods should check the actual version of the entry.</div>
+<div>43&emsp;&emsp;&nbsp; * If it is less than LOG_VERSION, the old version should be converted to the</div>
+<div>44&emsp;&emsp;&nbsp; * current version.</div>
+<div>45&emsp;&emsp;&nbsp; *</div>
+<div>46&emsp;&emsp;&nbsp; * &#60;p>Prior to LOG_VERSION 6, each log entry type had a separate version number</div>
+<div>47&emsp;&emsp;&nbsp; * that was incremented only when that log version changed.  From LOG_VERSION 6</div>
+<div>48&emsp;&emsp;&nbsp; * onward, all types use the same version, the LOG_VERSION constant.  For</div>
+<div>49&emsp;&emsp;&nbsp; * versions prior to 6, the readEntry and readFromLog methods will be checking</div>
+<div>50&emsp;&emsp;&nbsp; * the old per-type version.  There is no overlap between the old per-type</div>
+<div>51&emsp;&emsp;&nbsp; * versions and the LOG_VERSION values, because the per-type values are all</div>
+<div>52&emsp;&emsp;&nbsp; * below 6. [#15365]&#60;/p></div>
+<div>53&emsp;&emsp;</div>
+<div>54&emsp;&emsp;&nbsp; * &#60;p>The LogEntry instance must be sure that older versions are converted in</div>
+<div>55&emsp;&emsp;&nbsp; * memory into a correct instance of the newest version, so when that LogEntry</div>
+<div>56&emsp;&emsp;&nbsp; * object is written again as the result of migration, eviction, the resulting</div>
+<div>57&emsp;&emsp;&nbsp; * new log entry conforms to the requirements of the new version.  If context</div>
+<div>58&emsp;&emsp;&nbsp; * objects are required for data conversion, the conversion can be done in the</div>
+<div>59&emsp;&emsp;&nbsp; * Node.postFetchInit method.&#60;/p></div>
+<div>60&emsp;&emsp;&nbsp; *</div>
+<div>61&emsp;&emsp;&nbsp; * &#60;p>Starting with LOG_VERSION 9, log entries that can be included in the</div>
+<div>62&emsp;&emsp;&nbsp; * replication stream must be able to write themselves in the format for the</div>
+<div>63&emsp;&emsp;&nbsp; * immediately previous log version, to allow replication during an upgrade</div>
+<div>64&emsp;&emsp;&nbsp; * when the master has been upgraded and a replica has not.  Starting with</div>
+<div>65&emsp;&emsp;&nbsp; * LOG_VERSION 8, log entries that support replication must implement {@link</div>
+<div>66&emsp;&emsp;&nbsp; * ReplicableLogEntry}.  When changes are made to replicable log entries for</div>
+<div>67&emsp;&emsp;&nbsp; * LOG_VERSION 9 and later, those entries need to support writing in the</div>
+<div>68&emsp;&emsp;&nbsp; * previous version's format.&#60;/p></div>
+<div>69&emsp;&emsp;&nbsp; */</div>
+<div style="background-color:limegreen;">70&emsp;&emsp;<b>public class LogEntryType {&nbsp;&#8594; [ALLOWCREATE]</b></div>
+<div>71&emsp;&emsp;</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Version of the file header, which identifies the version of all entries</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * in that file.</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Changes to log entries for each version are:</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Version 3</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ---------</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * [12328] Add main and dupe tree fanout values for DatabaseImpl.</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * [12557] Add IN LSN array compression.</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * [11597] Add a change to FileSummaryLNs: obsolete offset tracking was</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * added and multiple records are stored for a single file rather than a</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * single record.  Each record contains the offsets that were tracked since</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the last record was written.</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * [11597] Add the full obsolete LSN in LNLogEntry.</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Version 4</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ---------</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * [#14422] Bump MapLN version from 1 to 2.  Instead of a String for the</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * comparator class name, store either a serialized string or Comparator.</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Version 5</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ---------</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * [#15195] FileSummaryLN version 3.  Add FileSummary.obsoleteLNSize and</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * obsoleteLNSizeCounted fields.</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Version 6 (in JE 3.3.X)</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ---------</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * [#15365] From this point onward, all log entries have the same version,</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * LOG_VERSION, rather than using per-type versions.</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * [#15365] DatabaseImpl stores a map of DbFileSummaries.</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * [#13467] Convert duplicatesAllowed boolean to DUPS_ALLOWED_BIT flag in</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * DatabaseImpl. Add REPLICATED_BIT flag to DatabaseImpl.</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * [#13467] Add REPLICATED_BIT to DbTree.</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * [#13467] Add ReplicatedDatabaseConfig to NameLN_TX to support</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * replication of database operations.</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * [#15581] Add lastAllocateReplicatedDbId to DbTree</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * [#16083] Add replication master node ID to txn commit/abort</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Version 7 (in JE 4.0)</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ---------------------</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Add the invisible bit in the entry header version field.</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Add the RollbackStart log entry type</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Add the RollbackEnd log entry type</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Add the Matchpoint log entry type.</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Version 8 (in JE 5.0)</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ---------------------</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Made provisions for storing Triggers in a DatabaseImpl.</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Database IDs enlarged from int or packed int, to long or packed long</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * (note that packed int and packed long are compatible).  [#18540]</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Add new log entry types for LN delete, insert and update. [#18055]</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Apply optimization to omit key size for some internal LNs, in addition</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * to user LNs. [#18055]</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * LN no longer has node ID. [#18633]</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Add FileSummary.maxLNSize. [#18633]</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * VLSN is optionally maintained in LogEntryHeader for cleaner migrated LNs</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * and a new VLSN_PRESENT entry header flag is used to signify the presence</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * of the VLSN.  PRESERVE_VLSN_BIT was added to DbTree to correspond to the</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * je.env.preserveRecordVersion environment config param. [#19476]</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Dup tree representation changed to use two-part keys. Deprecated: DIN,</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * DBIN, DupCountLN, INDeleteInfo, INDupDeleteInfo.  Removed</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * DatabaseImpl.maxDupTreeEntriesPerNode.  [#19165]</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Version 9 (in JE 6.0)</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ---------------------</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * See comment above about ReplicableLogEntry.</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * BIN-deltas are now represented as BINs using the new BINDeltaLogEntry</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * (log entry type NewBINDelta).</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Version 10 (in JE 6.2)</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ----------------------</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Each BIN-delta stores the total and max number of entries in the</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * previous full version of the same BIN. A BIN-delta may also store a</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * bloom filter for the keys in the full BIN.</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Version 11 (in JE 6.3)</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ----------------------</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * LN log records have additional info to handle embedded records. See</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * LNLogEntry for details. Also, BIN log records include the VLSNs of</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * embedded records.</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Added LOG_IMMUTABLE_FILE entry type.</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Version 12 (in JE 7.0)</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ----------------------</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Added expiration info to LNs and BIN slots. The LN's expiration time is</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * replicated, so this changes the replication format. Also added the "have</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * abort LSN" flag, to avoid writing a byte for a null LSN, and moved the</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * flags to the front to support the new forReplication format.</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For ReplicableLogEntry and VersionedWriteLoggable, added the</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * forReplication parameter to write methods to support a replication</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * format variation. This allows omitting some fields from an entry when</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * they are not needed by replication.</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * LNLogEntry in forReplication mode no longer includes the abortLSN or the</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * abortKnownDeleted flag. This is a format change because these were</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * used by Replay in earlier versions.</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Txn and VersionedWriteTxnEnd (Commit and Abort) in forReplication mode</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * now always includes a null prevLsn field, which only occupies one byte.</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * However, this is not strictly a format change, because this field has</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * never been used by Replay.</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Version 13 (in JE 7.1)</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ----------------------</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Added dtvlsn field to LOG_TXN_END entry to support efficient persistent</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * tracking of the DTVLN (Durable Transaction VLSN).</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Version 14 (in JE 7.3)</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * ----------------------</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Added LOG_RESTORE_REQUIRED to indicate that the environment's log is no</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * longer consistent, and some curative action must happen before the</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * environment can be recovered.</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final int LOG_VERSION = 14;</div>
+<div>201&emsp;&emsp;</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The latest log version for which the replicated log format of any</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * replicable log entry class changed.  Replication uses this value to</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * determine if the latest version of the replication stream can be</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * understood by an earlier software version.  This field is needed to</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * account for cases where log entry format changes only apply to</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * non-replicable entries, or only to the local, not replicated, form of</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * replicable entries, the as was the case for log versions 9, 10, and 11.</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final int LOG_VERSION_HIGHEST_REPLICABLE = 13;</div>
+<div>212&emsp;&emsp;</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final int FIRST_LOG_VERSION = 1;</div>
+<div>214&emsp;&emsp;</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The earliest log version for which replicable log entries support</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * writing themselves in older versions, to support replication to</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * older nodes during upgrades.</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final int LOG_VERSION_REPLICATE_OLDER = 9;</div>
+<div>221&emsp;&emsp;</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The log version that added expiration info to LNs and BIN slots for JE</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * 7.0.</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final int LOG_VERSION_EXPIRE_INFO = 12;</div>
+<div>227&emsp;&emsp;</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The log version that introduced the dtvlsn field in commit log entries.</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final int LOG_VERSION_DURABLE_VLSN = 13;</div>
+<div>232&emsp;&emsp;</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Should be used for reading the entry header of the file header, since</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the actual version is not known until the FileHeader item is read.</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final int UNKNOWN_FILE_HEADER_VERSION = -1;</div>
+<div>238&emsp;&emsp;</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Collection of log entry type classes, used to read the log.  Note that</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * this must be declared before any instances of LogEntryType, since the</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * constructor uses this map. Each statically defined LogEntryType should</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * register itself with this collection.</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final int MAX_TYPE_NUM = 39;</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static LogEntryType[] LOG_TYPES = new LogEntryType[MAX_TYPE_NUM];</div>
+<div>247&emsp;&emsp;</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Enumeration of log entry types. The log entry type represents the 2 byte</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * field that starts every log entry. The top byte is the log type, the</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * bottom byte holds the version value, provisional bit, replicated bit,</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * and invisible bit.</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Log type(8 bits)</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Provisional(2 bits) Replicated(1 bit) Invisible(1 bit) Version(5 bits)</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The top byte (log type) identifies the type and can be used to lookup</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the LogEntryType object, while the bottom byte has information about the</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * entry (instance) of this type.  The bottom byte is effectively entry</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * header information that is common to all types and is managed by methods</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * in LogEntryHeader. See LogEntryHeader.java</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>263&emsp;&emsp;</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*  Node types */</div>
+<div>265&emsp;&emsp;</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Deprecated transactional LN entry type, use LOG_DEL_LN_TRANSACTIONAL,</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * LOG_INS_LN_TRANSACTIONAL, LOG_UPD_LN_TRANSACTIONAL instead according to</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the operation type.</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_OLD_LN_TRANSACTIONAL =</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        createReplicableLogEntryType(</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (byte) 1, "LN_TX",</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            LNLogEntry.create(berkeley.com.sleepycat.je.tree.LN.class),</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Txnal.TXNAL,</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Marshall.OUTSIDE_LATCH,</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Replicable.REPLICABLE_NO_MATCH,</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeType.LN_USER);</div>
+<div>279&emsp;&emsp;</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Deprecated LN entry type, use LOG_DEL_LN, LOG_INS_LN, LOG_UPD_LN instead</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * according to the operation type.</div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_OLD_LN =</div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        createReplicableLogEntryType(</div>
+<div>286&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (byte) 2, "LN",</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            LNLogEntry.create(berkeley.com.sleepycat.je.tree.LN.class),</div>
+<div>288&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Txnal.NON_TXNAL,</div>
+<div>289&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Marshall.OUTSIDE_LATCH,</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Replicable.REPLICABLE_NO_MATCH,</div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeType.LN_USER);</div>
+<div>292&emsp;&emsp;</div>
+<div>293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Never used</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_MAPLN_TRANSACTIONAL =</div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 3, "MapLN_TX",</div>
+<div>299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         LNLogEntry.create(berkeley.com.sleepycat.je.tree.MapLN.class),</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.TXNAL,</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.INSIDE_LATCH,</div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.LN_INTERNAL);</div>
+<div>303&emsp;&emsp;</div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_MAPLN =</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 4, "MapLN",</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         LNLogEntry.create(berkeley.com.sleepycat.je.tree.MapLN.class),</div>
+<div>308&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.INSIDE_LATCH,</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.LN_INTERNAL);</div>
+<div>311&emsp;&emsp;</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_NAMELN_TRANSACTIONAL =</div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        createReplicableLogEntryType(</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (byte) 5, "NameLN_TX",</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new NameLNLogEntry(),</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Txnal.TXNAL,</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Marshall.OUTSIDE_LATCH,</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Replicable.REPLICABLE_NO_MATCH,</div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeType.LN_INTERNAL);</div>
+<div>320&emsp;&emsp;</div>
+<div>321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_NAMELN =</div>
+<div>322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        createReplicableLogEntryType(</div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (byte) 6, "NameLN",</div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new NameLNLogEntry(),</div>
+<div>325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Txnal.NON_TXNAL,</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Marshall.OUTSIDE_LATCH,</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Replicable.REPLICABLE_NO_MATCH,</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeType.LN_INTERNAL);</div>
+<div>329&emsp;&emsp;</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Obsolete in version 8, only used by some log readers. */</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_DEL_DUPLN_TRANSACTIONAL =</div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        createReplicableLogEntryType(</div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (byte) 7, "DelDupLN_TX",</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new DeletedDupLNLogEntry(),</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Txnal.TXNAL,</div>
+<div>336&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Marshall.OUTSIDE_LATCH,</div>
+<div>337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Replicable.REPLICABLE_NO_MATCH,</div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeType.LN_USER);</div>
+<div>339&emsp;&emsp;</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Obsolete in version 8, only used by some log readers. */</div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_DEL_DUPLN =</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        createReplicableLogEntryType(</div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (byte) 8, "DelDupLN",</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new DeletedDupLNLogEntry(),</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Txnal.NON_TXNAL,</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Marshall.OUTSIDE_LATCH,</div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Replicable.REPLICABLE_NO_MATCH,</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeType.LN_USER);</div>
+<div>349&emsp;&emsp;</div>
+<div>350&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Obsolete in version 8, only used by DupConvert and some log readers. */</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_DUPCOUNTLN_TRANSACTIONAL =</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 9, "DupCountLN_TX",</div>
+<div>354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         LNLogEntry.create(berkeley.com.sleepycat.je.tree.dupConvert.DupCountLN.class),</div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.TXNAL,</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.OLD_DUP);</div>
+<div>358&emsp;&emsp;</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Obsolete in version 8, only used by DupConvert and some log readers. */</div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_DUPCOUNTLN =</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 10, "DupCountLN",</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         LNLogEntry.create(berkeley.com.sleepycat.je.tree.dupConvert.DupCountLN.class),</div>
+<div>364&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.OLD_DUP);</div>
+<div>367&emsp;&emsp;</div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_FILESUMMARYLN =</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 11, "FileSummaryLN",</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         LNLogEntry.create(berkeley.com.sleepycat.je.tree.FileSummaryLN.class),</div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.INSIDE_LATCH,</div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.LN_INTERNAL);</div>
+<div>375&emsp;&emsp;</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_IN =</div>
+<div>377&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 12, "IN",</div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         INLogEntry.create(berkeley.com.sleepycat.je.tree.IN.class),</div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.IN);</div>
+<div>383&emsp;&emsp;</div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_BIN =</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 13, "BIN",</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         INLogEntry.create(berkeley.com.sleepycat.je.tree.BIN.class),</div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.IN);</div>
+<div>391&emsp;&emsp;</div>
+<div>392&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Obsolete in version 8, only used by DupConvert and some log readers. */</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_DIN =</div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 14, "DIN",</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         INLogEntry.create(berkeley.com.sleepycat.je.tree.dupConvert.DIN.class),</div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.OLD_DUP);</div>
+<div>400&emsp;&emsp;</div>
+<div>401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Obsolete in version 8, only used by DupConvert and some log readers. */</div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_DBIN =</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>404&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 15, "DBIN",</div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         INLogEntry.create(berkeley.com.sleepycat.je.tree.dupConvert.DBIN.class),</div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.OLD_DUP);</div>
+<div>409&emsp;&emsp;</div>
+<div>410&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The root entry of the DbTree, it saves the root information for name</div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * and id database.</div>
+<div>413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_DBTREE =</div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 16, "DbTree",</div>
+<div>417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         SingleItemEntry.create(</div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             berkeley.com.sleepycat.je.dbi.DbTree.class),</div>
+<div>419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.INSIDE_LATCH,</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.NONE);</div>
+<div>422&emsp;&emsp;</div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Transactional entries */</div>
+<div>424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_TXN_COMMIT =</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        createReplicableLogEntryType(</div>
+<div>426&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (byte) 17, "Commit",</div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new CommitLogEntry(),</div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Txnal.TXNAL,</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Marshall.INSIDE_LATCH, /* To ensure DTVLSN is in sync with VLSN */</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Replicable.REPLICABLE_MATCH,</div>
+<div>431&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeType.NONE);</div>
+<div>432&emsp;&emsp;</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_TXN_ABORT =</div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        createReplicableLogEntryType(</div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (byte) 18, "Abort",</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new AbortLogEntry(),</div>
+<div>437&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Txnal.TXNAL,</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Marshall.INSIDE_LATCH, /* To ensure DTVLSN is in sync with VLSN */</div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Replicable.REPLICABLE_MATCH,</div>
+<div>440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeType.NONE);</div>
+<div>441&emsp;&emsp;</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_CKPT_START =</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 19, "CkptStart",</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         SingleItemEntry.create(</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             berkeley.com.sleepycat.je.recovery.CheckpointStart.class),</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.NONE);</div>
+<div>450&emsp;&emsp;</div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_CKPT_END =</div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 20, "CkptEnd",</div>
+<div>454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         SingleItemEntry.create(</div>
+<div>455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             berkeley.com.sleepycat.je.recovery.CheckpointEnd.class),</div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.NONE);</div>
+<div>459&emsp;&emsp;</div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Obsolete in version 8, only used by some log readers. */</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_IN_DELETE_INFO =</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>463&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 21, "INDelete",</div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         SingleItemEntry.create(</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             berkeley.com.sleepycat.je.tree.dupConvert.INDeleteInfo.class),</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>467&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>468&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.NONE);</div>
+<div>469&emsp;&emsp;</div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Obsolete in version 9, replaced by "live" LOG_BIN_DELTA. */</div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_OLD_BIN_DELTA =</div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 22, "BINDelta",</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         new OldBINDeltaLogEntry</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         (berkeley.com.sleepycat.je.tree.OldBINDelta.class),</div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>478&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.NONE);</div>
+<div>479&emsp;&emsp;</div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Obsolete in version 8, only used by some log readers. */</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_OLD_DUP_BIN_DELTA =</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 23, "DupBINDelta",</div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         new OldBINDeltaLogEntry</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         (berkeley.com.sleepycat.je.tree.OldBINDelta.class),</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.NONE);</div>
+<div>489&emsp;&emsp;</div>
+<div>490&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Although this is replicable, it is never replicated except in tests. */</div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_TRACE =</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        createReplicableLogEntryType(</div>
+<div>493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (byte) 24, "Trace",</div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new TraceLogEntry(),</div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Txnal.NON_TXNAL,</div>
+<div>496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Marshall.OUTSIDE_LATCH,</div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Replicable.REPLICABLE_NO_MATCH,</div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeType.NONE);</div>
+<div>499&emsp;&emsp;</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* File header */</div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_FILE_HEADER =</div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>503&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 25, "FileHeader",</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         new FileHeaderEntry</div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         (berkeley.com.sleepycat.je.log.FileHeader.class),</div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.NONE);</div>
+<div>509&emsp;&emsp;</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Obsolete in version 8, only used by some log readers. */</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_IN_DUPDELETE_INFO =</div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 26, "INDupDelete",</div>
+<div>514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         SingleItemEntry.create(</div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             berkeley.com.sleepycat.je.tree.dupConvert.INDupDeleteInfo.class),</div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.NONE);</div>
+<div>519&emsp;&emsp;</div>
+<div>520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_TXN_PREPARE =</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 27, "Prepare",</div>
+<div>523&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         SingleItemEntry.create(</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             berkeley.com.sleepycat.je.txn.TxnPrepare.class),</div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.TXNAL,</div>
+<div>526&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.NONE);</div>
+<div>528&emsp;&emsp;</div>
+<div>529&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_ROLLBACK_START =</div>
+<div>530&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>531&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 28, "RollbackStart",</div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         SingleItemEntry.create(</div>
+<div>533&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             berkeley.com.sleepycat.je.txn.RollbackStart.class),</div>
+<div>534&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>535&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>536&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.NONE);</div>
+<div>537&emsp;&emsp;</div>
+<div>538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_ROLLBACK_END =</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType</div>
+<div>540&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((byte) 29, "RollbackEnd",</div>
+<div>541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         SingleItemEntry.create(</div>
+<div>542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             berkeley.com.sleepycat.je.txn.RollbackEnd.class),</div>
+<div>543&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Txnal.NON_TXNAL,</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         Marshall.OUTSIDE_LATCH,</div>
+<div>545&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         NodeType.NONE);</div>
+<div>546&emsp;&emsp;</div>
+<div>547&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_MATCHPOINT =</div>
+<div>548&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        createReplicableLogEntryType(</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (byte) 30, "Matchpoint",</div>
+<div>550&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new MatchpointLogEntry(),</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Txnal.NON_TXNAL,</div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Marshall.OUTSIDE_LATCH,</div>
+<div>553&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Replicable.REPLICABLE_MATCH,</div>
+<div>554&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeType.NONE);</div>
+<div>555&emsp;&emsp;</div>
+<div>556&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_DEL_LN_TRANSACTIONAL =</div>
+<div>557&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new UserLNLogEntryType((byte) 31, "DEL_LN_TX", Txnal.TXNAL);</div>
+<div>558&emsp;&emsp;</div>
+<div>559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_DEL_LN =</div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new UserLNLogEntryType((byte) 32, "DEL_LN", Txnal.NON_TXNAL);</div>
+<div>561&emsp;&emsp;</div>
+<div>562&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_INS_LN_TRANSACTIONAL =</div>
+<div>563&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new UserLNLogEntryType((byte) 33, "INS_LN_TX", Txnal.TXNAL);</div>
+<div>564&emsp;&emsp;</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_INS_LN =</div>
+<div>566&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new UserLNLogEntryType((byte) 34, "INS_LN", Txnal.NON_TXNAL);</div>
+<div>567&emsp;&emsp;</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_UPD_LN_TRANSACTIONAL =</div>
+<div>569&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new UserLNLogEntryType((byte) 35, "UPD_LN_TX", Txnal.TXNAL);</div>
+<div>570&emsp;&emsp;</div>
+<div>571&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_UPD_LN =</div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new UserLNLogEntryType((byte) 36, "UPD_LN", Txnal.NON_TXNAL);</div>
+<div>573&emsp;&emsp;</div>
+<div>574&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_BIN_DELTA =</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType(</div>
+<div>576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (byte) 37, "NewBINDelta",</div>
+<div>577&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new BINDeltaLogEntry(berkeley.com.sleepycat.je.tree.BIN.class),</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Txnal.NON_TXNAL,</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Marshall.OUTSIDE_LATCH,</div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeType.IN);</div>
+<div>581&emsp;&emsp;</div>
+<div>582&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_IMMUTABLE_FILE =</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType(</div>
+<div>584&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (byte) 38, "ImmutableFile",</div>
+<div>585&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            SingleItemEntry.create(</div>
+<div>586&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                berkeley.com.sleepycat.je.log.entry.EmptyLogEntry.class),</div>
+<div>587&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Txnal.NON_TXNAL,</div>
+<div>588&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Marshall.OUTSIDE_LATCH,</div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeType.NONE);</div>
+<div>590&emsp;&emsp;</div>
+<div>591&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final LogEntryType LOG_RESTORE_REQUIRED =</div>
+<div>592&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new LogEntryType(</div>
+<div>593&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (byte) 39, "RestoreRequired",</div>
+<div>594&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            SingleItemEntry.create(</div>
+<div>595&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                berkeley.com.sleepycat.je.log.entry.RestoreRequired.class),</div>
+<div>596&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Txnal.NON_TXNAL,</div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Marshall.OUTSIDE_LATCH,</div>
+<div>598&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeType.NONE);</div>
+<div>599&emsp;&emsp;</div>
+<div>600&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*** If you add new types, be sure to update MAX_TYPE_NUM at the top.***/</div>
+<div>601&emsp;&emsp;</div>
+<div>602&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Persistent fields */</div>
+<div>603&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final byte typeNum; // persistent value for this entry type</div>
+<div>604&emsp;&emsp;</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Transient fields */</div>
+<div>606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final String displayName;</div>
+<div>607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final LogEntry logEntry;</div>
+<div>608&emsp;&emsp;</div>
+<div>609&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>610&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Attributes</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>612&emsp;&emsp;</div>
+<div>613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Whether the log entry holds a transactional information. */</div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private Txnal isTransactional;</div>
+<div>615&emsp;&emsp;</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Does this log entry be marshalled outside or inside the log write</div>
+<div>618&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * latch.</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>620&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private Marshall marshallBehavior;</div>
+<div>621&emsp;&emsp;</div>
+<div>622&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Can this log entry be put in the replication stream? */</div>
+<div>623&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private Replicable replicationPossible;</div>
+<div>624&emsp;&emsp;</div>
+<div>625&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private NodeType nodeType;</div>
+<div>626&emsp;&emsp;</div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>628&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Constructors</div>
+<div>629&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>630&emsp;&emsp;</div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>632&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For base class support.</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>634&emsp;&emsp;</div>
+<div>635&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * This constructor only used when the LogEntryType is being used as a key</div>
+<div>637&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * for a map. No log types can be defined outside this package.</div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    LogEntryType(byte typeNum) {</div>
+<div>640&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.typeNum = typeNum;</div>
+<div>641&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        displayName = null;</div>
+<div>642&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        logEntry = null;</div>
+<div>643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>644&emsp;&emsp;</div>
+<div>645&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>646&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Used to create a map key for reporting that is not a real type.</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    LogEntryType(byte typeNum, String displayName) {</div>
+<div>649&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        assert typeNum > MAX_TYPE_NUM;</div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.typeNum = typeNum;</div>
+<div>651&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.displayName = displayName;</div>
+<div>652&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        logEntry = null;</div>
+<div>653&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>654&emsp;&emsp;</div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>656&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Create a non-replicable log type.</div>
+<div>657&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param isTransactional whether this type of log entry holds data</div>
+<div>659&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * involved in a transaction. For example, transaction commit and LN data</div>
+<div>660&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * records are transactional, but INs are not.</div>
+<div>661&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param marshallBehavior whether this type of log entry may be serialized</div>
+<div>662&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * outside the log write latch. This is true of the majority of</div>
+<div>663&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * types. Certain types like the FileSummaryLN rely on the log write latch</div>
+<div>664&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * to enforce serial semantics.</div>
+<div>665&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>666&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private LogEntryType(final byte typeNum,</div>
+<div>667&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         final String displayName,</div>
+<div>668&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         final LogEntry logEntry,</div>
+<div>669&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         final Txnal isTransactional,</div>
+<div>670&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         final Marshall marshallBehavior,</div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         final NodeType nodeType) {</div>
+<div>672&emsp;&emsp;</div>
+<div>673&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this(typeNum, displayName, logEntry, isTransactional, marshallBehavior,</div>
+<div>674&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             Replicable.LOCAL, nodeType);</div>
+<div>675&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>676&emsp;&emsp;</div>
+<div>677&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Create a replicable log type.</div>
+<div>679&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>680&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param isTransactional whether this type of log entry holds data</div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * involved in a transaction</div>
+<div>682&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param marshallBehavior whether this type of log entry may be serialized</div>
+<div>683&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * outside the log write latch</div>
+<div>684&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param replicationPossible whether this type of log entry can be shared</div>
+<div>685&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * with a replication group</div>
+<div>686&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static LogEntryType createReplicableLogEntryType(</div>
+<div>688&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final byte typeNum,</div>
+<div>689&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final String displayName,</div>
+<div>690&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final ReplicableLogEntry logEntry,</div>
+<div>691&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final Txnal isTransactional,</div>
+<div>692&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final Marshall marshallBehavior,</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final Replicable replicationPossible,</div>
+<div>694&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final NodeType nodeType) {</div>
+<div>695&emsp;&emsp;</div>
+<div>696&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return new LogEntryType(typeNum, displayName, logEntry,</div>
+<div>697&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                isTransactional, marshallBehavior,</div>
+<div>698&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                replicationPossible, nodeType);</div>
+<div>699&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>700&emsp;&emsp;</div>
+<div>701&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>702&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Internal constructor for all log types.  Don't create instances using</div>
+<div>703&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * this directly, to improve error checking.</div>
+<div>704&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>705&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private LogEntryType(final byte typeNum,</div>
+<div>706&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         final String displayName,</div>
+<div>707&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         final LogEntry logEntry,</div>
+<div>708&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         final Txnal isTransactional,</div>
+<div>709&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         final Marshall marshallBehavior,</div>
+<div>710&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         final Replicable replicationPossible,</div>
+<div>711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         final NodeType nodeType) {</div>
+<div>712&emsp;&emsp;</div>
+<div>713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.typeNum = typeNum;</div>
+<div>714&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.displayName = displayName;</div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.logEntry = logEntry;</div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.isTransactional = isTransactional;</div>
+<div>717&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.marshallBehavior = marshallBehavior;</div>
+<div>718&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.replicationPossible = replicationPossible;</div>
+<div>719&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.nodeType = nodeType;</div>
+<div>720&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        logEntry.setLogType(this);</div>
+<div>721&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LOG_TYPES[typeNum - 1] = this;</div>
+<div>722&emsp;&emsp;</div>
+<div style="background-color:limegreen;">723&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        assert logEntry != null && replicationPossible != null;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">724&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        assert !replicationPossible.isReplicable() ||&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>725&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            logEntry instanceof ReplicableLogEntry</div>
+<div>726&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            : "Replicable log types must have replicable log entries";</div>
+<div>727&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>728&emsp;&emsp;</div>
+<div>729&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>730&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the static version of this type</div>
+<div>731&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>732&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static LogEntryType findType(byte typeNum) {</div>
+<div style="background-color:limegreen;">733&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (typeNum &#60;= 0 || typeNum > MAX_TYPE_NUM) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>734&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return null;</div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>736&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return LOG_TYPES[typeNum - 1];</div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>738&emsp;&emsp;</div>
+<div>739&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>740&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get a copy of all types for unit testing.</div>
+<div>741&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>742&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static Set&#60;LogEntryType> getAllTypes() {</div>
+<div>743&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        HashSet&#60;LogEntryType> ret = new HashSet&#60;LogEntryType>();</div>
+<div>744&emsp;&emsp;</div>
+<div>745&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (int i = 0; i &#60; MAX_TYPE_NUM; i++) {</div>
+<div>746&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ret.add(LOG_TYPES[i]);</div>
+<div>747&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>748&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ret;</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>750&emsp;&emsp;</div>
+<div>751&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>752&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the log entry type owned by the shared, static version</div>
+<div>753&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>754&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public LogEntry getSharedLogEntry() {</div>
+<div>755&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return logEntry;</div>
+<div>756&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>757&emsp;&emsp;</div>
+<div>758&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return a clone of the log entry type for a given log type.</div>
+<div>760&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>761&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public LogEntry getNewLogEntry()</div>
+<div>762&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>763&emsp;&emsp;</div>
+<div>764&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return logEntry.clone();</div>
+<div>765&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>766&emsp;&emsp;</div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public byte getTypeNum() {</div>
+<div>768&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return typeNum;</div>
+<div>769&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>770&emsp;&emsp;</div>
+<div>771&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>772&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return true if type number is valid.</div>
+<div>773&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>774&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static boolean isValidType(byte typeNum) {</div>
+<div style="background-color:limegreen;">775&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return typeNum > 0 && typeNum &#60;= MAX_TYPE_NUM;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>776&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>777&emsp;&emsp;</div>
+<div>778&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toStringNoVersion() {</div>
+<div>779&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return displayName;</div>
+<div>780&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>781&emsp;&emsp;</div>
+<div>782&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>783&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>784&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return displayName;</div>
+<div>785&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>786&emsp;&emsp;</div>
+<div>787&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>788&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Check for equality without making a new object.</div>
+<div>789&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>790&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean equalsType(byte type) {</div>
+<div>791&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (this.typeNum == type);</div>
+<div>792&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>793&emsp;&emsp;</div>
+<div>794&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Override Object.equals. Ignore provisional bit when checking for</div>
+<div>796&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * equality.</div>
+<div>797&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>798&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>799&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean equals(Object obj) {</div>
+<div>800&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Same instance? */</div>
+<div style="background-color:limegreen;">801&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (this == obj) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return true;</div>
+<div>803&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>804&emsp;&emsp;</div>
+<div>805&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Is it the right type of object? */</div>
+<div style="background-color:limegreen;">806&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!(obj instanceof LogEntryType)) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>807&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return false;</div>
+<div>808&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>809&emsp;&emsp;</div>
+<div style="background-color:limegreen;">810&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return typeNum == ((LogEntryType) obj).typeNum;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>811&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>812&emsp;&emsp;</div>
+<div>813&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>814&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * This is used as a hash key.</div>
+<div>815&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>816&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>817&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public int hashCode() {</div>
+<div>818&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return typeNum;</div>
+<div>819&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>820&emsp;&emsp;</div>
+<div>821&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static enum Txnal {</div>
+<div>822&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        TXNAL(true),</div>
+<div>823&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        NON_TXNAL(false);</div>
+<div>824&emsp;&emsp;</div>
+<div>825&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        private final boolean isTxnal;</div>
+<div>826&emsp;&emsp;</div>
+<div>827&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Txnal(boolean isTxnal) {</div>
+<div>828&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.isTxnal = isTxnal;</div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>830&emsp;&emsp;</div>
+<div>831&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean isTransactional() {</div>
+<div>832&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return isTxnal;</div>
+<div>833&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>834&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>835&emsp;&emsp;</div>
+<div>836&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>837&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Return true if this log entry has transactional information in it,</div>
+<div>838&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * like a commit or abort record, or a transactional LN.</div>
+<div>839&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>840&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isTransactional() {</div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return isTransactional.isTransactional();</div>
+<div>842&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>843&emsp;&emsp;</div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static enum Marshall {</div>
+<div>845&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        OUTSIDE_LATCH(true),</div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        INSIDE_LATCH(false);</div>
+<div>847&emsp;&emsp;</div>
+<div>848&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        private final boolean marshallOutsideLatch;</div>
+<div>849&emsp;&emsp;</div>
+<div>850&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Marshall(boolean marshallOutsideLatch) {</div>
+<div>851&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.marshallOutsideLatch = marshallOutsideLatch;</div>
+<div>852&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>853&emsp;&emsp;</div>
+<div>854&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean marshallOutsideLatch() {</div>
+<div>855&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return marshallOutsideLatch;</div>
+<div>856&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>858&emsp;&emsp;</div>
+<div>859&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>860&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Return true if this log entry should be marshalled into a buffer outside</div>
+<div>861&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the log write latch. Currently, the FileSummaryLN and MapLN (which</div>
+<div>862&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * contains DbFileSummary objects) and the commit and abort log entries</div>
+<div>863&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * (due to their DTVLSN fields) need to be logged inside the log write</div>
+<div>864&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * latch.</div>
+<div>865&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>866&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean marshallOutsideLatch() {</div>
+<div>867&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return marshallBehavior.marshallOutsideLatch();</div>
+<div>868&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>869&emsp;&emsp;</div>
+<div>870&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>871&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Return true if the type of this LogEntryType is equivalent to typeB.</div>
+<div>872&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Version is used as a factor in the comparison when new log entry types</div>
+<div>873&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * are introduced in one release, which supercede existing types.</div>
+<div>874&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>875&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean compareTypeAndVersion(int versionA,</div>
+<div>876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                         int versionB,</div>
+<div>877&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                         final byte typeB) {</div>
+<div>878&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return typeNum == typeB;</div>
+<div>879&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>880&emsp;&emsp;</div>
+<div>881&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>882&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Indicates whether this type of log entry is shared in a replicated</div>
+<div>883&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * environment or not, and whether it can be used as a replication</div>
+<div>884&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * matchpoint.</div>
+<div>885&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>886&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static enum Replicable {</div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        REPLICABLE_MATCH(true, true),</div>
+<div>888&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        REPLICABLE_NO_MATCH(true, false),</div>
+<div>889&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LOCAL(false, false);</div>
+<div>890&emsp;&emsp;</div>
+<div>891&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        private final boolean isReplicable;</div>
+<div>892&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        private final boolean isMatchable;</div>
+<div>893&emsp;&emsp;</div>
+<div>894&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Replicable(boolean isReplicable, boolean isMatchable) {</div>
+<div>895&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.isReplicable = isReplicable;</div>
+<div>896&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            this.isMatchable = isMatchable;</div>
+<div>897&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>898&emsp;&emsp;</div>
+<div>899&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean isReplicable() {</div>
+<div>900&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return isReplicable;</div>
+<div>901&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>902&emsp;&emsp;</div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean isMatchable() {</div>
+<div>904&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return isMatchable;</div>
+<div>905&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>906&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>907&emsp;&emsp;</div>
+<div>908&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>909&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Return true if this type of log entry can be part of the replication</div>
+<div>910&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * stream. For example, INs can never be replicated, while LNs are</div>
+<div>911&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * replicated only if their owning database is replicated.</div>
+<div>912&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>913&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isReplicationPossible() {</div>
+<div>914&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return replicationPossible.isReplicable();</div>
+<div>915&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>916&emsp;&emsp;</div>
+<div>917&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>918&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Return true if this type of log entry can serve as the synchronization</div>
+<div>919&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * matchpoint for the replication stream. That generally means that this</div>
+<div>920&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * log entry contains an replication node ID.</div>
+<div>921&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>922&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isSyncPoint() {</div>
+<div>923&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return replicationPossible.isMatchable();</div>
+<div>924&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>925&emsp;&emsp;</div>
+<div>926&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>927&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Return true if this type of log entry can serve as the synchronization</div>
+<div>928&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * matchpoint for the replication stream.</div>
+<div>929&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>930&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static boolean isSyncPoint(byte entryType) {</div>
+<div>931&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return findType(entryType).isSyncPoint();</div>
+<div>932&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>933&emsp;&emsp;</div>
+<div>934&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Type of Btree node. */</div>
+<div>935&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static enum NodeType {</div>
+<div>936&emsp;&emsp;</div>
+<div>937&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Not a Btree node. */</div>
+<div>938&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        NONE,</div>
+<div>939&emsp;&emsp;</div>
+<div>940&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Internal node. Does not include old-format DIN/DBIN. */</div>
+<div>941&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        IN,</div>
+<div>942&emsp;&emsp;</div>
+<div>943&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* DIN/DBIN/DupCountLN in old-format duplicates database. */</div>
+<div>944&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        OLD_DUP,</div>
+<div>945&emsp;&emsp;</div>
+<div>946&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* LNs representing records in internal databases. */</div>
+<div>947&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LN_INTERNAL,</div>
+<div>948&emsp;&emsp;</div>
+<div>949&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* LNs representing ordinary user records.  */</div>
+<div>950&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LN_USER;</div>
+<div>951&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>952&emsp;&emsp;</div>
+<div>953&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isNodeType() {</div>
+<div style="background-color:limegreen;">954&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return nodeType != NodeType.NONE;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>955&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>956&emsp;&emsp;</div>
+<div>957&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isUserLNType() {</div>
+<div style="background-color:limegreen;">958&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return nodeType == NodeType.LN_USER;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>959&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>960&emsp;&emsp;</div>
+<div>961&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isLNType() {</div>
+<div style="background-color:limegreen;">962&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return nodeType == NodeType.LN_INTERNAL || isUserLNType();&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>963&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>964&emsp;&emsp;</div>
+<div>965&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isINType() {</div>
+<div style="background-color:limegreen;">966&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return nodeType == NodeType.IN;&nbsp;&#8594; [ALLOWCREATE]</b></div>
+<div>967&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>968&emsp;&emsp;</div>
+<div>969&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isOldDupType() {</div>
+<div>970&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return nodeType == NodeType.OLD_DUP;</div>
+<div>971&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>972&emsp;&emsp;</div>
+<div>973&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>974&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Return true if the two types are equal. Handles the situation where new</div>
+<div>975&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * log entry types were introduced in one release, that are actually</div>
+<div>976&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * equivalent to old, deprecated types.</div>
+<div>977&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>978&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static boolean compareTypeAndVersion(int versionA,</div>
+<div>979&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                                byte typeA,</div>
+<div>980&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                                int versionB,</div>
+<div>981&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                                byte typeB) {</div>
+<div>982&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LogEntryType entryA = findType(typeA);</div>
+<div>983&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return entryA.compareTypeAndVersion(versionA, versionB, typeB);</div>
+<div>984&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>985&emsp;&emsp;</div>
+<div>986&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static class UserLNLogEntryType extends LogEntryType {</div>
+<div>987&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        public UserLNLogEntryType(byte typeNum,</div>
+<div>988&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                  String displayName,</div>
+<div>989&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                  Txnal txnal) {</div>
+<div>990&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            super(typeNum, displayName,</div>
+<div>991&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  LNLogEntry.create(berkeley.com.sleepycat.je.tree.LN.class),</div>
+<div>992&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  txnal, Marshall.OUTSIDE_LATCH,</div>
+<div>993&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  Replicable.REPLICABLE_NO_MATCH, NodeType.LN_USER);</div>
+<div>994&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>995&emsp;&emsp;</div>
+<div>996&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>997&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        public boolean compareTypeAndVersion(int versionA,</div>
+<div>998&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                             int versionB,</div>
+<div>999&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                             byte typeB) {</div>
+<div>1000&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            /* If the other entry is newer, the types should match. */</div>
+<div>1001&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (versionA &#60;= versionB && getTypeNum() == typeB) {</div>
+<div>1002&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return true;</div>
+<div>1003&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1004&emsp;&emsp;</div>
+<div>1005&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            /*</div>
+<div>1006&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             * If the other entry is older, the type might be an old,</div>
+<div>1007&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             * deprecated, equivalent type.</div>
+<div>1008&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             */</div>
+<div>1009&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if ((versionA > versionB) && isEquivalentOldType(typeB)) {</div>
+<div>1010&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return true;</div>
+<div>1011&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1012&emsp;&emsp;</div>
+<div>1013&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            /*</div>
+<div>1014&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             * In this case, the other entry's version is older or newer but it</div>
+<div>1015&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             * doesn't matter -- it's completely the wrong type.</div>
+<div>1016&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             */</div>
+<div>1017&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return false;</div>
+<div>1018&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1019&emsp;&emsp;</div>
+<div>1020&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        private boolean isEquivalentOldType(byte typeB) {</div>
+<div>1021&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if ((!isTransactional() && (typeB == LOG_OLD_LN.getTypeNum())) ||</div>
+<div>1022&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                (isTransactional() &&</div>
+<div>1023&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                 (typeB == LOG_OLD_LN_TRANSACTIONAL.getTypeNum()))) {</div>
+<div>1024&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return true;</div>
+<div>1025&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1026&emsp;&emsp;</div>
+<div>1027&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return false;</div>
+<div>1028&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1029&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1030&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

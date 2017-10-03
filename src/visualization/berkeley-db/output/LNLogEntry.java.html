@@ -1,0 +1,1138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LNLogEntry.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*-</div>
+<div>2&emsp;&emsp;&nbsp; * Copyright (C) 2002, 2017, Oracle and/or its affiliates. All rights reserved.</div>
+<div>3&emsp;&emsp;&nbsp; *</div>
+<div>4&emsp;&emsp;&nbsp; * This file was distributed by Oracle as part of a version of Oracle Berkeley</div>
+<div>5&emsp;&emsp;&nbsp; * DB Java Edition made available at:</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; * http://www.oracle.com/technetwork/database/database-technologies/berkeleydb/downloads/index.html</div>
+<div>8&emsp;&emsp;&nbsp; *</div>
+<div>9&emsp;&emsp;&nbsp; * Please see the LICENSE file included in the top-level directory of the</div>
+<div>10&emsp;&emsp;&nbsp; * appropriate version of Oracle Berkeley DB Java Edition for a copy of the</div>
+<div>11&emsp;&emsp;&nbsp; * license and additional information.</div>
+<div>12&emsp;&emsp;&nbsp; */</div>
+<div>13&emsp;&emsp;</div>
+<div>14&emsp;&emsp;package berkeley.com.sleepycat.je.log.entry;</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;import static berkeley.com.sleepycat.je.EnvironmentFailureException.unexpectedState;</div>
+<div>17&emsp;&emsp;</div>
+<div>18&emsp;&emsp;import java.lang.reflect.Constructor;</div>
+<div>19&emsp;&emsp;import java.nio.ByteBuffer;</div>
+<div>20&emsp;&emsp;import java.util.Arrays;</div>
+<div>21&emsp;&emsp;import java.util.Collection;</div>
+<div>22&emsp;&emsp;</div>
+<div>23&emsp;&emsp;import berkeley.com.sleepycat.je.DatabaseEntry;</div>
+<div>24&emsp;&emsp;import berkeley.com.sleepycat.je.dbi.DatabaseId;</div>
+<div>25&emsp;&emsp;import berkeley.com.sleepycat.je.dbi.DatabaseImpl;</div>
+<div>26&emsp;&emsp;import berkeley.com.sleepycat.je.dbi.DupKeyData;</div>
+<div>27&emsp;&emsp;import berkeley.com.sleepycat.je.dbi.EnvironmentImpl;</div>
+<div>28&emsp;&emsp;import berkeley.com.sleepycat.je.dbi.TTL;</div>
+<div>29&emsp;&emsp;import berkeley.com.sleepycat.je.log.LogEntryHeader;</div>
+<div>30&emsp;&emsp;import berkeley.com.sleepycat.je.log.LogEntryType;</div>
+<div>31&emsp;&emsp;import berkeley.com.sleepycat.je.log.LogUtils;</div>
+<div>32&emsp;&emsp;import berkeley.com.sleepycat.je.log.VersionedWriteLoggable;</div>
+<div>33&emsp;&emsp;import berkeley.com.sleepycat.je.tree.Key;</div>
+<div>34&emsp;&emsp;import berkeley.com.sleepycat.je.tree.LN;</div>
+<div>35&emsp;&emsp;import berkeley.com.sleepycat.je.tree.VersionedLN;</div>
+<div>36&emsp;&emsp;import berkeley.com.sleepycat.je.txn.Txn;</div>
+<div>37&emsp;&emsp;import berkeley.com.sleepycat.je.utilint.DbLsn;</div>
+<div>38&emsp;&emsp;import berkeley.com.sleepycat.je.utilint.VLSN;</div>
+<div>39&emsp;&emsp;</div>
+<div>40&emsp;&emsp;/**</div>
+<div>41&emsp;&emsp;&nbsp; * An LNLogEntry is the in-memory image of an LN logrec describing a write op</div>
+<div>42&emsp;&emsp;&nbsp; * (insertion, update, or deletion) performed by a locker T on a record R.</div>
+<div>43&emsp;&emsp;&nbsp; * T always locks R in exclusive (WRITE or WRITE_RANGE) mode before performing</div>
+<div>44&emsp;&emsp;&nbsp; * any write ops on it, and it retains its exclusive lock on R until it</div>
+<div>45&emsp;&emsp;&nbsp; * terminates (commits or aborts). (Non-transactional lockers can be viewed as</div>
+<div>46&emsp;&emsp;&nbsp; * "simple" transactions that perform at most one write op, and then</div>
+<div>47&emsp;&emsp;&nbsp; * immediately commit).</div>
+<div>48&emsp;&emsp;&nbsp; *</div>
+<div>49&emsp;&emsp;&nbsp; * On disk, an LN logrec contains :</div>
+<div>50&emsp;&emsp;&nbsp; *</div>
+<div>51&emsp;&emsp;&nbsp; * 1 &#60;= version &#60;= 5</div>
+<div>52&emsp;&emsp;&nbsp; *</div>
+<div>53&emsp;&emsp;&nbsp; *   LN data</div>
+<div>54&emsp;&emsp;&nbsp; *   databaseid</div>
+<div>55&emsp;&emsp;&nbsp; *   key</div>
+<div>56&emsp;&emsp;&nbsp; *   abortLsn             -- if transactional</div>
+<div>57&emsp;&emsp;&nbsp; *   abortKnownDeleted    -- if transactional</div>
+<div>58&emsp;&emsp;&nbsp; *   txn id               -- if transactional</div>
+<div>59&emsp;&emsp;&nbsp; *   prev LSN of same txn -- if transactional</div>
+<div>60&emsp;&emsp;&nbsp; *</div>
+<div>61&emsp;&emsp;&nbsp; * 6 &#60;= versions &#60;= 10 :</div>
+<div>62&emsp;&emsp;&nbsp; *</div>
+<div>63&emsp;&emsp;&nbsp; *   databaseid</div>
+<div>64&emsp;&emsp;&nbsp; *   abortLsn             -- if transactional</div>
+<div>65&emsp;&emsp;&nbsp; *   abortKnownDeleted    -- if transactional</div>
+<div>66&emsp;&emsp;&nbsp; *   txn id               -- if transactional</div>
+<div>67&emsp;&emsp;&nbsp; *   prev LSN of same txn -- if transactional</div>
+<div>68&emsp;&emsp;&nbsp; *   data</div>
+<div>69&emsp;&emsp;&nbsp; *   key</div>
+<div>70&emsp;&emsp;&nbsp; *</div>
+<div>71&emsp;&emsp;&nbsp; * 11 == version :</div>
+<div>72&emsp;&emsp;&nbsp; *</div>
+<div>73&emsp;&emsp;&nbsp; *   databaseid</div>
+<div>74&emsp;&emsp;&nbsp; *   abortLsn               -- if transactional</div>
+<div>75&emsp;&emsp;&nbsp; *   1-byte flags</div>
+<div>76&emsp;&emsp;&nbsp; *     abortKnownDeleted</div>
+<div>77&emsp;&emsp;&nbsp; *     embeddedLN</div>
+<div>78&emsp;&emsp;&nbsp; *     haveAbortKey</div>
+<div>79&emsp;&emsp;&nbsp; *     haveAbortData</div>
+<div>80&emsp;&emsp;&nbsp; *     haveAbortVLSN</div>
+<div>81&emsp;&emsp;&nbsp; *   txn id                 -- if transactional</div>
+<div>82&emsp;&emsp;&nbsp; *   prev LSN of same txn   -- if transactional</div>
+<div>83&emsp;&emsp;&nbsp; *   abort key              -- if haveAbortKey</div>
+<div>84&emsp;&emsp;&nbsp; *   abort data             -- if haveAbortData</div>
+<div>85&emsp;&emsp;&nbsp; *   abort vlsn             -- if haveAbortVLSN</div>
+<div>86&emsp;&emsp;&nbsp; *   data</div>
+<div>87&emsp;&emsp;&nbsp; *   key</div>
+<div>88&emsp;&emsp;&nbsp; *</div>
+<div>89&emsp;&emsp;&nbsp; *   In forReplication mode, these flags and fields are omitted:</div>
+<div>90&emsp;&emsp;&nbsp; *     embeddedLN, haveAbortKey, haveAbortData, haveAbortVLSN,</div>
+<div>91&emsp;&emsp;&nbsp; *     abort key, abort data, abort vlsn</div>
+<div>92&emsp;&emsp;&nbsp; *</div>
+<div>93&emsp;&emsp;&nbsp; * 12 &#60;= version :</div>
+<div>94&emsp;&emsp;&nbsp; *</div>
+<div>95&emsp;&emsp;&nbsp; *   1-byte flags</div>
+<div>96&emsp;&emsp;&nbsp; *     abortKnownDeleted</div>
+<div>97&emsp;&emsp;&nbsp; *     embeddedLN</div>
+<div>98&emsp;&emsp;&nbsp; *     haveAbortKey</div>
+<div>99&emsp;&emsp;&nbsp; *     haveAbortData</div>
+<div>100&emsp;&emsp;&nbsp; *     haveAbortVLSN</div>
+<div>101&emsp;&emsp;&nbsp; *     haveAbortLSN</div>
+<div>102&emsp;&emsp;&nbsp; *     haveAbortExpiration</div>
+<div>103&emsp;&emsp;&nbsp; *     haveExpiration</div>
+<div>104&emsp;&emsp;&nbsp; *   databaseid</div>
+<div>105&emsp;&emsp;&nbsp; *   abortLsn                -- if transactional and haveAbortLSN</div>
+<div>106&emsp;&emsp;&nbsp; *   txn id                  -- if transactional</div>
+<div>107&emsp;&emsp;&nbsp; *   prev LSN of same txn    -- if transactional</div>
+<div>108&emsp;&emsp;&nbsp; *   abort key               -- if haveAbortKey</div>
+<div>109&emsp;&emsp;&nbsp; *   abort data              -- if haveAbortData</div>
+<div>110&emsp;&emsp;&nbsp; *   abort vlsn              -- if haveAbortVLSN</div>
+<div>111&emsp;&emsp;&nbsp; *   abort expiration        -- if haveAbortExpiration</div>
+<div>112&emsp;&emsp;&nbsp; *   expiration              -- if haveExpiration</div>
+<div>113&emsp;&emsp;&nbsp; *   data</div>
+<div>114&emsp;&emsp;&nbsp; *   key</div>
+<div>115&emsp;&emsp;&nbsp; *</div>
+<div>116&emsp;&emsp;&nbsp; *   In forReplication mode, these flags and fields are omitted:</div>
+<div>117&emsp;&emsp;&nbsp; *     abortKnownDeleted, embeddedLN, haveAbortKey, haveAbortData,</div>
+<div>118&emsp;&emsp;&nbsp; *     haveAbortVLSN, abort key, abort data, abort vlsn</div>
+<div>119&emsp;&emsp;&nbsp; *</div>
+<div>120&emsp;&emsp;&nbsp; * NOTE: LNLogEntry is sub-classed by NameLNLogEntry, which adds some extra</div>
+<div>121&emsp;&emsp;&nbsp; * fields after the record key.</div>
+<div>122&emsp;&emsp;&nbsp; */</div>
+<div style="background-color:limegreen;">123&emsp;&emsp;<b>public class LNLogEntry&#60;T extends LN> extends BaseReplicableEntry&#60;T> {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>124&emsp;&emsp;</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final byte ABORT_KD_MASK = 0x1;</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final byte EMBEDDED_LN_MASK = 0x2;</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final byte HAVE_ABORT_KEY_MASK = 0x4;</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final byte HAVE_ABORT_DATA_MASK = 0x8;</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final byte HAVE_ABORT_VLSN_MASK = 0x10;</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final byte HAVE_ABORT_LSN_MASK = 0x20;</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final byte HAVE_ABORT_EXPIRATION_MASK = 0x40;</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final byte HAVE_EXPIRATION_MASK = (byte) 0x80;</div>
+<div>133&emsp;&emsp;</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Used for computing the minimum log space used by an LNLogEntry.</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static final int MIN_LOG_SIZE = 1 + // Flags</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                           1 + // DatabaseId</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                           1 + // LN with zero-length data</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                           LogEntryHeader.MIN_HEADER_SIZE;</div>
+<div>141&emsp;&emsp;</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The log version when the most recent format change for this entry was</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * made (including any changes to the format of the underlying LN and other</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * loggables).</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @see #getLastFormatChange</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final int LAST_FORMAT_CHANGE = 12;</div>
+<div>150&emsp;&emsp;</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Persistent fields.</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>154&emsp;&emsp;</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The id of the DB containing the record.</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private DatabaseId dbId;</div>
+<div>159&emsp;&emsp;</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The Txn performing the write op. It is null for non-transactional DBs.</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * On disk we store only the txn id and the LSN of the previous logrec</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * (if any) generated by this txn.</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private Txn txn;</div>
+<div>166&emsp;&emsp;</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The LSN of the record's "abort" version, i.e., the version to revert to</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * if this logrec must be undone as a result of a txn abort. It is set to</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the most recent version before the record was locked by the locker T</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * associated with this logrec. Because T locks R before it writes it, the</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * abort version is always a committed version.</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * It is null for non-transactional lockers, because such lockers never</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * abort.</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private long abortLsn = DbLsn.NULL_LSN;</div>
+<div>178&emsp;&emsp;</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Whether the record's abort version was a deleted version or not.</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean abortKnownDeleted;</div>
+<div>183&emsp;&emsp;</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The key of the record's abort version, if haveAbortKey is true;</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * null otherwise.</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private byte[] abortKey = null;</div>
+<div>189&emsp;&emsp;</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The data portion of the record's abort version, if haveAbortData is</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * true; null otherwise.</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private byte[] abortData = null;</div>
+<div>195&emsp;&emsp;</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The VLSN of the record's abort version, if haveAbortVLSN is true;</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * NULL_VLSN otherwise.</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private long abortVLSN = VLSN.NULL_VLSN_SEQUENCE;</div>
+<div>201&emsp;&emsp;</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Abort expiration time in days or hours. */</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private int abortExpiration = 0;</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean abortExpirationInHours = false;</div>
+<div>205&emsp;&emsp;</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * True if the logrec stores an abort LSN, which is the case only if</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * (a) this is a transactional logrec (b) the abort LSN is non-null.</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean haveAbortLSN;</div>
+<div>211&emsp;&emsp;</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * True if the logrec stores an abort key, which is the case only if</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * (a) this is a transactional logrec, (b) the record's abort version</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * was embedded in the BIN, and (c) the DB allows key updates.</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean haveAbortKey;</div>
+<div>218&emsp;&emsp;</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * True if the logrec stores abort data, which is the case only if</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * (a) this is a transactional logrec and (b) the record's abort</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * version was embedded in the BIN.</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean haveAbortData;</div>
+<div>225&emsp;&emsp;</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * True if the logrec stores an abort VLSN, which is the case only if</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * (a) this is a transactional logrec (b) the record's abort version</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * was embedded in the BIN, and (c) VLSN caching is enabled.</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean haveAbortVLSN;</div>
+<div>232&emsp;&emsp;</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * True if the logrec stores an abort expiration, which is the case only if</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * (a) this is a transactional logrec (b) the record's abort version has a</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * non-zero expiration.</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean haveAbortExpiration;</div>
+<div>239&emsp;&emsp;</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * True if the logrec stores a non-zero expiration.</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean haveExpiration;</div>
+<div>244&emsp;&emsp;</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Whether, after the write op described by this logrec, the record is</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * embedded in the BIN or not.</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean embeddedLN;</div>
+<div>250&emsp;&emsp;</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The LN storing the record's data, after the write op described by this</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * logrec. The ln has a null data value if the write op is a deletion. For</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * replicated DBs, the ln contains the record's VLSN as well.</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private LN ln;</div>
+<div>257&emsp;&emsp;</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The value of the record's key, after the write op described by this</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * logrec.</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private byte[] key;</div>
+<div>263&emsp;&emsp;</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Expiration time in days or hours. */</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private int expiration;</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean expirationInHours;</div>
+<div>267&emsp;&emsp;</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Transient fields.</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>271&emsp;&emsp;</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Transient field for duplicates conversion and user key/data methods. */</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    enum DupStatus { UNKNOWN, NEED_CONVERSION, DUP_DB, NOT_DUP_DB }</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private DupStatus dupStatus;</div>
+<div>275&emsp;&emsp;</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* For construction of VersionedLN, when VLSN is preserved. */</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final Constructor&#60;VersionedLN> versionedLNConstructor;</div>
+<div>278&emsp;&emsp;</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Creates an instance to read an entry.</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param &#60;T> the type of the contained LN</div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param cls the class of the contained LN</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the log entry</div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>286&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static &#60;T extends LN> LNLogEntry&#60;T> create(final Class&#60;T> cls) {</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return new LNLogEntry&#60;>(cls);</div>
+<div>288&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>289&emsp;&emsp;</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Constructor to read an entry. */</div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    LNLogEntry(final Class&#60;T> cls) {</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        super(cls);</div>
+<div style="background-color:limegreen;">293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (cls == LN.class) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            versionedLNConstructor = getNoArgsConstructor(VersionedLN.class);</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            versionedLNConstructor = null;</div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>299&emsp;&emsp;</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Constructor to write an entry. */</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public LNLogEntry(</div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LogEntryType entryType,</div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        DatabaseId dbId,</div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Txn txn,</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long abortLsn,</div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean abortKD,</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        byte[] abortKey,</div>
+<div>308&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        byte[] abortData,</div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long abortVLSN,</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int abortExpiration,</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean abortExpirationInHours,</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        byte[] key,</div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        T ln,</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean embeddedLN,</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int expiration,</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean expirationInHours) {</div>
+<div>317&emsp;&emsp;</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setLogType(entryType);</div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.dbId = dbId;</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.txn = txn;</div>
+<div>321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.abortLsn = abortLsn;</div>
+<div>322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.abortKnownDeleted = abortKD;</div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.abortKey = abortKey;</div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.abortData = abortData;</div>
+<div>325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.abortVLSN = abortVLSN;</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.abortExpiration = abortExpiration;</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.abortExpirationInHours = abortExpirationInHours;</div>
+<div>328&emsp;&emsp;</div>
+<div style="background-color:limegreen;">329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        this.haveAbortLSN = (abortLsn != DbLsn.NULL_LSN);&nbsp;&#8594; [ALLOWCREATE, READONLY]</b></div>
+<div style="background-color:limegreen;">330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        this.haveAbortKey = (abortKey != null);&nbsp;&#8594; [ALLOWCREATE, READONLY]</b></div>
+<div style="background-color:limegreen;">331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        this.haveAbortData = (abortData != null);&nbsp;&#8594; [ALLOWCREATE]</b></div>
+<div style="background-color:limegreen;">332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        this.haveAbortVLSN = !VLSN.isNull(abortVLSN);&nbsp;&#8594; [ALLOWCREATE]</b></div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.haveAbortExpiration = (abortExpiration != 0);</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.haveExpiration = (expiration != 0);</div>
+<div>335&emsp;&emsp;</div>
+<div>336&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.embeddedLN = embeddedLN;</div>
+<div>337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.key = key;</div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.ln = ln;</div>
+<div>339&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.expiration = expiration;</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.expirationInHours = expirationInHours;</div>
+<div>341&emsp;&emsp;</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        versionedLNConstructor = null;</div>
+<div>343&emsp;&emsp;</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* A txn should only be provided for transactional entry types. */</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        assert(entryType.isTransactional() == (txn != null));</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>347&emsp;&emsp;</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void reset() {</div>
+<div>349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        dbId = null;</div>
+<div>350&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        txn = null;</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        abortLsn = DbLsn.NULL_LSN;</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        abortKnownDeleted = false;</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        abortKey = null;</div>
+<div>354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        abortData = null;</div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        abortVLSN = VLSN.NULL_VLSN_SEQUENCE;</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        abortExpiration = 0;</div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        abortExpirationInHours = false;</div>
+<div>358&emsp;&emsp;</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        haveAbortLSN = false;</div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        haveAbortKey = false;</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        haveAbortData = false;</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        haveAbortVLSN = false;</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        haveAbortExpiration = false;</div>
+<div>364&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        haveExpiration = false;</div>
+<div>365&emsp;&emsp;</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        embeddedLN = false;</div>
+<div>367&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        key = null;</div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ln = null;</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        expiration = 0;</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        expirationInHours = false;</div>
+<div>371&emsp;&emsp;</div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        dupStatus = null;</div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>374&emsp;&emsp;</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void readEntry(</div>
+<div>377&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        EnvironmentImpl envImpl,</div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LogEntryHeader header,</div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ByteBuffer entryBuffer) {</div>
+<div>380&emsp;&emsp;</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Subclasses must call readBaseLNEntry. */</div>
+<div style="background-color:limegreen;">382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        assert getClass() == LNLogEntry.class;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL] & [TRANSACTIONAL]</b></div>
+<div>383&emsp;&emsp;</div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /*</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * Prior to version 8, the optimization to omit the key size was</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * mistakenly not applied to internal LN types such as FileSummaryLN</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * and MapLN, and was only applied to user LN types.  The optimization</div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * should be applicable whenever LNLogEntry is not subclassed to add</div>
+<div>389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * additional fields. [#18055]</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         */</div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final boolean keyIsLastSerializedField =</div>
+<div style="background-color:limegreen;">392&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            header.getVersion() >= 8 || entryType.isUserLNType();&nbsp;&#8594; [TRANSACTIONAL] & [TRANSACTIONAL]</b></div>
+<div>393&emsp;&emsp;</div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        readBaseLNEntry(envImpl, header, entryBuffer,</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        keyIsLastSerializedField);</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>397&emsp;&emsp;</div>
+<div>398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Method shared by LNLogEntry subclasses.</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param keyIsLastSerializedField specifies whether the key length can be</div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * omitted because the key is the last field.  This should be false when</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * an LNLogEntry subclass adds fields to the serialized format.</div>
+<div>404&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final void readBaseLNEntry(</div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        EnvironmentImpl envImpl,</div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LogEntryHeader header,</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ByteBuffer entryBuffer,</div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean keyIsLastSerializedField) {</div>
+<div>410&emsp;&emsp;</div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        reset();</div>
+<div>412&emsp;&emsp;</div>
+<div>413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int logVersion = header.getVersion();</div>
+<div style="background-color:limegreen;">414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        boolean unpacked = (logVersion &#60; 6);&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int recStartPosition = entryBuffer.position();</div>
+<div>416&emsp;&emsp;</div>
+<div style="background-color:limegreen;">417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (logVersion >= 12) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            setFlags(entryBuffer.get());</div>
+<div>419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>420&emsp;&emsp;</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /*</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * For log version 6 and above we store the key last so that we can</div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * avoid storing the key size. Instead, we derive it from the LN size</div>
+<div>424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * and the total entry size. The DatabaseId is also packed.</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         */</div>
+<div style="background-color:limegreen;">426&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (logVersion &#60; 6) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            /* LN is first for log versions prior to 6. */</div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ln = newLNInstance(envImpl);</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ln.readFromLog(entryBuffer, logVersion);</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>431&emsp;&emsp;</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* DatabaseImpl Id. */</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        dbId = new DatabaseId();</div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        dbId.readFromLog(entryBuffer, logVersion);</div>
+<div>435&emsp;&emsp;</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Key. */</div>
+<div style="background-color:limegreen;">437&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (logVersion &#60; 6) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            key = LogUtils.readByteArray(entryBuffer, true/*unpacked*/);</div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>440&emsp;&emsp;</div>
+<div style="background-color:limegreen;">441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (entryType.isTransactional()) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>442&emsp;&emsp;</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            /*</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             * AbortLsn. If it was a marker LSN that was used to fill in a</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             * create, mark it null.</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;             */</div>
+<div style="background-color:limegreen;">447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (haveAbortLSN || logVersion &#60; 12) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                abortLsn = LogUtils.readLong(entryBuffer, unpacked);</div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if (DbLsn.getFileNumber(abortLsn) ==</div>
+<div style="background-color:limegreen;">450&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                    DbLsn.getFileNumber(DbLsn.NULL_LSN)) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    abortLsn = DbLsn.NULL_LSN;</div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>454&emsp;&emsp;</div>
+<div style="background-color:limegreen;">455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (logVersion &#60; 12) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                setFlags(entryBuffer.get());</div>
+<div style="background-color:limegreen;">457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                haveAbortLSN = (abortLsn != DbLsn.NULL_LSN);&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>459&emsp;&emsp;</div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            /* txn id and prev LSN by same txn. */</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            txn = new Txn();</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            txn.readFromLog(entryBuffer, logVersion);</div>
+<div>463&emsp;&emsp;</div>
+<div style="background-color:limegreen;">464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        } else if (logVersion == 11) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            setFlags(entryBuffer.get());</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>467&emsp;&emsp;</div>
+<div style="background-color:limegreen;">468&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (logVersion >= 11) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">469&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (haveAbortKey) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                abortKey = LogUtils.readByteArray(entryBuffer, false);</div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div style="background-color:limegreen;">472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (haveAbortData) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                abortData = LogUtils.readByteArray(entryBuffer, false);</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div style="background-color:limegreen;">475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (haveAbortVLSN) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                abortVLSN = LogUtils.readPackedLong(entryBuffer);</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>478&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>479&emsp;&emsp;</div>
+<div style="background-color:limegreen;">480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (logVersion >= 12) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (haveAbortExpiration) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                abortExpiration = LogUtils.readPackedInt(entryBuffer);</div>
+<div style="background-color:limegreen;">483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (abortExpiration &#60; 0) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    abortExpiration = (- abortExpiration);</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    abortExpirationInHours = true;</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div style="background-color:limegreen;">488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (haveExpiration) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                expiration = LogUtils.readPackedInt(entryBuffer);</div>
+<div style="background-color:limegreen;">490&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (expiration &#60; 0) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    expiration = (- expiration);</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    expirationInHours = true;</div>
+<div>493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>496&emsp;&emsp;</div>
+<div style="background-color:limegreen;">497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (logVersion >= 6) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>498&emsp;&emsp;</div>
+<div>499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ln = newLNInstance(envImpl);</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ln.readFromLog(entryBuffer, logVersion);</div>
+<div>501&emsp;&emsp;</div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int keySize;</div>
+<div style="background-color:limegreen;">503&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (keyIsLastSerializedField) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                int bytesWritten = entryBuffer.position() - recStartPosition;</div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                keySize = header.getItemSize() - bytesWritten;</div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } else {</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                keySize = LogUtils.readPackedInt(entryBuffer);</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            key = LogUtils.readBytesNoLength(entryBuffer, keySize);</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>511&emsp;&emsp;</div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Save transient fields after read. */</div>
+<div>513&emsp;&emsp;</div>
+<div style="background-color:limegreen;">514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (header.getVLSN() != null) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ln.setVLSNSequence(header.getVLSN().getSequence());</div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>517&emsp;&emsp;</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Dup conversion will be done by postFetchInit. */</div>
+<div style="background-color:limegreen;">519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        dupStatus =&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (logVersion &#60; 8) ? DupStatus.NEED_CONVERSION : DupStatus.UNKNOWN;</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>522&emsp;&emsp;</div>
+<div>523&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void setFlags(final byte flags) {</div>
+<div style="background-color:limegreen;">524&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        embeddedLN = ((flags & EMBEDDED_LN_MASK) != 0);&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">525&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        abortKnownDeleted = ((flags & ABORT_KD_MASK) != 0);&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">526&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        haveAbortLSN = ((flags & HAVE_ABORT_LSN_MASK) != 0);&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">527&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        haveAbortKey = ((flags & HAVE_ABORT_KEY_MASK) != 0);&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">528&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        haveAbortData = ((flags & HAVE_ABORT_DATA_MASK) != 0);&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">529&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        haveAbortVLSN = ((flags & HAVE_ABORT_VLSN_MASK) != 0);&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">530&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        haveAbortExpiration = ((flags & HAVE_ABORT_EXPIRATION_MASK) != 0);&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">531&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        haveExpiration = ((flags & HAVE_EXPIRATION_MASK) != 0);&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>533&emsp;&emsp;</div>
+<div>534&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>535&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean hasReplicationFormat() {</div>
+<div>536&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return true;</div>
+<div>537&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>538&emsp;&emsp;</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>540&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isReplicationFormatWorthwhile(final ByteBuffer logBuffer,</div>
+<div>541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                                 final int srcVersion,</div>
+<div>542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                                 final int destVersion) {</div>
+<div>543&emsp;&emsp;</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* The replication format is optimized only in versions >= 11. */</div>
+<div>545&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (destVersion &#60; 11) {</div>
+<div>546&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return false;</div>
+<div>547&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>548&emsp;&emsp;</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /*</div>
+<div>550&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * It is too much trouble to parse versions older than 12, because the</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * flags are not at the front in older versions.</div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         */</div>
+<div>553&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (srcVersion &#60; 12) {</div>
+<div>554&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return false;</div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>556&emsp;&emsp;</div>
+<div>557&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final byte flags = logBuffer.get(0);</div>
+<div>558&emsp;&emsp;</div>
+<div>559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /*</div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * If we have an abort key or data, assume that the savings is</div>
+<div>561&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * substantial enough to be worthwhile.</div>
+<div>562&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         *</div>
+<div>563&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * The abort key is unusual and implies that data is hidden in the key</div>
+<div>564&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * using a partial comparator, so we assume it is probably large,</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * relative to the total size.</div>
+<div>566&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         *</div>
+<div>567&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * If there is abort data, it may be small, however, because the</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * presence of abort data implies that this is an update or deletion,</div>
+<div>569&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * there will also be an abort LSN and an abort VLSN (with HA). Plus,</div>
+<div>570&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * abort data is likely to be around the same size as the non-abort</div>
+<div>571&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * data, and keys are normally smallish, meaning that the abort data is</div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * largish relative to the total record size. So we assume the savings</div>
+<div>573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * are substantial enough.</div>
+<div>574&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         */</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (flags &</div>
+<div>576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (HAVE_ABORT_KEY_MASK | HAVE_ABORT_DATA_MASK)) != 0;</div>
+<div>577&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>578&emsp;&emsp;</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * newLNInstance usually returns exactly the type of LN of the type that</div>
+<div>581&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * was contained in in the log. For example, if a LNLogEntry holds a MapLN,</div>
+<div>582&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * newLNInstance will return that MapLN. There is one extra possibility for</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * vanilla (data record) LNs. In that case, this method may either return a</div>
+<div>584&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * LN or a generated type, the VersionedLN, which adds the vlsn information</div>
+<div>585&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * from the log header to the LN object.</div>
+<div>586&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>587&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    LN newLNInstance(EnvironmentImpl envImpl) {</div>
+<div style="background-color:limegreen;">588&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (versionedLNConstructor != null && envImpl.getPreserveVLSN()) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return newInstanceOfType(versionedLNConstructor);</div>
+<div>590&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>591&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return newInstanceOfType();</div>
+<div>592&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>593&emsp;&emsp;</div>
+<div>594&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>595&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public StringBuilder dumpEntry(StringBuilder sb, boolean verbose) {</div>
+<div>596&emsp;&emsp;</div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        dbId.dumpLog(sb, verbose);</div>
+<div>598&emsp;&emsp;</div>
+<div>599&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ln.dumpKey(sb, key);</div>
+<div>600&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ln.dumpLog(sb, verbose);</div>
+<div>601&emsp;&emsp;</div>
+<div>602&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        sb.append("&#60;embeddedLN val=\"");</div>
+<div>603&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        sb.append(embeddedLN);</div>
+<div>604&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        sb.append("\"/>");</div>
+<div>605&emsp;&emsp;</div>
+<div>606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (haveExpiration) {</div>
+<div>607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append("&#60;expires val=\"");</div>
+<div>608&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append(TTL.formatExpiration(expiration, expirationInHours));</div>
+<div>609&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append("\"/>");</div>
+<div>610&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>611&emsp;&emsp;</div>
+<div>612&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (entryType.isTransactional()) {</div>
+<div>613&emsp;&emsp;</div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            txn.dumpLog(sb, verbose);</div>
+<div>615&emsp;&emsp;</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append("&#60;abortLSN val=\"");</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append(DbLsn.getNoFormatString(abortLsn));</div>
+<div>618&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append("\"/>");</div>
+<div>619&emsp;&emsp;</div>
+<div>620&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append("&#60;abortKD val=\"");</div>
+<div>621&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append(abortKnownDeleted ? "true" : "false");</div>
+<div>622&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append("\"/>");</div>
+<div>623&emsp;&emsp;</div>
+<div>624&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (haveAbortKey) {</div>
+<div>625&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                sb.append(Key.dumpString(abortKey, "abortKey", 0));</div>
+<div>626&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (haveAbortData) {</div>
+<div>628&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                sb.append(Key.dumpString(abortData, "abortData", 0));</div>
+<div>629&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>630&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (haveAbortVLSN) {</div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                sb.append("&#60;abortVLSN v=\"");</div>
+<div>632&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                sb.append(abortVLSN);</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                sb.append("\"/>");</div>
+<div>634&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>635&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (haveAbortExpiration) {</div>
+<div>636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                sb.append("&#60;abortExpires val=\"");</div>
+<div>637&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                sb.append(TTL.formatExpiration(</div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    abortExpiration, abortExpirationInHours));</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                sb.append("\"/>");</div>
+<div>640&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>641&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>642&emsp;&emsp;</div>
+<div>643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return sb;</div>
+<div>644&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>645&emsp;&emsp;</div>
+<div>646&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void dumpRep(StringBuilder sb) {</div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (entryType.isTransactional()) {</div>
+<div>649&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append(" txn=").append(txn.getId());</div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>651&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>652&emsp;&emsp;</div>
+<div>653&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>654&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public LN getMainItem() {</div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ln;</div>
+<div>656&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>657&emsp;&emsp;</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>659&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public long getTransactionId() {</div>
+<div>660&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (entryType.isTransactional()) {</div>
+<div>661&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return txn.getId();</div>
+<div>662&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>663&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return 0;</div>
+<div>664&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>665&emsp;&emsp;</div>
+<div>666&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>667&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Writing support.</div>
+<div>668&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>669&emsp;&emsp;</div>
+<div>670&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public int getLastFormatChange() {</div>
+<div>672&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return LAST_FORMAT_CHANGE;</div>
+<div>673&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>674&emsp;&emsp;</div>
+<div>675&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>676&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Collection&#60;VersionedWriteLoggable> getEmbeddedLoggables() {</div>
+<div>677&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Arrays.asList(new LN(), new DatabaseId(), new Txn());</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>679&emsp;&emsp;</div>
+<div>680&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public int getSize(final int logVersion, final boolean forReplication) {</div>
+<div>682&emsp;&emsp;</div>
+<div style="background-color:limegreen;">683&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        assert getClass() == LNLogEntry.class;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>684&emsp;&emsp;</div>
+<div>685&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return getBaseLNEntrySize(</div>
+<div>686&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            logVersion, true /*keyIsLastSerializedField*/, forReplication);</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>688&emsp;&emsp;</div>
+<div>689&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>690&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Method shared by LNLogEntry subclasses.</div>
+<div>691&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>692&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param keyIsLastSerializedField specifies whether the key length can be</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * omitted because the key is the last field.  This should be false when</div>
+<div>694&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * an LNLogEntry subclass adds fields to the serialized format.</div>
+<div>695&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>696&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final int getBaseLNEntrySize(</div>
+<div>697&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final int logVersion,</div>
+<div>698&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final boolean keyIsLastSerializedField,</div>
+<div>699&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final boolean forReplication) {</div>
+<div>700&emsp;&emsp;</div>
+<div>701&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int size = ln.getLogSize(logVersion, forReplication) +</div>
+<div>702&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            dbId.getLogSize(logVersion, forReplication) +</div>
+<div>703&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            key.length;</div>
+<div>704&emsp;&emsp;</div>
+<div style="background-color:limegreen;">705&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!keyIsLastSerializedField) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>706&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            size += LogUtils.getPackedIntLogSize(key.length);</div>
+<div>707&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>708&emsp;&emsp;</div>
+<div style="background-color:limegreen;">709&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (entryType.isTransactional() || logVersion >= 11) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>710&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            size += 1;   // flags</div>
+<div>711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>712&emsp;&emsp;</div>
+<div style="background-color:limegreen;">713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (entryType.isTransactional()) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">714&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (logVersion &#60; 12 || (haveAbortLSN && !forReplication)) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                size += LogUtils.getPackedLongLogSize(abortLsn);</div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>717&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            size += txn.getLogSize(logVersion, forReplication);</div>
+<div>718&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>719&emsp;&emsp;</div>
+<div style="background-color:limegreen;">720&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!forReplication) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">721&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (logVersion >= 11 ) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">722&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (haveAbortKey) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>723&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    size += LogUtils.getByteArrayLogSize(abortKey);</div>
+<div>724&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div style="background-color:limegreen;">725&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (haveAbortData) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>726&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    size += LogUtils.getByteArrayLogSize(abortData);</div>
+<div>727&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div style="background-color:limegreen;">728&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (haveAbortVLSN) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>729&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    size += LogUtils.getPackedLongLogSize(abortVLSN);</div>
+<div>730&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>731&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div style="background-color:limegreen;">732&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (haveAbortExpiration) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">733&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                size += LogUtils.getPackedIntLogSize(&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>734&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    abortExpirationInHours ?</div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        (- abortExpiration) : abortExpiration);</div>
+<div>736&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>738&emsp;&emsp;</div>
+<div style="background-color:limegreen;">739&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (logVersion >= 12) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">740&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (haveExpiration) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">741&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                size += LogUtils.getPackedIntLogSize(&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>742&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    expirationInHours ? (- expiration) : expiration);</div>
+<div>743&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>744&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>745&emsp;&emsp;</div>
+<div>746&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return size;</div>
+<div>747&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>748&emsp;&emsp;</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>750&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void writeEntry(final ByteBuffer destBuffer,</div>
+<div>751&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                           final int logVersion,</div>
+<div>752&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                           final boolean forReplication) {</div>
+<div>753&emsp;&emsp;</div>
+<div>754&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Subclasses must call writeBaseLNEntry. */</div>
+<div style="background-color:limegreen;">755&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        assert getClass() == LNLogEntry.class;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>756&emsp;&emsp;</div>
+<div>757&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        writeBaseLNEntry(</div>
+<div>758&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            destBuffer, logVersion, true /*keyIsLastSerializedField*/,</div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            forReplication);</div>
+<div>760&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>761&emsp;&emsp;</div>
+<div>762&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>763&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Method shared by LNLogEntry subclasses.</div>
+<div>764&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>765&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param keyIsLastSerializedField specifies whether the key length can be</div>
+<div>766&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * omitted because the key is the last field.  This should be false when</div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * an LNLogEntry subclass adds fields to the serialized format.</div>
+<div>768&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>769&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final void writeBaseLNEntry(</div>
+<div>770&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final ByteBuffer destBuffer,</div>
+<div>771&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final int logVersion,</div>
+<div>772&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final boolean keyIsLastSerializedField,</div>
+<div>773&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final boolean forReplication) {</div>
+<div>774&emsp;&emsp;</div>
+<div>775&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        byte flags = 0;</div>
+<div>776&emsp;&emsp;</div>
+<div style="background-color:limegreen;">777&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (entryType.isTransactional() &&&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>778&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (logVersion &#60; 12 || !forReplication)) {</div>
+<div>779&emsp;&emsp;</div>
+<div style="background-color:limegreen;">780&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (abortKnownDeleted) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>781&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                flags |= ABORT_KD_MASK;</div>
+<div>782&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div style="background-color:limegreen;">783&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (haveAbortLSN) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>784&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                flags |= HAVE_ABORT_LSN_MASK;</div>
+<div>785&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>786&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>787&emsp;&emsp;</div>
+<div style="background-color:limegreen;">788&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!forReplication) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">789&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (logVersion >= 11) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">790&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (embeddedLN) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>791&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    flags |= EMBEDDED_LN_MASK;</div>
+<div>792&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div style="background-color:limegreen;">793&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (haveAbortKey) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>794&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    flags |= HAVE_ABORT_KEY_MASK;</div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div style="background-color:limegreen;">796&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (haveAbortData) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>797&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    flags |= HAVE_ABORT_DATA_MASK;</div>
+<div>798&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div style="background-color:limegreen;">799&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (haveAbortVLSN) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>800&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    flags |= HAVE_ABORT_VLSN_MASK;</div>
+<div>801&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div style="background-color:limegreen;">803&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (logVersion >= 12) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">804&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (haveAbortExpiration) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>805&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    flags |= HAVE_ABORT_EXPIRATION_MASK;</div>
+<div>806&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>807&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>808&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>809&emsp;&emsp;</div>
+<div style="background-color:limegreen;">810&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (logVersion >= 12) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">811&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (haveExpiration) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>812&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                flags |= HAVE_EXPIRATION_MASK;</div>
+<div>813&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>814&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            destBuffer.put(flags);</div>
+<div>815&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>816&emsp;&emsp;</div>
+<div>817&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        dbId.writeToLog(destBuffer, logVersion, forReplication);</div>
+<div>818&emsp;&emsp;</div>
+<div style="background-color:limegreen;">819&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (entryType.isTransactional()) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>820&emsp;&emsp;</div>
+<div style="background-color:limegreen;">821&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (logVersion &#60; 12 || (haveAbortLSN && !forReplication)) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>822&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                LogUtils.writePackedLong(destBuffer, abortLsn);</div>
+<div>823&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>824&emsp;&emsp;</div>
+<div style="background-color:limegreen;">825&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (logVersion &#60; 12) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>826&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                destBuffer.put(flags);</div>
+<div>827&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>828&emsp;&emsp;</div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            txn.writeToLog(destBuffer, logVersion, forReplication);</div>
+<div>830&emsp;&emsp;</div>
+<div style="background-color:limegreen;">831&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        } else if (logVersion == 11) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>832&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            destBuffer.put(flags);</div>
+<div>833&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>834&emsp;&emsp;</div>
+<div style="background-color:limegreen;">835&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!forReplication) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">836&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (logVersion >= 11) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">837&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (haveAbortKey) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>838&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    LogUtils.writeByteArray(destBuffer, abortKey);</div>
+<div>839&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div style="background-color:limegreen;">840&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (haveAbortData) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    LogUtils.writeByteArray(destBuffer, abortData);</div>
+<div>842&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div style="background-color:limegreen;">843&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (haveAbortVLSN) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    LogUtils.writePackedLong(destBuffer, abortVLSN);</div>
+<div>845&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div style="background-color:limegreen;">847&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (logVersion >= 12) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">848&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (haveAbortExpiration) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">849&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                    LogUtils.writePackedInt(&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>850&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        destBuffer,</div>
+<div>851&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        abortExpirationInHours ?</div>
+<div>852&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                            (-abortExpiration) : abortExpiration);</div>
+<div>853&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>854&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>855&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>856&emsp;&emsp;</div>
+<div style="background-color:limegreen;">857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (logVersion >= 12) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">858&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (haveExpiration) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">859&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                LogUtils.writePackedInt(&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>860&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    destBuffer,</div>
+<div>861&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    expirationInHours ? (-expiration) : expiration);</div>
+<div>862&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>863&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>864&emsp;&emsp;</div>
+<div>865&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ln.writeToLog(destBuffer, logVersion, forReplication);</div>
+<div>866&emsp;&emsp;</div>
+<div style="background-color:limegreen;">867&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!keyIsLastSerializedField) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>868&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            LogUtils.writePackedInt(destBuffer, key.length);</div>
+<div>869&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>870&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LogUtils.writeBytesNoLength(destBuffer, key);</div>
+<div>871&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>872&emsp;&emsp;</div>
+<div>873&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>874&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isImmediatelyObsolete(DatabaseImpl dbImpl) {</div>
+<div style="background-color:limegreen;">875&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return (ln.isDeleted() ||&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                embeddedLN ||</div>
+<div style="background-color:limegreen;">877&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                dbImpl.isLNImmediatelyObsolete());&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>878&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>879&emsp;&emsp;</div>
+<div>880&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>881&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isDeleted() {</div>
+<div>882&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ln.isDeleted();</div>
+<div>883&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>884&emsp;&emsp;</div>
+<div>885&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>886&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For LN entries, we need to record the latest LSN for that node with the</div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * owning transaction, within the protection of the log latch. This is a</div>
+<div>888&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * callback for the log manager to do that recording.</div>
+<div>889&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>890&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>891&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void postLogWork(</div>
+<div>892&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LogEntryHeader header,</div>
+<div>893&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long justLoggedLsn,</div>
+<div>894&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        VLSN vlsn) {</div>
+<div>895&emsp;&emsp;</div>
+<div style="background-color:limegreen;">896&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (entryType.isTransactional()) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>897&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            txn.addLogInfo(justLoggedLsn);</div>
+<div>898&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>899&emsp;&emsp;</div>
+<div>900&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Save transient fields after write. */</div>
+<div style="background-color:limegreen;">901&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (vlsn != null) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>902&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ln.setVLSNSequence(vlsn.getSequence());</div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>904&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>905&emsp;&emsp;</div>
+<div>906&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>907&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void postFetchInit(DatabaseImpl dbImpl) {</div>
+<div>908&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        postFetchInit(dbImpl.getSortedDuplicates());</div>
+<div>909&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>910&emsp;&emsp;</div>
+<div>911&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>912&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Converts the key/data for old format LNs in a duplicates DB.</div>
+<div>913&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>914&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * This method MUST be called before calling any of the following methods:</div>
+<div>915&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *  getLN</div>
+<div>916&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *  getKey</div>
+<div>917&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *  getUserKeyData</div>
+<div>918&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>919&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * TODO:</div>
+<div>920&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * This method is not called by the HA feeder when materializing entries.</div>
+<div>921&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * This is OK because entries with log version 7 and below are never</div>
+<div>922&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * materialized. But we may want to rename this method to make it clear</div>
+<div>923&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * that it only is, and only must be, called for the log versions &#60; 8.</div>
+<div>924&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>925&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void postFetchInit(boolean isDupDb) {</div>
+<div>926&emsp;&emsp;</div>
+<div style="background-color:limegreen;">927&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        final boolean needConversion =&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>928&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (dupStatus == DupStatus.NEED_CONVERSION);</div>
+<div>929&emsp;&emsp;</div>
+<div style="background-color:limegreen;">930&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        dupStatus = isDupDb ? DupStatus.DUP_DB : DupStatus.NOT_DUP_DB;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>931&emsp;&emsp;</div>
+<div>932&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Do not convert more than once. */</div>
+<div style="background-color:limegreen;">933&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!needConversion) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>934&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return;</div>
+<div>935&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>936&emsp;&emsp;</div>
+<div>937&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Nothing to convert for non-duplicates DB. */</div>
+<div style="background-color:limegreen;">938&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (dupStatus == DupStatus.NOT_DUP_DB) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>939&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return;</div>
+<div>940&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>941&emsp;&emsp;</div>
+<div>942&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        key = combineDupKeyData();</div>
+<div>943&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>944&emsp;&emsp;</div>
+<div>945&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>946&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Combine old key and old LN's data into a new key, and set the LN's data</div>
+<div>947&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * to empty.</div>
+<div>948&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>949&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    byte[] combineDupKeyData() {</div>
+<div style="background-color:limegreen;">950&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        assert !ln.isDeleted(); // DeletedLNLogEntry overrides this method.&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>951&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return DupKeyData.combine(key, ln.setEmpty());</div>
+<div>952&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>953&emsp;&emsp;</div>
+<div>954&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>955&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Translates two-part keys in duplicate DBs back to the original user</div>
+<div>956&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * operation params.  postFetchInit must be called before calling this</div>
+<div>957&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * method.</div>
+<div>958&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>959&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void getUserKeyData(</div>
+<div>960&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        DatabaseEntry keyParam,</div>
+<div>961&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        DatabaseEntry dataParam) {</div>
+<div>962&emsp;&emsp;</div>
+<div>963&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        requireKnownDupStatus();</div>
+<div>964&emsp;&emsp;</div>
+<div>965&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (dupStatus == DupStatus.DUP_DB) {</div>
+<div>966&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            DupKeyData.split(new DatabaseEntry(key), keyParam, dataParam);</div>
+<div>967&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>968&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (keyParam != null) {</div>
+<div>969&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                keyParam.setData(key);</div>
+<div>970&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>971&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (dataParam != null) {</div>
+<div>972&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                dataParam.setData(ln.getData());</div>
+<div>973&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>974&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>975&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>976&emsp;&emsp;</div>
+<div>977&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>978&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Accessors.</div>
+<div>979&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>980&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isEmbeddedLN() {</div>
+<div>981&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return embeddedLN;</div>
+<div>982&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>983&emsp;&emsp;</div>
+<div>984&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public LN getLN() {</div>
+<div>985&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        requireKnownDupStatus();</div>
+<div>986&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ln;</div>
+<div>987&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>988&emsp;&emsp;</div>
+<div>989&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public byte[] getKey() {</div>
+<div>990&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        requireKnownDupStatus();</div>
+<div>991&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return key;</div>
+<div>992&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>993&emsp;&emsp;</div>
+<div>994&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public byte[] getData() {</div>
+<div>995&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ln.getData();</div>
+<div>996&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>997&emsp;&emsp;</div>
+<div>998&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public byte[] getEmbeddedData() {</div>
+<div>999&emsp;&emsp;</div>
+<div>1000&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (!isEmbeddedLN()) {</div>
+<div>1001&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return null;</div>
+<div>1002&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1003&emsp;&emsp;</div>
+<div>1004&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (ln.isDeleted()) {</div>
+<div>1005&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return Key.EMPTY_KEY;</div>
+<div>1006&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1007&emsp;&emsp;</div>
+<div>1008&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ln.getData();</div>
+<div>1009&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1010&emsp;&emsp;</div>
+<div>1011&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public int getExpiration() {</div>
+<div>1012&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return expiration;</div>
+<div>1013&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1014&emsp;&emsp;</div>
+<div>1015&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isExpirationInHours() {</div>
+<div>1016&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return expirationInHours;</div>
+<div>1017&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1018&emsp;&emsp;</div>
+<div>1019&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void requireKnownDupStatus() {</div>
+<div style="background-color:limegreen;">1020&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (dupStatus != DupStatus.DUP_DB &&&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>1021&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            dupStatus != DupStatus.NOT_DUP_DB) {</div>
+<div>1022&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw unexpectedState(</div>
+<div>1023&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                "postFetchInit was not called");</div>
+<div>1024&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1025&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1026&emsp;&emsp;</div>
+<div>1027&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1028&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * This method is only used when the converted length is not needed, for</div>
+<div>1029&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * example by StatsFileReader.</div>
+<div>1030&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1031&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public int getUnconvertedDataLength() {</div>
+<div>1032&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ln.getData().length;</div>
+<div>1033&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1034&emsp;&emsp;</div>
+<div>1035&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1036&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * This method is only used when the converted length is not needed, for</div>
+<div>1037&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * example by StatsFileReader.</div>
+<div>1038&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1039&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public int getUnconvertedKeyLength() {</div>
+<div>1040&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return key.length;</div>
+<div>1041&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1042&emsp;&emsp;</div>
+<div>1043&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>1044&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public DatabaseId getDbId() {</div>
+<div>1045&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return dbId;</div>
+<div>1046&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1047&emsp;&emsp;</div>
+<div>1048&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public long getAbortLsn() {</div>
+<div>1049&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return abortLsn;</div>
+<div>1050&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1051&emsp;&emsp;</div>
+<div>1052&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean getAbortKnownDeleted() {</div>
+<div>1053&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return abortKnownDeleted;</div>
+<div>1054&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1055&emsp;&emsp;</div>
+<div>1056&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public byte[] getAbortKey() {</div>
+<div>1057&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return abortKey;</div>
+<div>1058&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1059&emsp;&emsp;</div>
+<div>1060&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public byte[] getAbortData() {</div>
+<div>1061&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return abortData;</div>
+<div>1062&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1063&emsp;&emsp;</div>
+<div>1064&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public long getAbortVLSN() {</div>
+<div>1065&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return abortVLSN;</div>
+<div>1066&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1067&emsp;&emsp;</div>
+<div>1068&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public int getAbortExpiration() {</div>
+<div>1069&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return abortExpiration;</div>
+<div>1070&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1071&emsp;&emsp;</div>
+<div>1072&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isAbortExpirationInHours() {</div>
+<div>1073&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return abortExpirationInHours;</div>
+<div>1074&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1075&emsp;&emsp;</div>
+<div>1076&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Long getTxnId() {</div>
+<div>1077&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (entryType.isTransactional()) {</div>
+<div>1078&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return txn.getId();</div>
+<div>1079&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1080&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return null;</div>
+<div>1081&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1082&emsp;&emsp;</div>
+<div>1083&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Txn getUserTxn() {</div>
+<div style="background-color:limegreen;">1084&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (entryType.isTransactional()) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>1085&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return txn;</div>
+<div>1086&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1087&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return null;</div>
+<div>1088&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1089&emsp;&emsp;</div>
+<div>1090&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>1091&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean logicalEquals(LogEntry other) {</div>
+<div>1092&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (!(other instanceof LNLogEntry)) {</div>
+<div>1093&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return false;</div>
+<div>1094&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1095&emsp;&emsp;</div>
+<div>1096&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LNLogEntry&#60;?> otherEntry = (LNLogEntry&#60;?>) other;</div>
+<div>1097&emsp;&emsp;</div>
+<div>1098&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (!dbId.logicalEquals(otherEntry.dbId)) {</div>
+<div>1099&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return false;</div>
+<div>1100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1101&emsp;&emsp;</div>
+<div>1102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (txn != null) {</div>
+<div>1103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (!txn.logicalEquals(otherEntry.txn)) {</div>
+<div>1104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return false;</div>
+<div>1105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (otherEntry.txn != null) {</div>
+<div>1108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return false;</div>
+<div>1109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1111&emsp;&emsp;</div>
+<div>1112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (!Arrays.equals(key, otherEntry.key)) {</div>
+<div>1113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return false;</div>
+<div>1114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1115&emsp;&emsp;</div>
+<div>1116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (!ln.logicalEquals(otherEntry.ln)) {</div>
+<div>1117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return false;</div>
+<div>1118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1119&emsp;&emsp;</div>
+<div>1120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return true;</div>
+<div>1121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1122&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

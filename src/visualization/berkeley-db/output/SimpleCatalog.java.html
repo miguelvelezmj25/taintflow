@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SimpleCatalog.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*-</div>
+<div>2&emsp;&emsp;&nbsp; * Copyright (C) 2002, 2017, Oracle and/or its affiliates. All rights reserved.</div>
+<div>3&emsp;&emsp;&nbsp; *</div>
+<div>4&emsp;&emsp;&nbsp; * This file was distributed by Oracle as part of a version of Oracle Berkeley</div>
+<div>5&emsp;&emsp;&nbsp; * DB Java Edition made available at:</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; * http://www.oracle.com/technetwork/database/database-technologies/berkeleydb/downloads/index.html</div>
+<div>8&emsp;&emsp;&nbsp; *</div>
+<div>9&emsp;&emsp;&nbsp; * Please see the LICENSE file included in the top-level directory of the</div>
+<div>10&emsp;&emsp;&nbsp; * appropriate version of Oracle Berkeley DB Java Edition for a copy of the</div>
+<div>11&emsp;&emsp;&nbsp; * license and additional information.</div>
+<div>12&emsp;&emsp;&nbsp; */</div>
+<div>13&emsp;&emsp;</div>
+<div>14&emsp;&emsp;package berkeley.com.sleepycat.persist.impl;</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;import java.util.ArrayList;</div>
+<div>17&emsp;&emsp;import java.util.HashMap;</div>
+<div>18&emsp;&emsp;import java.util.IdentityHashMap;</div>
+<div>19&emsp;&emsp;import java.util.List;</div>
+<div>20&emsp;&emsp;import java.util.Map;</div>
+<div>21&emsp;&emsp;import java.util.NoSuchElementException;</div>
+<div>22&emsp;&emsp;</div>
+<div>23&emsp;&emsp;import berkeley.com.sleepycat.compat.DbCompat;</div>
+<div>24&emsp;&emsp;import berkeley.com.sleepycat.persist.raw.RawObject;</div>
+<div>25&emsp;&emsp;import berkeley.com.sleepycat.util.ClassResolver;</div>
+<div>26&emsp;&emsp;</div>
+<div>27&emsp;&emsp;/**</div>
+<div>28&emsp;&emsp;&nbsp; * A static catalog containing simple types only.  Once created, this catalog</div>
+<div>29&emsp;&emsp;&nbsp; * is immutable.</div>
+<div>30&emsp;&emsp;&nbsp; *</div>
+<div>31&emsp;&emsp;&nbsp; * For bindings accessed by a PersistComparator during recovery, the</div>
+<div>32&emsp;&emsp;&nbsp; * SimpleCatalog provides formats for all simple types.  To reduce redundant</div>
+<div>33&emsp;&emsp;&nbsp; * format objects, the SimpleCatalog's formats are copied when creating a</div>
+<div>34&emsp;&emsp;&nbsp; * regular PersistCatalog.</div>
+<div>35&emsp;&emsp;&nbsp; *</div>
+<div>36&emsp;&emsp;&nbsp; * This class also contains utility methods for dealing with primitives.</div>
+<div>37&emsp;&emsp;&nbsp; *</div>
+<div>38&emsp;&emsp;&nbsp; * @author Mark Hayes</div>
+<div>39&emsp;&emsp;&nbsp; */</div>
+<div style="background-color:limegreen;">40&emsp;&emsp;<b>public class SimpleCatalog implements Catalog {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>41&emsp;&emsp;</div>
+<div>42&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final Map&#60;String, Class> keywordToPrimitive;</div>
+<div>43&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static {</div>
+<div>44&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        keywordToPrimitive = new HashMap&#60;String, Class>(8);</div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        keywordToPrimitive.put("boolean", Boolean.TYPE);</div>
+<div>46&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        keywordToPrimitive.put("char", Character.TYPE);</div>
+<div>47&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        keywordToPrimitive.put("byte", Byte.TYPE);</div>
+<div>48&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        keywordToPrimitive.put("short", Short.TYPE);</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        keywordToPrimitive.put("int", Integer.TYPE);</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        keywordToPrimitive.put("long", Long.TYPE);</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        keywordToPrimitive.put("float", Float.TYPE);</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        keywordToPrimitive.put("double", Double.TYPE);</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>54&emsp;&emsp;</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final Map&#60;Class, Class> primitiveTypeToWrapper;</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static {</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        primitiveTypeToWrapper = new HashMap&#60;Class, Class>(8);</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        primitiveTypeToWrapper.put(Boolean.TYPE, Boolean.class);</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        primitiveTypeToWrapper.put(Character.TYPE, Character.class);</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        primitiveTypeToWrapper.put(Byte.TYPE, Byte.class);</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        primitiveTypeToWrapper.put(Short.TYPE, Short.class);</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        primitiveTypeToWrapper.put(Integer.TYPE, Integer.class);</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        primitiveTypeToWrapper.put(Long.TYPE, Long.class);</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        primitiveTypeToWrapper.put(Float.TYPE, Float.class);</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        primitiveTypeToWrapper.put(Double.TYPE, Double.class);</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>67&emsp;&emsp;</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final SimpleCatalog instance = new SimpleCatalog(null);</div>
+<div>69&emsp;&emsp;</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static boolean isSimpleType(Class type) {</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return instance.formatMap.containsKey(type.getName());</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>73&emsp;&emsp;</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static Class primitiveToWrapper(Class type) {</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Class cls = primitiveTypeToWrapper.get(type);</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (cls == null) {</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw DbCompat.unexpectedState(type.getName());</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return cls;</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>81&emsp;&emsp;</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static Class resolveClass(String className, ClassLoader loader)</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws ClassNotFoundException {</div>
+<div>84&emsp;&emsp;</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Class cls = keywordToPrimitive.get(className);</div>
+<div style="background-color:limegreen;">86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (cls == null) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            cls = ClassResolver.resolveClass(className, loader);</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return cls;</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>91&emsp;&emsp;</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static Class resolveKeyClass(String className, ClassLoader loader) {</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Class cls = keywordToPrimitive.get(className);</div>
+<div style="background-color:limegreen;">94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (cls != null) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            cls = primitiveTypeToWrapper.get(cls);</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            try {</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                cls = ClassResolver.resolveClass(className, loader);</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } catch (ClassNotFoundException e) {</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw new IllegalArgumentException</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    ("Key class not found: " + className);</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return cls;</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>106&emsp;&emsp;</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static String keyClassName(String className) {</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Class cls = keywordToPrimitive.get(className);</div>
+<div style="background-color:limegreen;">109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (cls != null) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            cls = primitiveTypeToWrapper.get(cls);</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return cls.getName();</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return className;</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>116&emsp;&emsp;</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static List&#60;Format> getAllSimpleFormats(ClassLoader loader) {</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return new ArrayList&#60;Format>(new SimpleCatalog(loader).formatList);</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>120&emsp;&emsp;</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static boolean addMissingSimpleFormats(ClassLoader loader,</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                           List&#60;Format> copyToList) {</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean anyCopied = false;</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        SimpleCatalog tempCatalog = null;</div>
+<div style="background-color:limegreen;">125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for (int i = 0; i &#60;= Format.ID_PREDEFINED; i += 1) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            final Format thisFormat = instance.formatList.get(i);</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            final Format otherFormat = copyToList.get(i);</div>
+<div style="background-color:limegreen;">128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (thisFormat != null && otherFormat == null) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                assert thisFormat.getWrapperFormat() == null;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (tempCatalog == null) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    tempCatalog = new SimpleCatalog(loader);</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                copyToList.set(i, tempCatalog.formatList.get(i));</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                anyCopied = true;</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return anyCopied;</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>139&emsp;&emsp;</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final ClassLoader classLoader;</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final List&#60;SimpleFormat> formatList;</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final Map&#60;String, SimpleFormat> formatMap;</div>
+<div>143&emsp;&emsp;</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    SimpleCatalog(final ClassLoader classLoader) {</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.classLoader = classLoader;</div>
+<div>146&emsp;&emsp;</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /*</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * Reserve slots for all predefined IDs, so that that next ID assigned</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * will be Format.ID_PREDEFINED plus one.</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         */</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int initCapacity = Format.ID_PREDEFINED * 2;</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        formatList = new ArrayList&#60;SimpleFormat>(initCapacity);</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        formatMap = new HashMap&#60;String, SimpleFormat>(initCapacity);</div>
+<div>154&emsp;&emsp;</div>
+<div style="background-color:limegreen;">155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for (int i = 0; i &#60;= Format.ID_PREDEFINED; i += 1) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            formatList.add(null);</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>158&emsp;&emsp;</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Initialize all predefined formats.  */</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_BOOL,     new SimpleFormat.FBool(this, true));</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_BOOL_W,   new SimpleFormat.FBool(this, false));</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_BYTE,     new SimpleFormat.FByte(this, true));</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_BYTE_W,   new SimpleFormat.FByte(this, false));</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_SHORT,    new SimpleFormat.FShort(this, true));</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_SHORT_W,  new SimpleFormat.FShort(this, false));</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_INT,      new SimpleFormat.FInt(this, true));</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_INT_W,    new SimpleFormat.FInt(this, false));</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_LONG,     new SimpleFormat.FLong(this, true));</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_LONG_W,   new SimpleFormat.FLong(this, false));</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_FLOAT,    new SimpleFormat.FFloat(this, true));</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_FLOAT_W,  new SimpleFormat.FFloat(this, false));</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_DOUBLE,   new SimpleFormat.FDouble(this, true));</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_DOUBLE_W, new SimpleFormat.FDouble(this, false));</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_CHAR,     new SimpleFormat.FChar(this, true));</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_CHAR_W,   new SimpleFormat.FChar(this, false));</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_STRING,   new SimpleFormat.FString(this));</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_BIGINT,   new SimpleFormat.FBigInt(this));</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_BIGDEC,   new SimpleFormat.FBigDec(this));</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setFormat(Format.ID_DATE,     new SimpleFormat.FDate(this));</div>
+<div>180&emsp;&emsp;</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Tell primitives about their wrapper class. */</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setWrapper(Format.ID_BOOL, Format.ID_BOOL_W);</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setWrapper(Format.ID_BYTE, Format.ID_BYTE_W);</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setWrapper(Format.ID_SHORT, Format.ID_SHORT_W);</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setWrapper(Format.ID_INT, Format.ID_INT_W);</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setWrapper(Format.ID_LONG, Format.ID_LONG_W);</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setWrapper(Format.ID_FLOAT, Format.ID_FLOAT_W);</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setWrapper(Format.ID_DOUBLE, Format.ID_DOUBLE_W);</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setWrapper(Format.ID_CHAR, Format.ID_CHAR_W);</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>191&emsp;&emsp;</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Sets a format for which space in the formatList has been preallocated,</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * and makes it the current format for the class.</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void setFormat(int id, SimpleFormat format) {</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        format.setId(id);</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        format.initializeIfNeeded(this, null /*model*/);</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        formatList.set(id, format);</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        formatMap.put(format.getClassName(), format);</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>202&emsp;&emsp;</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Tells a primitive format about the format for its corresponding</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * primitive wrapper class.</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void setWrapper(int primitiveId, int wrapperId) {</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        SimpleFormat primitiveFormat = formatList.get(primitiveId);</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        SimpleFormat wrapperFormat = formatList.get(wrapperId);</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        primitiveFormat.setWrapperFormat(wrapperFormat);</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>212&emsp;&emsp;</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public int getInitVersion(Format format, boolean forReader) {</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Catalog.CURRENT_VERSION;</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>216&emsp;&emsp;</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Format getFormat(int formatId, boolean expectStored) {</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Format format;</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            format = formatList.get(formatId);</div>
+<div style="background-color:limegreen;">221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (format == null) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL]</b></div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw DbCompat.unexpectedState</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    ("Not a simple type: " + formatId);</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return format;</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (NoSuchElementException e) {</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw DbCompat.unexpectedState</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                ("Not a simple type: " + formatId);</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>231&emsp;&emsp;</div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Format getFormat(Class cls, boolean checkEntitySubclassIndexes) {</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Format format = formatMap.get(cls.getName());</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (format == null) {</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new IllegalArgumentException</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                ("Not a simple type: " + cls.getName());</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return format;</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>240&emsp;&emsp;</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Format getFormat(String className) {</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return formatMap.get(className);</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>244&emsp;&emsp;</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Format createFormat(String clsName,</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                               Map&#60;String, Format> newFormats) {</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw DbCompat.unexpectedState();</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>249&emsp;&emsp;</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Format createFormat(Class type, Map&#60;String, Format> newFormats) {</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw DbCompat.unexpectedState();</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>253&emsp;&emsp;</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isRawAccess() {</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return false;</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>257&emsp;&emsp;</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Object convertRawObject(RawObject o, IdentityHashMap converted) {</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw DbCompat.unexpectedState();</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>261&emsp;&emsp;</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Class resolveClass(String clsName)</div>
+<div>263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws ClassNotFoundException {</div>
+<div>264&emsp;&emsp;</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return SimpleCatalog.resolveClass(clsName, classLoader);</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>267&emsp;&emsp;</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Class resolveKeyClass(String clsName) {</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return SimpleCatalog.resolveKeyClass(clsName, classLoader);</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Registering proxy is not allowed for SimpleType. */</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static boolean allowRegisterProxy(Class type) {</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return !isSimpleType(type);</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>276&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

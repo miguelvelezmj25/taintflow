@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>INLogEntry.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*-</div>
+<div>2&emsp;&emsp;&nbsp; * Copyright (C) 2002, 2017, Oracle and/or its affiliates. All rights reserved.</div>
+<div>3&emsp;&emsp;&nbsp; *</div>
+<div>4&emsp;&emsp;&nbsp; * This file was distributed by Oracle as part of a version of Oracle Berkeley</div>
+<div>5&emsp;&emsp;&nbsp; * DB Java Edition made available at:</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; * http://www.oracle.com/technetwork/database/database-technologies/berkeleydb/downloads/index.html</div>
+<div>8&emsp;&emsp;&nbsp; *</div>
+<div>9&emsp;&emsp;&nbsp; * Please see the LICENSE file included in the top-level directory of the</div>
+<div>10&emsp;&emsp;&nbsp; * appropriate version of Oracle Berkeley DB Java Edition for a copy of the</div>
+<div>11&emsp;&emsp;&nbsp; * license and additional information.</div>
+<div>12&emsp;&emsp;&nbsp; */</div>
+<div>13&emsp;&emsp;</div>
+<div>14&emsp;&emsp;package berkeley.com.sleepycat.je.log.entry;</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;import static berkeley.com.sleepycat.je.EnvironmentFailureException.unexpectedState;</div>
+<div>17&emsp;&emsp;</div>
+<div>18&emsp;&emsp;import java.nio.ByteBuffer;</div>
+<div>19&emsp;&emsp;</div>
+<div>20&emsp;&emsp;import berkeley.com.sleepycat.je.dbi.DatabaseId;</div>
+<div>21&emsp;&emsp;import berkeley.com.sleepycat.je.dbi.DatabaseImpl;</div>
+<div>22&emsp;&emsp;import berkeley.com.sleepycat.je.dbi.EnvironmentImpl;</div>
+<div>23&emsp;&emsp;import berkeley.com.sleepycat.je.log.LogEntryHeader;</div>
+<div>24&emsp;&emsp;import berkeley.com.sleepycat.je.log.LogEntryType;</div>
+<div>25&emsp;&emsp;import berkeley.com.sleepycat.je.log.LogUtils;</div>
+<div>26&emsp;&emsp;import berkeley.com.sleepycat.je.tree.BIN;</div>
+<div>27&emsp;&emsp;import berkeley.com.sleepycat.je.tree.IN;</div>
+<div>28&emsp;&emsp;import berkeley.com.sleepycat.je.utilint.DbLsn;</div>
+<div>29&emsp;&emsp;</div>
+<div>30&emsp;&emsp;/**</div>
+<div>31&emsp;&emsp;&nbsp; * - INLogEntry is used to read/write full-version IN logrecs.</div>
+<div>32&emsp;&emsp;&nbsp; *</div>
+<div>33&emsp;&emsp;&nbsp; * - BINDeltaLogEntry subclasses INLogEntry and is used to read/write</div>
+<div>34&emsp;&emsp;&nbsp; *   BIN-delta logrecs for log versions 9 or later.</div>
+<div>35&emsp;&emsp;&nbsp; *</div>
+<div>36&emsp;&emsp;&nbsp; * - OldBINDeltaLogEntry is used to read/write BIN-delta logrecs for</div>
+<div>37&emsp;&emsp;&nbsp; *   log versions earlier than 9. OldBINDeltaLogEntry is not a subclass</div>
+<div>38&emsp;&emsp;&nbsp; *   of INLogEntry.</div>
+<div>39&emsp;&emsp;&nbsp; *</div>
+<div>40&emsp;&emsp;&nbsp; * On disk, a full IN logrec contains:</div>
+<div>41&emsp;&emsp;&nbsp; * </div>
+<div>42&emsp;&emsp;&nbsp; * &#60;pre></div>
+<div>43&emsp;&emsp;&nbsp; * (3 &#60;= version &#60; 6)</div>
+<div>44&emsp;&emsp;&nbsp; *        IN</div>
+<div>45&emsp;&emsp;&nbsp; *        database id</div>
+<div>46&emsp;&emsp;&nbsp; *        prevFullLsn  -- in version 2</div>
+<div>47&emsp;&emsp;&nbsp; *</div>
+<div>48&emsp;&emsp;&nbsp; * (6 &#60;= version &#60; 8)</div>
+<div>49&emsp;&emsp;&nbsp; *        database id</div>
+<div>50&emsp;&emsp;&nbsp; *        prevFullLsn</div>
+<div>51&emsp;&emsp;&nbsp; *        IN</div>
+<div>52&emsp;&emsp;&nbsp; *</div>
+<div>53&emsp;&emsp;&nbsp; * (8 &#60;= version)</div>
+<div>54&emsp;&emsp;&nbsp; *        database id</div>
+<div>55&emsp;&emsp;&nbsp; *        prevFullLsn</div>
+<div>56&emsp;&emsp;&nbsp; *        prevDeltaLsn</div>
+<div>57&emsp;&emsp;&nbsp; *        IN</div>
+<div>58&emsp;&emsp;&nbsp; * &#60;/pre></div>
+<div>59&emsp;&emsp;&nbsp; *</div>
+<div>60&emsp;&emsp;&nbsp; *  On disk, a BIN-delta logrec written via the BINDeltaLogEntry contains:</div>
+<div>61&emsp;&emsp;&nbsp; *</div>
+<div>62&emsp;&emsp;&nbsp; * &#60;pre></div>
+<div>63&emsp;&emsp;&nbsp; * (version == 9)</div>
+<div>64&emsp;&emsp;&nbsp; *        database id</div>
+<div>65&emsp;&emsp;&nbsp; *        prevFullLsn  -- always NULL</div>
+<div>66&emsp;&emsp;&nbsp; *        prevDeltaLsn</div>
+<div>67&emsp;&emsp;&nbsp; *        BIN (dirty slots only)</div>
+<div>68&emsp;&emsp;&nbsp; *        prevFullLsn</div>
+<div>69&emsp;&emsp;&nbsp; *</div>
+<div>70&emsp;&emsp;&nbsp; * (version >= 10)</div>
+<div>71&emsp;&emsp;&nbsp; *        database id</div>
+<div>72&emsp;&emsp;&nbsp; *        prevFullLsn</div>
+<div>73&emsp;&emsp;&nbsp; *        prevDeltaLsn</div>
+<div>74&emsp;&emsp;&nbsp; *        BIN (dirty slots only and including the new fullBinNEntries and</div>
+<div>75&emsp;&emsp;&nbsp; *             fullBinMaxEntries fields) </div>
+<div>76&emsp;&emsp;&nbsp; * &#60;/pre></div>
+<div>77&emsp;&emsp;&nbsp; *</div>
+<div>78&emsp;&emsp;&nbsp; */</div>
+<div>79&emsp;&emsp;public class INLogEntry&#60;T extends IN> extends BaseEntry&#60;T></div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    implements LogEntry, INContainingEntry {</div>
+<div>81&emsp;&emsp;</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Persistent fields in an IN entry.</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>85&emsp;&emsp;</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private DatabaseId dbId;</div>
+<div>87&emsp;&emsp;</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * this.in may be a (a) UIN, (b) full BIN, or (c) BIN delta.</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * In case (a), "this" is a INLogEntry</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * In case (c), "this" is a BINDeltaLogEntry instance.</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * In case (b), "this" may be either a INLogEntry or a BINDeltaLogEntry</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * instance. It will be a BINDeltaLogEntry instance, if "this" is used</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * to log a full in-memory BIN as a BIN-delta.</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private T in;</div>
+<div>97&emsp;&emsp;</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * If non-null, used to write a pre-serialized log entry. In this case the</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * 'in' field is null.</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private ByteBuffer inBytes;</div>
+<div>103&emsp;&emsp;</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The lsn of the previous full-version logrec for the same IN.</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * See comment above about the evolution of this field.</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private long prevFullLsn;</div>
+<div>110&emsp;&emsp;</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * If this is a BIN logrec and the previous logrec for the same BIN was</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * a BIN-delta, prevDeltaLsn is the lsn of that previous logrec. Otherwise,</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * prevDeltaLsn is NULL.</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * See comment above about the evolution of this field.</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private long prevDeltaLsn;</div>
+<div>119&emsp;&emsp;</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Construct a log entry for reading.</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static &#60;T extends IN> INLogEntry&#60;T> create(final Class&#60;T> INClass) {</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return new INLogEntry&#60;T>(INClass);</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>126&emsp;&emsp;</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    INLogEntry(Class&#60;T> INClass) {</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        super(INClass);</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>130&emsp;&emsp;</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Construct an INLogEntry for writing to the log.</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public INLogEntry(T in) {</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this(in, false /*isBINDelta*/);</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>137&emsp;&emsp;</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Used by both INLogEntry and BINDeltaLogEntry for writing to the log.</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    INLogEntry(T in, boolean isBINDelta) {</div>
+<div>142&emsp;&emsp;</div>
+<div style="background-color:limegreen;">143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        setLogType(isBINDelta ? LogEntryType.LOG_BIN_DELTA : in.getLogType());&nbsp;&#8594; [ALLOWCREATE, READONLY]</b></div>
+<div>144&emsp;&emsp;</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        dbId = in.getDatabase().getId();</div>
+<div>146&emsp;&emsp;</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.in = in;</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        inBytes = null;</div>
+<div>149&emsp;&emsp;</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        prevFullLsn = in.getLastFullLsn();</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        prevDeltaLsn = in.getLastDeltaLsn();</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>153&emsp;&emsp;</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Used to write a pre-serialized log entry.</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public INLogEntry(final ByteBuffer bytes,</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                      final long lastFullLsn,</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                      final long lastDeltaLsn,</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                      final LogEntryType logEntryType,</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                      final IN parent) {</div>
+<div>162&emsp;&emsp;</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        setLogType(logEntryType);</div>
+<div>164&emsp;&emsp;</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        dbId = parent.getDatabase().getId();</div>
+<div>166&emsp;&emsp;</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        in = null;</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        inBytes = bytes;</div>
+<div>169&emsp;&emsp;</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        prevFullLsn = lastFullLsn;</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        prevDeltaLsn = lastDeltaLsn;</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>173&emsp;&emsp;</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Whether this LogEntry reads/writes a BIN-Delta logrec.</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Overriden by the BINDeltaLogEntry subclass.</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isBINDelta() {</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return false;</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>182&emsp;&emsp;</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public DatabaseId getDbId() {</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return dbId;</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>187&emsp;&emsp;</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public long getPrevFullLsn() {</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return prevFullLsn;</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>192&emsp;&emsp;</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public long getPrevDeltaLsn() {</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return prevDeltaLsn;</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>197&emsp;&emsp;</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public T getMainItem() {</div>
+<div style="background-color:limegreen;">200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        assert inBytes == null;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>201&emsp;&emsp;</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return in;</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>204&emsp;&emsp;</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public IN getIN(DatabaseImpl dbImpl) {</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        assert inBytes == null;</div>
+<div>208&emsp;&emsp;</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return in;</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>211&emsp;&emsp;</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public long getNodeId() {</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        assert inBytes == null;</div>
+<div>214&emsp;&emsp;</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return in.getNodeId();</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>217&emsp;&emsp;</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isPreSerialized() {</div>
+<div style="background-color:limegreen;">219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return inBytes != null;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>221&emsp;&emsp;</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the main item BIN if it has any slots with expiration times.</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Must only be called if this entry's type is BIN or BIN_DELTA.</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * This method is called for expiration tracking because getMainItem and</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * getIN cannot be called on an INLogEntry logging parameter, since it may</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * be in pre-serialize form when it appears in the off-heap cache.</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public BIN getBINWithExpiration() {</div>
+<div>231&emsp;&emsp;</div>
+<div style="background-color:limegreen;">232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (inBytes != null) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            final BIN bin = new BIN();</div>
+<div style="background-color:limegreen;">234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (!bin.mayHaveExpirationValues(&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                inBytes, LogEntryType.LOG_VERSION)) {</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return null;</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            inBytes.mark();</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            readMainItem((T) bin, inBytes, LogEntryType.LOG_VERSION);</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            inBytes.reset();</div>
+<div style="background-color:limegreen;">241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            return bin.hasExpirationValues() ? bin : null;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>243&emsp;&emsp;</div>
+<div style="background-color:limegreen;">244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        assert in.isBIN();&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final BIN bin = (BIN) in;</div>
+<div style="background-color:limegreen;">246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return bin.hasExpirationValues() ? bin : null;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>248&emsp;&emsp;</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Read support</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>252&emsp;&emsp;</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void readEntry(</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        EnvironmentImpl envImpl,</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LogEntryHeader header,</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ByteBuffer entryBuffer) {</div>
+<div>258&emsp;&emsp;</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        assert inBytes == null;</div>
+<div>260&emsp;&emsp;</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int logVersion = header.getVersion();</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean version6OrLater = (logVersion >= 6);</div>
+<div>263&emsp;&emsp;</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (logVersion &#60; 2) {</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw unexpectedState(</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                "Attempt to read from log file with version " +</div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                logVersion + ", which is not supported any more");</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>269&emsp;&emsp;</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (version6OrLater) {</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            dbId = new DatabaseId();</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            dbId.readFromLog(entryBuffer, logVersion);</div>
+<div>273&emsp;&emsp;</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            prevFullLsn = LogUtils.readLong(entryBuffer, false/*unpacked*/);</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (logVersion >= 8) {</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                prevDeltaLsn = LogUtils.readPackedLong(entryBuffer);</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } else {</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                prevDeltaLsn = DbLsn.NULL_LSN;</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>281&emsp;&emsp;</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /* Read IN. */</div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        in = newInstanceOfType();</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        readMainItem(in, entryBuffer, logVersion);</div>
+<div>285&emsp;&emsp;</div>
+<div>286&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (!version6OrLater) {</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            dbId = new DatabaseId();</div>
+<div>288&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            dbId.readFromLog(entryBuffer, logVersion);</div>
+<div>289&emsp;&emsp;</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            prevFullLsn = LogUtils.readLong(entryBuffer, true/*unpacked*/);</div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            prevDeltaLsn = DbLsn.NULL_LSN;</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>294&emsp;&emsp;</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void readMainItem(T in, ByteBuffer entryBuffer, int logVersion) {</div>
+<div>296&emsp;&emsp;</div>
+<div style="background-color:limegreen;">297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (isBINDelta()) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div style="background-color:limegreen;">298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            assert(logVersion >= 9);&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY] & [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>299&emsp;&emsp;</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            in.readFromLog(</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                entryBuffer, logVersion, true /*deltasOnly*/);</div>
+<div>302&emsp;&emsp;</div>
+<div style="background-color:limegreen;">303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (logVersion == 9) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                prevFullLsn = LogUtils.readPackedLong(entryBuffer);</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>306&emsp;&emsp;</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            in.setLastFullLsn(prevFullLsn);</div>
+<div>308&emsp;&emsp;</div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            in.readFromLog(entryBuffer, logVersion);</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>313&emsp;&emsp;</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Writing support</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public int getSize() {</div>
+<div>319&emsp;&emsp;</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final int inSize;</div>
+<div>321&emsp;&emsp;</div>
+<div style="background-color:limegreen;">322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (inBytes != null) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            inSize = inBytes.remaining();</div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            inSize = in.getLogSize(isBINDelta());</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>327&emsp;&emsp;</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (inSize +</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                dbId.getLogSize() +</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                LogUtils.getPackedLongLogSize(prevFullLsn) +</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                LogUtils.getPackedLongLogSize(prevDeltaLsn));</div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>333&emsp;&emsp;</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void writeEntry(ByteBuffer destBuffer) {</div>
+<div>336&emsp;&emsp;</div>
+<div>337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        dbId.writeToLog(destBuffer);</div>
+<div>338&emsp;&emsp;</div>
+<div>339&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LogUtils.writePackedLong(destBuffer, prevFullLsn);</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LogUtils.writePackedLong(destBuffer, prevDeltaLsn);</div>
+<div>341&emsp;&emsp;</div>
+<div style="background-color:limegreen;">342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (inBytes != null) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            final int pos = inBytes.position();</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            destBuffer.put(inBytes);</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            inBytes.position(pos);</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            in.writeToLog(destBuffer, isBINDelta());</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>350&emsp;&emsp;</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public long getTransactionId() {</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return 0;</div>
+<div>354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>355&emsp;&emsp;</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * INs from two different environments are never considered equal,</div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * because they have lsns that are environment-specific.</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean logicalEquals(@SuppressWarnings("unused") LogEntry other) {</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return false;</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>364&emsp;&emsp;</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public StringBuilder dumpEntry(StringBuilder sb, boolean verbose) {</div>
+<div>367&emsp;&emsp;</div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        dbId.dumpLog(sb, verbose);</div>
+<div>369&emsp;&emsp;</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (inBytes != null) {</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append("&#60;INBytes len=\"");</div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append(inBytes.remaining());</div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append("\"/>");</div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            in.dumpLog(sb, verbose);</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>377&emsp;&emsp;</div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (prevFullLsn != DbLsn.NULL_LSN) {</div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append("&#60;prevFullLsn>");</div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append(DbLsn.getNoFormatString(prevFullLsn));</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append("&#60;/prevFullLsn>");</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (prevDeltaLsn != DbLsn.NULL_LSN) {</div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append("&#60;prevDeltaLsn>");</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append(DbLsn.getNoFormatString(prevDeltaLsn));</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            sb.append("&#60;/prevDeltaLsn>");</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return sb;</div>
+<div>389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>390&emsp;&emsp;</div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** Never replicated. */</div>
+<div>392&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void dumpRep(@SuppressWarnings("unused") StringBuilder sb) {</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>394&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LNFileReader.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*-</div>
+<div>2&emsp;&emsp;&nbsp; * Copyright (C) 2002, 2017, Oracle and/or its affiliates. All rights reserved.</div>
+<div>3&emsp;&emsp;&nbsp; *</div>
+<div>4&emsp;&emsp;&nbsp; * This file was distributed by Oracle as part of a version of Oracle Berkeley</div>
+<div>5&emsp;&emsp;&nbsp; * DB Java Edition made available at:</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; * http://www.oracle.com/technetwork/database/database-technologies/berkeleydb/downloads/index.html</div>
+<div>8&emsp;&emsp;&nbsp; *</div>
+<div>9&emsp;&emsp;&nbsp; * Please see the LICENSE file included in the top-level directory of the</div>
+<div>10&emsp;&emsp;&nbsp; * appropriate version of Oracle Berkeley DB Java Edition for a copy of the</div>
+<div>11&emsp;&emsp;&nbsp; * license and additional information.</div>
+<div>12&emsp;&emsp;&nbsp; */</div>
+<div>13&emsp;&emsp;</div>
+<div>14&emsp;&emsp;package berkeley.com.sleepycat.je.log;</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;import java.nio.ByteBuffer;</div>
+<div>17&emsp;&emsp;import java.util.HashMap;</div>
+<div>18&emsp;&emsp;import java.util.Map;</div>
+<div>19&emsp;&emsp;</div>
+<div>20&emsp;&emsp;import javax.transaction.xa.Xid;</div>
+<div>21&emsp;&emsp;</div>
+<div>22&emsp;&emsp;import berkeley.com.sleepycat.je.DatabaseException;</div>
+<div>23&emsp;&emsp;import berkeley.com.sleepycat.je.dbi.DatabaseId;</div>
+<div>24&emsp;&emsp;import berkeley.com.sleepycat.je.dbi.EnvironmentImpl;</div>
+<div>25&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.LNLogEntry;</div>
+<div>26&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.LogEntry;</div>
+<div>27&emsp;&emsp;import berkeley.com.sleepycat.je.log.entry.NameLNLogEntry;</div>
+<div>28&emsp;&emsp;import berkeley.com.sleepycat.je.txn.RollbackEnd;</div>
+<div>29&emsp;&emsp;import berkeley.com.sleepycat.je.txn.RollbackStart;</div>
+<div>30&emsp;&emsp;import berkeley.com.sleepycat.je.txn.TxnAbort;</div>
+<div>31&emsp;&emsp;import berkeley.com.sleepycat.je.txn.TxnCommit;</div>
+<div>32&emsp;&emsp;import berkeley.com.sleepycat.je.txn.TxnPrepare;</div>
+<div>33&emsp;&emsp;</div>
+<div>34&emsp;&emsp;/**</div>
+<div>35&emsp;&emsp;&nbsp; * LNFileReader scans log files for LNs. Also, if it's going backwards for the</div>
+<div>36&emsp;&emsp;&nbsp; * undo phase in recovery, it reads transaction commit entries.</div>
+<div>37&emsp;&emsp;&nbsp; */</div>
+<div>38&emsp;&emsp;public class LNFileReader extends FileReader {</div>
+<div>39&emsp;&emsp;</div>
+<div>40&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>41&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * targetEntryMap maps DbLogEntryTypes to log entries. We use this</div>
+<div>42&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * collection to find the right LogEntry instance to read in the current</div>
+<div>43&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * entry.</div>
+<div>44&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Map&#60;LogEntryType, LogEntry> targetEntryMap;</div>
+<div>46&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected LogEntry targetLogEntry;</div>
+<div>47&emsp;&emsp;</div>
+<div>48&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private long ckptEnd;</div>
+<div>49&emsp;&emsp;</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Create this reader to start at a given LSN.</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param env The relevant EnvironmentImpl</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param readBufferSize buffer size in bytes for reading in log</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param startLsn where to start in the log</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param redo If true, we're going to go forward from</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *             the start LSN to the end of the log. If false, we're going</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *             backwards from the end of the log to the start LSN.</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param finishLsn the last LSN to read in the log. May be null if we</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *  want to read to the end of the log.</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param endOfFileLsn the virtual LSN that marks the end of the log. (The</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *  one off the end of the log). Only used if we're reading backwards.</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *  Different from the startLsn because the startLsn tells us where the</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *  beginning of the start entry is, but not the length/end of the start</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *  entry. May be null if we're going foward.</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public LNFileReader(EnvironmentImpl env,</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        int readBufferSize,</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        long startLsn,</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        boolean redo,</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        long endOfFileLsn,</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        long finishLsn,</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        Long singleFileNum,</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        long ckptEnd)</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>75&emsp;&emsp;</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        super(env, readBufferSize, redo /*forward*/, startLsn,</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              singleFileNum, endOfFileLsn, finishLsn);</div>
+<div>78&emsp;&emsp;</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        this.ckptEnd = ckptEnd;</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        targetEntryMap = new HashMap&#60;LogEntryType, LogEntry>();</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>82&emsp;&emsp;</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void addTargetType(LogEntryType entryType)</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>85&emsp;&emsp;</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        targetEntryMap.put(entryType, entryType.getNewLogEntry());</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>88&emsp;&emsp;</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return true if this is a transactional LN or Locker Commit entry.</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected boolean isTargetEntry() {</div>
+<div>94&emsp;&emsp;</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (currentEntryHeader.getProvisional().isProvisional</div>
+<div style="background-color:limegreen;">96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            (getLastLsn(), ckptEnd)) {&nbsp;&#8594; [ALLOWCREATE]</b></div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            /* Skip provisionial entries */</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            targetLogEntry = null;</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            LogEntryType fromLogType =</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                new LogEntryType(currentEntryHeader.getType());</div>
+<div>102&emsp;&emsp;</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            /* Is it a target entry? */</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            targetLogEntry = targetEntryMap.get(fromLogType);</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div style="background-color:limegreen;">106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return (targetLogEntry != null);&nbsp;&#8594; [ALLOWCREATE]</b></div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>108&emsp;&emsp;</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * This reader instantiates an LN and key for every LN entry.</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected boolean processEntry(ByteBuffer entryBuffer)</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>115&emsp;&emsp;</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        targetLogEntry.readEntry(envImpl, currentEntryHeader, entryBuffer);</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return true;</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>119&emsp;&emsp;</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return true if the last entry was an LN.</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isLN() {</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (targetLogEntry instanceof LNLogEntry);</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>126&emsp;&emsp;</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get the last LN log entry seen by the reader.  Note that</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * LNLogEntry.postFetchInit must be called before calling certain</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * LNLogEntry methods.</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public LNLogEntry&#60;?> getLNLogEntry() {</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (LNLogEntry&#60;?>) targetLogEntry;</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>135&emsp;&emsp;</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns a NameLNLogEntry if the LN is a NameLN, or null otherwise.</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public NameLNLogEntry getNameLNLogEntry() {</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (targetLogEntry instanceof NameLNLogEntry) ?</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ((NameLNLogEntry) targetLogEntry) :</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            null;</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>144&emsp;&emsp;</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get the last databaseId seen by the reader.</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public DatabaseId getDatabaseId() {</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return targetLogEntry.getDbId();</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>151&emsp;&emsp;</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the transaction id of the current entry.</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Long getTxnId() {</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ((LNLogEntry&#60;?>) targetLogEntry).getTxnId();</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>158&emsp;&emsp;</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return true if the last entry was a TxnPrepare record.</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isPrepare() {</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (targetLogEntry.getMainItem() instanceof TxnPrepare);</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>165&emsp;&emsp;</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get the last txn prepare id seen by the reader.</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public long getTxnPrepareId() {</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ((TxnPrepare) targetLogEntry.getMainItem()).getId();</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>172&emsp;&emsp;</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get the last txn prepare Xid seen by the reader.</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Xid getTxnPrepareXid() {</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ((TxnPrepare) targetLogEntry.getMainItem()).getXid();</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>179&emsp;&emsp;</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return true if the last entry was a TxnCommit record.</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isCommit() {</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (targetLogEntry.getMainItem() instanceof TxnCommit);</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>186&emsp;&emsp;</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return true if the last entry was a RollbackStart record.</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isRollbackStart() {</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (targetLogEntry.getMainItem() instanceof RollbackStart);</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>193&emsp;&emsp;</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return true if the last entry was a RollbackStart record.</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isRollbackEnd() {</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (targetLogEntry.getMainItem() instanceof RollbackEnd);</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>200&emsp;&emsp;</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Object getMainItem() {</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return targetLogEntry.getMainItem();</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>204&emsp;&emsp;</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For error message.</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String dumpCurrentHeader() {</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return currentEntryHeader.toString();</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>211&emsp;&emsp;</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return true if the last entry was a TxnAbort record.</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isAbort() {</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (targetLogEntry.getMainItem() instanceof TxnAbort);</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>218&emsp;&emsp;</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get the last txn abort id seen by the reader.</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public long getTxnAbortId() {</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ((TxnAbort) targetLogEntry.getMainItem()).getId();</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>225&emsp;&emsp;</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get the last txn commit id seen by the reader.</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public long getTxnCommitId() {</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ((TxnCommit) targetLogEntry.getMainItem()).getId();</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>232&emsp;&emsp;</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get last abort LSN seen by the reader (may be null).</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public long getAbortLsn() {</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ((LNLogEntry&#60;?>) targetLogEntry).getAbortLsn();</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>239&emsp;&emsp;</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get last abort known deleted seen by the reader.</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean getAbortKnownDeleted() {</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ((LNLogEntry&#60;?>) targetLogEntry).getAbortKnownDeleted();</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>246&emsp;&emsp;</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isInvisible() {</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return currentEntryHeader.isInvisible();</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>250&emsp;&emsp;</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Return the VLSN if this entry is in replicated stream.</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public long getVLSN() {</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        assert entryIsReplicated();</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return currentEntryHeader.getVLSN().getSequence();</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>258&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>
