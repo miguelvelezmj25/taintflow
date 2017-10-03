@@ -66,8 +66,8 @@ public class AnalysisTest {
 
         AnalysisTest.infoflowConfiguration.setCodeEliminationMode(InfoflowConfiguration.CodeEliminationMode.NoCodeElimination);
         AnalysisTest.infoflowConfiguration.setAccessPathLength(1);
-        AnalysisTest.infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.FlowInsensitive);
-//        AnalysisTest.infoflowConfiguration.setMaxThreadNum(1);
+        AnalysisTest.infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.ContextFlowSensitive);
+        AnalysisTest.infoflowConfiguration.setMaxThreadNum(1);
 
         AnalysisTest.infoflowConfiguration.setInspectSources(false);
         AnalysisTest.infoflowConfiguration.setInspectSinks(false);
@@ -85,9 +85,7 @@ public class AnalysisTest {
 
 
         AnalysisTest.infoflowConfiguration.setSequentialPathProcessing(true);
-//        AnalysisTest.infoflowConfiguration.setDataFlowTimeout(300);
-
-
+        AnalysisTest.infoflowConfiguration.setDataFlowTimeout(900);
 
         // Incorrect results
 //        AnalysisTest.infoflowConfiguration.setIgnoreFlowsInSystemPackages(true);
@@ -96,16 +94,6 @@ public class AnalysisTest {
         // Config soot
         AnalysisTest.sootConfiguration = new SootConfig();
     }
-
-//    @Before
-//    public void beforeTest() {
-//        infoflow.getSources() = new ArrayList<>();
-//        infoflow.getSources().add("<edu.cmu.cs.mvelezce.analysis.Source: boolean getOptionA()>");
-//        infoflow.getSources().add("<edu.cmu.cs.mvelezce.analysis.Source: boolean getOptionB()>");
-//
-//        infoflow.getSinks() = new ArrayList<>();
-//        infoflow.getSinks().add("<edu.cmu.cs.mvelezce.analysis.Sink: boolean getDecision(boolean)>");
-//    }
 
     @Test
     public void interaction0_1() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
@@ -1824,7 +1812,7 @@ public class AnalysisTest {
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, false));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
 
         // Add taint wrapper
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
@@ -1909,14 +1897,14 @@ public class AnalysisTest {
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, false));
 
         // Add taint wrapper
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<berkeley.persist.gettingStarted.ExampleInventoryRead: void main(java.lang.String[])>";
+        String entryPoint = "<berkeley.persist.gettingStarted.ExampleDatabasePut: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -1926,7 +1914,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(1);
+        infoflow.aggregateInfoflowResults(8322);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 

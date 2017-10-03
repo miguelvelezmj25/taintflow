@@ -51,25 +51,25 @@ public class TaintInfoflow extends Infoflow {
     protected void constructCallgraph() {
         super.constructCallgraph();
 
-//        Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
-//        PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink", ControlFlowSink.v()));
-////        PackManager.v().getPack("jtp").add(new Transform("jtp.trycatchlabelnop", TryCatchLabelNop.v()));
-////        PackManager.v().getPack("jtp").add(new Transform("jtp.nop", Nop.v()));
+        Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
+        PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink", ControlFlowSink.v()));
+//        PackManager.v().getPack("jtp").add(new Transform("jtp.trycatchlabelnop", TryCatchLabelNop.v()));
+//        PackManager.v().getPack("jtp").add(new Transform("jtp.nop", Nop.v()));
+
+        while (iter.hasNext()) {
+            MethodOrMethodContext m = iter.next();
+            SootMethod method = m.method();
 //
-//        while (iter.hasNext()) {
-//            MethodOrMethodContext m = iter.next();
-//            SootMethod method = m.method();
-////
-//            String methodPackage = method.getDeclaringClass().getPackageName();
-//
-//            for(String packageName : this.packages) {
-////                if((!method.getDeclaringClass().isJavaLibraryClass() || !method.getDeclaringClass().isPhantomClass())
-////                    /*&& methodPackage.contains(packageName)*/ && method.hasActiveBody()) {
-//                if(methodPackage.contains(packageName) && method.hasActiveBody()) {
-//                    PackManager.v().getPack("jtp").apply(method.getActiveBody());
-//                }
-//            }
-//        }
+            String methodPackage = method.getDeclaringClass().getPackageName();
+
+            for(String packageName : this.packages) {
+//                if((!method.getDeclaringClass().isJavaLibraryClass() || !method.getDeclaringClass().isPhantomClass())
+//                    /*&& methodPackage.contains(packageName)*/ && method.hasActiveBody()) {
+                if(methodPackage.contains(packageName) && method.hasActiveBody()) {
+                    PackManager.v().getPack("jtp").apply(method.getActiveBody());
+                }
+            }
+        }
     }
 
     public void aggregateInfoflowResults(int count) throws IOException {
@@ -111,7 +111,7 @@ public class TaintInfoflow extends Infoflow {
 
         System.out.println("\n############## STATS");
         System.out.println("Number of results: " + aggregatedResults.size() + "\n");
-        assert aggregatedResults.size() == count;
+//        assert aggregatedResults.size() == count;
         this.calculateOptionToSinkCount(aggregatedResults);
         this.calculateInteractionOrder(aggregatedResults);
     }

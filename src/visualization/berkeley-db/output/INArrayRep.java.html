@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>INArrayRep.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*-</div>
+<div>2&emsp;&emsp;&nbsp; * Copyright (C) 2002, 2017, Oracle and/or its affiliates. All rights reserved.</div>
+<div>3&emsp;&emsp;&nbsp; *</div>
+<div>4&emsp;&emsp;&nbsp; * This file was distributed by Oracle as part of a version of Oracle Berkeley</div>
+<div>5&emsp;&emsp;&nbsp; * DB Java Edition made available at:</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; * http://www.oracle.com/technetwork/database/database-technologies/berkeleydb/downloads/index.html</div>
+<div>8&emsp;&emsp;&nbsp; *</div>
+<div>9&emsp;&emsp;&nbsp; * Please see the LICENSE file included in the top-level directory of the</div>
+<div>10&emsp;&emsp;&nbsp; * appropriate version of Oracle Berkeley DB Java Edition for a copy of the</div>
+<div>11&emsp;&emsp;&nbsp; * license and additional information.</div>
+<div>12&emsp;&emsp;&nbsp; */</div>
+<div>13&emsp;&emsp;package berkeley.com.sleepycat.je.tree;</div>
+<div>14&emsp;&emsp;</div>
+<div>15&emsp;&emsp;import berkeley.com.sleepycat.je.evictor.Evictor;</div>
+<div>16&emsp;&emsp;</div>
+<div>17&emsp;&emsp;/**</div>
+<div>18&emsp;&emsp;&nbsp; * The base class for the various array representations used by fields</div>
+<div>19&emsp;&emsp;&nbsp; * associated with an IN node. Storage efficiency, especially when JE is</div>
+<div>20&emsp;&emsp;&nbsp; * operating in a "cache full" environment is the prime motivation for the</div>
+<div>21&emsp;&emsp;&nbsp; * various representations.</div>
+<div>22&emsp;&emsp;&nbsp; * &#60;p></div>
+<div>23&emsp;&emsp;&nbsp; * Each representation assumes that all read operations are done under a shared</div>
+<div>24&emsp;&emsp;&nbsp; * latch and all updates (set, copy and compact) are done under an exclusive</div>
+<div>25&emsp;&emsp;&nbsp; * latch. As a result, the representations themselves do not make any</div>
+<div>26&emsp;&emsp;&nbsp; * provisions for synchronization.</div>
+<div>27&emsp;&emsp;&nbsp; * &#60;p></div>
+<div>28&emsp;&emsp;&nbsp; * The callers of all the potentially representation mutating methods:</div>
+<div>29&emsp;&emsp;&nbsp; * &#60;ol></div>
+<div>30&emsp;&emsp;&nbsp; * &#60;li></div>
+<div>31&emsp;&emsp;&nbsp; * {@link #set(int, Object, IN)}</div>
+<div>32&emsp;&emsp;&nbsp; * &#60;/li></div>
+<div>33&emsp;&emsp;&nbsp; * &#60;li></div>
+<div>34&emsp;&emsp;&nbsp; * {@link #copy(int, int, int, IN)}</div>
+<div>35&emsp;&emsp;&nbsp; * &#60;/li></div>
+<div>36&emsp;&emsp;&nbsp; * &#60;li></div>
+<div>37&emsp;&emsp;&nbsp; * {@link #compact(IN)}</div>
+<div>38&emsp;&emsp;&nbsp; * &#60;/li></div>
+<div>39&emsp;&emsp;&nbsp; * &#60;/ol></div>
+<div>40&emsp;&emsp;&nbsp; * must be careful to save the result value and use it for subsequent</div>
+<div>41&emsp;&emsp;&nbsp; * operations, since it could represent the new mutated object.</div>
+<div>42&emsp;&emsp;&nbsp; */</div>
+<div>43&emsp;&emsp;public abstract class INArrayRep&#60;ARRAY_BASE_TYPE, REP_ENUM_TYPE,</div>
+<div>44&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                 ELEMENT_TYPE> {</div>
+<div>45&emsp;&emsp;</div>
+<div>46&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public INArrayRep() {</div>
+<div>47&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>48&emsp;&emsp;</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Returns the type associated with the representation. */</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public abstract REP_ENUM_TYPE getType();</div>
+<div>51&emsp;&emsp;</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Sets the array element at idx to the node. The underlying representation</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * can change as a result of the set operation.</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param idx the index to be set</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param e the array elelement at the idx</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return either this, or the new representation if there was a mutation.</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public abstract ARRAY_BASE_TYPE set(int idx, ELEMENT_TYPE e, IN parent);</div>
+<div>62&emsp;&emsp;</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the element at idx.</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public abstract ELEMENT_TYPE get(int idx);</div>
+<div>67&emsp;&emsp;</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Copies n elements at index denoted by "from" to the index denoted by</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * "to". Overlapping copies are supported. It's possible that the</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * representation may mutate as a result of the copy.</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param from the source (inclusive) of the copy</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param to the target (inclusive) of the copy</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param n the number of elements to be copied.</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return either this, or the new representation if there was a mutation.</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public abstract ARRAY_BASE_TYPE copy(int from, int to, int n, IN parent);</div>
+<div>80&emsp;&emsp;</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Chooses a more compact representation, if that's possible, otherwise</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * does nothing.</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * WARNING: This method must not change the memory size of the current</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * representation and return 'this', without explicitly adjusting memory</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * usage (via noteRepChange) before returning.  Returning a new instance is</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the trigger for adjusting memory usage in the parent.</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return this or a more compact representation.</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public abstract ARRAY_BASE_TYPE compact(IN parent);</div>
+<div>93&emsp;&emsp;</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Changes the capacity, either truncating existing elements at the end if</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the capacity is reduced, or adding empty elements at the end if the</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * capacity is enlarged. The caller guarantees that all truncated elements</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * are unused.</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public abstract ARRAY_BASE_TYPE resize(int capacity);</div>
+<div>101&emsp;&emsp;</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the current memory size of the underlying representation in</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * bytes. It returns the size of the representation, excluding the size of</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the elements contained in it.</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the memory size of the representation in bytes</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public abstract long calculateMemorySize();</div>
+<div>110&emsp;&emsp;</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Update the cache statistics for this representation.</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param increment true the stat should be incremented, false if it must</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * be decremented</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param evictor the evictor that shoulds ths stat counters</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    abstract void updateCacheStats(boolean increment, Evictor evictor);</div>
+<div>119&emsp;&emsp;</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Updates the cache statistics associated with this representation. It</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * should be invoked upon every creation, every rep change and finally when</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the IN node is decached.</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param increment true if the stat is to be incremented, false if it is</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * to be decremented</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final void updateCacheStats(boolean increment, IN parent) {</div>
+<div>129&emsp;&emsp;</div>
+<div style="background-color:limegreen;">130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!parent.getInListResident()) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            /* If the IN is not in the cache don't accumulate stats for it. */</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return;</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>134&emsp;&emsp;</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        updateCacheStats(increment, parent.getEnv().getEvictor());</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>137&emsp;&emsp;</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Performs the bookkeeping associated with a representation change. It</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * accounts for the change in storage and adjusts the cache statistics.</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param newRep the new representation that is replacing this one.</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final void noteRepChange(</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        INArrayRep&#60;ARRAY_BASE_TYPE, REP_ENUM_TYPE, ELEMENT_TYPE> newRep,</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        IN parent) {</div>
+<div>147&emsp;&emsp;</div>
+<div style="background-color:limegreen;">148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (parent == null) {&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL, READONLY]</b></div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            /* Only true in unit tests. */</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return;</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>152&emsp;&emsp;</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        parent.updateMemorySize(newRep.calculateMemorySize() -</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                calculateMemorySize());</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        updateCacheStats(false, parent);</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        newRep.updateCacheStats(true, parent);</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>158&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

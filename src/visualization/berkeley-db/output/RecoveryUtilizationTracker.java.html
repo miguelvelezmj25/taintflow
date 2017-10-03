@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RecoveryUtilizationTracker.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*-</div>
+<div>2&emsp;&emsp;&nbsp; * Copyright (C) 2002, 2017, Oracle and/or its affiliates. All rights reserved.</div>
+<div>3&emsp;&emsp;&nbsp; *</div>
+<div>4&emsp;&emsp;&nbsp; * This file was distributed by Oracle as part of a version of Oracle Berkeley</div>
+<div>5&emsp;&emsp;&nbsp; * DB Java Edition made available at:</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; * http://www.oracle.com/technetwork/database/database-technologies/berkeleydb/downloads/index.html</div>
+<div>8&emsp;&emsp;&nbsp; *</div>
+<div>9&emsp;&emsp;&nbsp; * Please see the LICENSE file included in the top-level directory of the</div>
+<div>10&emsp;&emsp;&nbsp; * appropriate version of Oracle Berkeley DB Java Edition for a copy of the</div>
+<div>11&emsp;&emsp;&nbsp; * license and additional information.</div>
+<div>12&emsp;&emsp;&nbsp; */</div>
+<div>13&emsp;&emsp;</div>
+<div>14&emsp;&emsp;package berkeley.com.sleepycat.je.cleaner;</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;import java.util.HashMap;</div>
+<div>17&emsp;&emsp;import java.util.Map;</div>
+<div>18&emsp;&emsp;</div>
+<div>19&emsp;&emsp;import berkeley.com.sleepycat.je.DatabaseException;</div>
+<div>20&emsp;&emsp;import berkeley.com.sleepycat.je.dbi.DatabaseId;</div>
+<div>21&emsp;&emsp;import berkeley.com.sleepycat.je.dbi.DatabaseImpl;</div>
+<div>22&emsp;&emsp;import berkeley.com.sleepycat.je.dbi.EnvironmentImpl;</div>
+<div>23&emsp;&emsp;import berkeley.com.sleepycat.je.log.LogEntryType;</div>
+<div>24&emsp;&emsp;import berkeley.com.sleepycat.je.utilint.DbLsn;</div>
+<div>25&emsp;&emsp;</div>
+<div>26&emsp;&emsp;/**</div>
+<div>27&emsp;&emsp;&nbsp; * Accumulates changes to the utilization profile during recovery.</div>
+<div>28&emsp;&emsp;&nbsp; *</div>
+<div>29&emsp;&emsp;&nbsp; * &#60;p>Per-database information is keyed by DatabaseId because the DatabaseImpl</div>
+<div>30&emsp;&emsp;&nbsp; * is not always available during recovery.  In fact this is the only reason</div>
+<div>31&emsp;&emsp;&nbsp; * that a "local" tracker is used during recovery -- to avoid requiring that</div>
+<div>32&emsp;&emsp;&nbsp; * the DatabaseImpl is available, which is necessary to use the "global"</div>
+<div>33&emsp;&emsp;&nbsp; * UtilizationTracker.  There is no requirement to accumulate totals locally,</div>
+<div>34&emsp;&emsp;&nbsp; * since recovery is single threaded.&#60;/p></div>
+<div>35&emsp;&emsp;&nbsp; *</div>
+<div>36&emsp;&emsp;&nbsp; * &#60;p>When finished with this object, its information should be added to the</div>
+<div>37&emsp;&emsp;&nbsp; * Environment's UtilizationTracker and DatabaseImpl objects by calling</div>
+<div>38&emsp;&emsp;&nbsp; * transferToUtilizationTracker.  This is done at the end of recovery, just</div>
+<div>39&emsp;&emsp;&nbsp; * prior to the checkpoint.  It does not have to be done under the log write</div>
+<div>40&emsp;&emsp;&nbsp; * latch, since recovery is single threaded.&#60;/p></div>
+<div>41&emsp;&emsp;&nbsp; */</div>
+<div>42&emsp;&emsp;public class RecoveryUtilizationTracker extends BaseLocalUtilizationTracker {</div>
+<div>43&emsp;&emsp;</div>
+<div>44&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* File number -> LSN of FileSummaryLN */</div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final Map&#60;Long, Long> fileSummaryLsns;</div>
+<div>46&emsp;&emsp;</div>
+<div>47&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* DatabaseId  -> LSN of MapLN */</div>
+<div>48&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final Map&#60;DatabaseId, Long> databaseLsns;</div>
+<div>49&emsp;&emsp;</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public RecoveryUtilizationTracker(EnvironmentImpl env) {</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        super(env, new HashMap&#60;Object,DbFileSummaryMap>());</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        fileSummaryLsns = new HashMap&#60;Long, Long>();</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        databaseLsns = new HashMap&#60;DatabaseId, Long>();</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>55&emsp;&emsp;</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Saves the LSN of the last logged FileSummaryLN.</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void saveLastLoggedFileSummaryLN(long fileNum, long lsn) {</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        fileSummaryLsns.put(Long.valueOf(fileNum), Long.valueOf(lsn));</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>62&emsp;&emsp;</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Saves the LSN of the last logged MapLN.</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void saveLastLoggedMapLN(DatabaseId dbId, long lsn) {</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        databaseLsns.put(dbId, Long.valueOf(lsn));</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>69&emsp;&emsp;</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Counts the addition of all new log entries including LNs.</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void countNewLogEntry(</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long lsn,</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LogEntryType type,</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int size,</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        DatabaseId dbId) {</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        </div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        countNew(lsn, dbId, type, size);</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>81&emsp;&emsp;</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Counts the LSN of a node obsolete unconditionally.</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Even when trackOffset is true, duplicate offsets are not checked (no</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * assertion is fired) because recovery is known to count the same LSN</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * offset twice in certain circumstances.</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void countObsoleteUnconditional(</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long lsn,</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LogEntryType type,</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int size,</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        DatabaseId dbId,</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean trackOffset) {</div>
+<div>95&emsp;&emsp;</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        countObsolete(</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            lsn, dbId, type, size,</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            true,       // countPerFile</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            true,       // countPerDb</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            trackOffset,</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            false);     // checkDupOffsets</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>103&emsp;&emsp;</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Counts the oldLsn of a node obsolete if it has not already been counted</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * at the point of lsn in the log.</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Even when trackOffset is true, duplicate offsets are not checked (no</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * assertion is fired) because recovery is known to count the same LSN</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * offset twice in certain circumstances.</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return whether the file was previously uncounted.</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean countObsoleteIfUncounted(</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long oldLsn,</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long newLsn,</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        LogEntryType type,</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int size,</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        DatabaseId dbId,</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean trackOffset) {</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        </div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Long fileNum = Long.valueOf(DbLsn.getFileNumber(oldLsn));</div>
+<div>123&emsp;&emsp;</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean fileUncounted = isFileUncounted(fileNum, newLsn);</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean dbUncounted = isDbUncounted(dbId, newLsn);</div>
+<div>126&emsp;&emsp;</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        countObsolete(</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            oldLsn, dbId, type, size,</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            fileUncounted, // countPerFile</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            dbUncounted,   // countPerDb</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            trackOffset,</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            false);        // checkDupOffsets</div>
+<div>133&emsp;&emsp;</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return fileUncounted;</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>136&emsp;&emsp;</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Overrides this method for recovery and returns whether the most recently</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * seen FileSummaryLN for the given file is prior to the given LSN.</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean isFileUncounted(Long fileNum, long lsn) {</div>
+<div>143&emsp;&emsp;</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long fsLsn = DbLsn.longToLsn(fileSummaryLsns.get(fileNum));</div>
+<div>145&emsp;&emsp;</div>
+<div style="background-color:limegreen;">146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        int cmpFsLsnToNewLsn = (fsLsn != DbLsn.NULL_LSN ?&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL]</b></div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                DbLsn.compareTo(fsLsn, lsn) : -1);</div>
+<div>148&emsp;&emsp;</div>
+<div style="background-color:limegreen;">149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return cmpFsLsnToNewLsn &#60; 0;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL]</b></div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>151&emsp;&emsp;</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns whether the MapLN for the given database ID is prior to the</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * given LSN.</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private boolean isDbUncounted(DatabaseId dbId, long lsn) {</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        long dbLsn = DbLsn.longToLsn(databaseLsns.get(dbId));</div>
+<div style="background-color:limegreen;">158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        int cmpDbLsnToLsn = (dbLsn != DbLsn.NULL_LSN) ?&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL]</b></div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            DbLsn.compareTo(dbLsn, lsn) : -1;</div>
+<div style="background-color:limegreen;">160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return cmpDbLsnToLsn &#60; 0;&nbsp;&#8594; [ALLOWCREATE, TRANSACTIONAL]</b></div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>162&emsp;&emsp;</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Clears all accmulated utilization info for the given file.</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void resetFileInfo(long fileNum) {</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        TrackedFileSummary trackedSummary = getTrackedFile(fileNum);</div>
+<div style="background-color:limegreen;">168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (trackedSummary != null) {&nbsp;&#8594; [TRANSACTIONAL]</b></div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            trackedSummary.reset();</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>172&emsp;&emsp;</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Clears all accmulated utilization info for the given database.</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void resetDbInfo(DatabaseId dbId) {</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        removeDbFileSummaries(dbId);</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>179&emsp;&emsp;</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the DatabaseImpl from the database key, which in this case is</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the DatabaseId.</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    DatabaseImpl databaseKeyToDatabaseImpl(Object databaseKey)</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throws DatabaseException {</div>
+<div>187&emsp;&emsp;</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        DatabaseId dbId = (DatabaseId) databaseKey;</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return env.getDbTree().getDb(dbId);</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>191&emsp;&emsp;</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Must release the database, since DbTree.getDb was called by</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * databaseKeyToDatabaseImpl.</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    void releaseDatabaseImpl(DatabaseImpl db) {</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        env.getDbTree().releaseDb(db);</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>200&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

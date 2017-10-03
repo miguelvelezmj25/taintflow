@@ -4,7 +4,9 @@ import java.util.HashSet;
 import java.util.Set;
 
 import soot.Unit;
+import soot.jimple.Stmt;
 import soot.jimple.infoflow.InfoflowManager;
+import soot.jimple.infoflow.collect.ConcurrentHashSet;
 import soot.jimple.infoflow.collect.MyConcurrentHashMap;
 import soot.jimple.infoflow.data.Abstraction;
 import soot.jimple.infoflow.data.AbstractionAtSink;
@@ -35,6 +37,7 @@ public class TaintPropagationResults {
 	}
 	
 	protected final InfoflowManager manager;
+	private Set<Stmt> sinks = new ConcurrentHashSet<>();
 	protected final MyConcurrentHashMap<AbstractionAtSink, Abstraction> results =
 			new MyConcurrentHashMap<AbstractionAtSink, Abstraction>();
 	
@@ -80,6 +83,8 @@ public class TaintPropagationResults {
 				(resultAbs, resultAbs.getAbstraction());
 		if (newAbs != resultAbs.getAbstraction())
 			newAbs.addNeighbor(resultAbs.getAbstraction());
+
+		this.sinks.add(resultAbs.getSinkStmt());
 		
 		// Notify the handlers
 		boolean continueAnalysis = true;
@@ -116,4 +121,7 @@ public class TaintPropagationResults {
 		this.resultAddedHandlers.add(handler);
 	}
 
+	public Set<Stmt> getSinks() {
+		return sinks;
+	}
 }

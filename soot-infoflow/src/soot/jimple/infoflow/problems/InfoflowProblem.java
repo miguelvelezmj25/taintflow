@@ -66,7 +66,8 @@ public class InfoflowProblem extends AbstractInfoflowProblem {
 	private final PropagationRuleManager propagationRules;
 	
 	protected final TaintPropagationResults results;
-	
+	private int sinkCount = 0;
+
 	public InfoflowProblem(InfoflowManager manager,
 			IAliasingStrategy aliasingStrategy,
 			Aliasing aliasing,
@@ -107,6 +108,10 @@ public class InfoflowProblem extends AbstractInfoflowProblem {
 				public Set<Abstraction> computeTargets(Abstraction d1, Abstraction source) {
 					if (1 <= manager.getConfig().getStopAfterFirstKFlows() && manager.getConfig().getStopAfterFirstKFlows() <= results.getResults().size())
 						return Collections.emptySet();
+
+					if(results.getSinks().size() == sinkCount) {
+						return Collections.emptySet();
+					}
 
 					// Notify the handler if we have one
 					if (taintPropagationHandler != null)
@@ -1060,5 +1065,8 @@ public class InfoflowProblem extends AbstractInfoflowProblem {
     public TaintPropagationResults getResults(){
    		return this.results;
 	}
-        
+
+	public void setSinkCount(int sinkCount) {
+		this.sinkCount = sinkCount;
+	}
 }
