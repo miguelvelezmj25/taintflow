@@ -2102,7 +2102,7 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<edu.cmu.cs.mvelezce.Regions0: void main(java.lang.String[])>";
+        String entryPoint = "<edu.cmu.cs.mvelezce.Regions: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -2120,7 +2120,7 @@ public class AnalysisTest {
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
-        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
