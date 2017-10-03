@@ -65,7 +65,7 @@ public class AnalysisTest {
         AnalysisTest.infoflowConfiguration.setEnableImplicitFlows(true);
 
         AnalysisTest.infoflowConfiguration.setCodeEliminationMode(InfoflowConfiguration.CodeEliminationMode.NoCodeElimination);
-        AnalysisTest.infoflowConfiguration.setAccessPathLength(1);
+        AnalysisTest.infoflowConfiguration.setAccessPathLength(10);
         AnalysisTest.infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.ContextFlowSensitive);
         AnalysisTest.infoflowConfiguration.setMaxThreadNum(1);
 
@@ -85,14 +85,14 @@ public class AnalysisTest {
 
 
         AnalysisTest.infoflowConfiguration.setSequentialPathProcessing(true);
-        AnalysisTest.infoflowConfiguration.setDataFlowTimeout(900);
+//        AnalysisTest.infoflowConfiguration.setDataFlowTimeout(900);
 
         // Incorrect results
 //        AnalysisTest.infoflowConfiguration.setIgnoreFlowsInSystemPackages(true);
 //        AnalysisTest.infoflowConfiguration.setExcludeSootLibraryClasses(true);
 
 
-        AnalysisTest.infoflowConfiguration.setStopAfterFirstKFlows(10);
+//        AnalysisTest.infoflowConfiguration.setStopAfterFirstKFlows(10);
 
         // Config soot
         AnalysisTest.sootConfiguration = new SootConfig();
@@ -1873,15 +1873,15 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(60);
+        infoflow.aggregateInfoflowResults(81);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/prevayler/src/main/java";
-
-        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
-        generator.generateHTMLPage();
-        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+//        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/prevayler/src/main/java";
+//
+//        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+//        generator.generateHTMLPage();
+//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
