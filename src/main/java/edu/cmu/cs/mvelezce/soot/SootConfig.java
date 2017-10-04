@@ -12,16 +12,18 @@ public class SootConfig implements IInfoflowConfig {
     public void setSootOptions(Options options) {
         // explicitly include packages for shorter runtime:
         List<String> includeList = new LinkedList<>();
-        includeList.add("java.lang.*");
-        includeList.add("java.util.*");
-        includeList.add("java.io.*");
-
-		includeList.add("java.security.*");
-		includeList.add("javax.crypto.*");
+//        includeList.add("java.lang.*");
+//        includeList.add("java.util.*");
+//        includeList.add("java.io.*");
+//
+//		includeList.add("java.security.*");
+//		includeList.add("javax.crypto.*");
 
         Options.v().set_no_bodies_for_excluded(true);
         Options.v().set_allow_phantom_refs(true);
 
+
+//        includeList.add("java.util.HashMap");
 //        options.set_include(includeList);
 
         options.set_output_format(Options.output_format_none);
