@@ -75,8 +75,8 @@ public class Run {
         // Config soot
         sootConfiguration = new SootConfig();
 
-//        File file = new File("/home/mvelezce/programming/java/projects/systems/original/berkeleydb/target/classes");
-        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeleydb/target/classes");
+        File file = new File("/home/mvelezce/programming/java/projects/systems/original/berkeleydb/target/classes");
+//        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeleydb/target/classes");
         appPath = file + sep + appPath;
 
 //        file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/berkeley-db/out/test/berkeley-db");
