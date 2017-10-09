@@ -61,11 +61,12 @@ public class AnalysisTest {
 
         // Config information flow
         AnalysisTest.infoflowConfiguration = new InfoflowConfiguration();
+        // More precise call graph algorithm
         AnalysisTest.infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.SPARK);
         AnalysisTest.infoflowConfiguration.setEnableImplicitFlows(true);
 
         AnalysisTest.infoflowConfiguration.setCodeEliminationMode(InfoflowConfiguration.CodeEliminationMode.NoCodeElimination);
-        AnalysisTest.infoflowConfiguration.setAccessPathLength(5);
+        AnalysisTest.infoflowConfiguration.setAccessPathLength(10);
         AnalysisTest.infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.ContextFlowSensitive);
         AnalysisTest.infoflowConfiguration.setMaxThreadNum(1);
 
@@ -79,22 +80,20 @@ public class AnalysisTest {
         AnalysisTest.infoflowConfiguration.setOneSourceAtATime(true);
 
         AnalysisTest.infoflowConfiguration.setSingleJoinPointAbstraction(true);
-        AnalysisTest.infoflowConfiguration.setEnableArraySizeTainting(false);
-        AnalysisTest.infoflowConfiguration.setEnableTypeChecking(false);
-        InfoflowConfiguration.setMergeNeighbors(true);
+//        AnalysisTest.infoflowConfiguration.setEnableArraySizeTainting(false);
+//        AnalysisTest.infoflowConfiguration.setEnableTypeChecking(false);
+//        InfoflowConfiguration.setMergeNeighbors(true);
 
-
-        AnalysisTest.infoflowConfiguration.setSequentialPathProcessing(true);
-        AnalysisTest.infoflowConfiguration.setDataFlowTimeout(300);
-
-
+//        AnalysisTest.infoflowConfiguration.setSequentialPathProcessing(true);
+//        AnalysisTest.infoflowConfiguration.setDataFlowTimeout(900);
 
         // Incorrect results
 //        AnalysisTest.infoflowConfiguration.setIgnoreFlowsInSystemPackages(true);
 //        AnalysisTest.infoflowConfiguration.setExcludeSootLibraryClasses(true);
 
-//        InfoflowConfiguration.setOneResultPerAccessPath(true);
-//        AnalysisTest.infoflowConfiguration.setStopAfterFirstKFlows(2);
+
+//        AnalysisTest.infoflowConfiguration.setStopAfterFirstKFlows(10);
+
         // Config soot
         AnalysisTest.sootConfiguration = new SootConfig();
     }
@@ -1969,7 +1968,7 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<berkeley.persist.gettingStarted.ExampleInventoryRead: void main(java.lang.String[])>";
+        String entryPoint = "<berkeley.persist.gettingStarted.ExampleDatabasePut: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
@@ -1987,7 +1986,7 @@ public class AnalysisTest {
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
-        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test

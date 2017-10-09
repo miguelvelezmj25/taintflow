@@ -112,7 +112,7 @@ public class TaintInfoflow extends Infoflow {
 
         System.out.println("\n############## STATS");
         System.out.println("Number of results: " + aggregatedResults.size() + "\n");
-        assert aggregatedResults.size() == count;
+//        assert aggregatedResults.size() == count;
         this.calculateOptionToSinkCount(aggregatedResults);
         this.calculateInteractionOrder(aggregatedResults);
     }

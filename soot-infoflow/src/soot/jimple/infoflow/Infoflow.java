@@ -417,8 +417,8 @@ public class Infoflow extends AbstractInfoflow {
 
 					forwardProblem.sinkCount = sinkCount;
 					int stopAfterFlows = 2 * sinkCount;
-					logger.info("Stop after {} flows", stopAfterFlows);
-					this.config.setStopAfterFirstKFlows(stopAfterFlows);
+//					logger.info("Stop after {} flows", stopAfterFlows);
+//					this.config.setStopAfterFirstKFlows(stopAfterFlows);
 
 					// Initialize the taint wrapper if we have one
 					if (taintWrapper != null)

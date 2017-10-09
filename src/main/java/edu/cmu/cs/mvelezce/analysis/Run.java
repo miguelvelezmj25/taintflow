@@ -39,12 +39,13 @@ public class Run {
 
         // Config information flow
         infoflowConfiguration = new InfoflowConfiguration();
+        // More precise call graph algorithm
         infoflowConfiguration.setCallgraphAlgorithm(InfoflowConfiguration.CallgraphAlgorithm.SPARK);
         infoflowConfiguration.setEnableImplicitFlows(true);
 
         infoflowConfiguration.setCodeEliminationMode(InfoflowConfiguration.CodeEliminationMode.NoCodeElimination);
-        infoflowConfiguration.setAccessPathLength(1);
-        infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.FlowInsensitive);
+        infoflowConfiguration.setAccessPathLength(10);
+        infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.ContextFlowSensitive);
         infoflowConfiguration.setMaxThreadNum(1);
 
         infoflowConfiguration.setInspectSources(false);
@@ -57,22 +58,21 @@ public class Run {
         infoflowConfiguration.setOneSourceAtATime(true);
 
         infoflowConfiguration.setSingleJoinPointAbstraction(true);
-        infoflowConfiguration.setEnableArraySizeTainting(false);
-        infoflowConfiguration.setEnableTypeChecking(false);
-        InfoflowConfiguration.setMergeNeighbors(true);
-
+//        infoflowConfiguration.setEnableArraySizeTainting(false);
+//        infoflowConfiguration.setEnableTypeChecking(false);
+//        InfoflowConfiguration.setMergeNeighbors(true);
 
 //        infoflowConfiguration.setSequentialPathProcessing(true);
-//        infoflowConfiguration.setDataFlowTimeout(300);
-
-
+//        infoflowConfiguration.setDataFlowTimeout(900);
 
         // Incorrect results
 //        infoflowConfiguration.setIgnoreFlowsInSystemPackages(true);
 //        infoflowConfiguration.setExcludeSootLibraryClasses(true);
 
+
+//        infoflowConfiguration.setStopAfterFirstKFlows(10);
+
         // Config soot
-//        infoflowConfiguration.setStopAfterFirstKFlows(2);
         sootConfiguration = new SootConfig();
 
 //        File file = new File("/home/mvelezce/programming/java/projects/systems/original/berkeleydb/target/classes");
@@ -97,7 +97,7 @@ public class Run {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-        String entryPoint = "<berkeley.persist.gettingStarted.ExampleInventoryRead: void main(java.lang.String[])>";
+        String entryPoint = "<berkeley.persist.gettingStarted.ExampleDatabasePut: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
