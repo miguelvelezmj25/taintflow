@@ -55,7 +55,7 @@ public class TaintInfoflow extends Infoflow {
         Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
         PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink", ControlFlowSink.v()));
 //        PackManager.v().getPack("jtp").add(new Transform("jtp.trycatchlabelnop", TryCatchLabelNop.v()));
-        PackManager.v().getPack("jtp").add(new Transform("jtp.nop", Nop.v()));
+//        PackManager.v().getPack("jtp").add(new Transform("jtp.nop", Nop.v()));
 
         while (iter.hasNext()) {
             MethodOrMethodContext m = iter.next();

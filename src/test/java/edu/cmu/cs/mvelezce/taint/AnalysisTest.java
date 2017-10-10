@@ -70,8 +70,9 @@ public class AnalysisTest {
         AnalysisTest.infoflowConfiguration.setDataFlowSolver(InfoflowConfiguration.DataFlowSolver.ContextFlowSensitive);
         AnalysisTest.infoflowConfiguration.setMaxThreadNum(1);
 
-        AnalysisTest.infoflowConfiguration.setInspectSources(false);
+        AnalysisTest.infoflowConfiguration.setInspectSources(true);
         AnalysisTest.infoflowConfiguration.setInspectSinks(false);
+
         AnalysisTest.infoflowConfiguration.setAliasingAlgorithm(InfoflowConfiguration.AliasingAlgorithm.None);
         AnalysisTest.infoflowConfiguration.setFlowSensitiveAliasing(false);
         AnalysisTest.infoflowConfiguration.setStopAfterFirstFlow(false);
@@ -2587,7 +2588,7 @@ public class AnalysisTest {
         infoflow.setSootConfig(AnalysisTest.sootConfiguration);
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
 //        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
-        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, true));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, false));
 
         // Add taint wrapper
 //        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
@@ -2604,7 +2605,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(2);
+        infoflow.aggregateInfoflowResults(1);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 

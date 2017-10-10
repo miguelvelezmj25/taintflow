@@ -2,12 +2,13 @@ package edu.cmu.cs.mvelezce.soot.jimple.jtp;
 
 import soot.*;
 import soot.jimple.Jimple;
-import soot.jimple.NopStmt;
+import soot.jimple.StaticInvokeExpr;
+import soot.jimple.Stmt;
 import soot.tagkit.BytecodeOffsetTag;
 import soot.tagkit.LineNumberTag;
 import soot.tagkit.Tag;
-import soot.util.Chain;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -27,7 +28,10 @@ public class Nop extends BodyTransformer {
         PatchingChain<Unit> units = b.getUnits();
         Iterator<Unit> unitsIterator = b.getUnits().snapshotIterator();
 
-        while(unitsIterator.hasNext()) {
+        SootClass sootClass = Scene.v().loadClassAndSupport("edu.cmu.cs.mvelezce.analysis.option.Noop");
+        SootMethod sootMethod = sootClass.getMethod("void noop()");
+
+        while (unitsIterator.hasNext()) {
             Unit unit = unitsIterator.next();
 
             Tag lineNumberTag = null;
@@ -53,9 +57,12 @@ public class Nop extends BodyTransformer {
                 bytecodeOffsetTag = new BytecodeOffsetTag(-1);
             }
 
-            NopStmt nop = Jimple.v().newNopStmt();
-            nop.addTag(lineNumberTag);
-            nop.addTag(bytecodeOffsetTag);
+            StaticInvokeExpr invExpr = Jimple.v().newStaticInvokeExpr(sootMethod.makeRef(), new ArrayList<Value>());
+            Stmt nop = Jimple.v().newInvokeStmt(invExpr);
+
+//            NopStmt nop = Jimple.v().newNopStmt();
+            nop.addTag(new LineNumberTag(-1));
+            nop.addTag(new BytecodeOffsetTag(-1));
 
             units.insertBefore(nop, unit);
         }
