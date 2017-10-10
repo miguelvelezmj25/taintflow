@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.cmu.cs.mvelezce.analysis.option.json.ControlFlowResult;
 import edu.cmu.cs.mvelezce.analysis.option.json.SourceToSinkPath;
 import edu.cmu.cs.mvelezce.soot.jimple.jtp.ControlFlowSink;
+import edu.cmu.cs.mvelezce.soot.jimple.jtp.Nop;
 import org.apache.commons.io.FileUtils;
 import soot.*;
 import soot.jimple.InvokeExpr;
@@ -54,7 +55,7 @@ public class TaintInfoflow extends Infoflow {
         Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
         PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink", ControlFlowSink.v()));
 //        PackManager.v().getPack("jtp").add(new Transform("jtp.trycatchlabelnop", TryCatchLabelNop.v()));
-//        PackManager.v().getPack("jtp").add(new Transform("jtp.nop", Nop.v()));
+        PackManager.v().getPack("jtp").add(new Transform("jtp.nop", Nop.v()));
 
         while (iter.hasNext()) {
             MethodOrMethodContext m = iter.next();
@@ -111,7 +112,7 @@ public class TaintInfoflow extends Infoflow {
 
         System.out.println("\n############## STATS");
         System.out.println("Number of results: " + aggregatedResults.size() + "\n");
-//        assert aggregatedResults.size() == count;
+        assert aggregatedResults.size() == count;
         this.calculateOptionToSinkCount(aggregatedResults);
         this.calculateInteractionOrder(aggregatedResults);
     }

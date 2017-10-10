@@ -4,6 +4,7 @@ import soot.Body;
 import soot.PatchingChain;
 import soot.Trap;
 import soot.Unit;
+import soot.jimple.NopStmt;
 import soot.jimple.internal.JIdentityStmt;
 import soot.jimple.internal.JThrowStmt;
 
@@ -41,6 +42,10 @@ public class TaintflowUnitGraph extends BriefUnitGraph {
 
             for(Trap trap : body.getTraps()) {
                 Unit handlerUnit = trap.getHandlerUnit();
+
+                if(handlerUnit instanceof NopStmt) {
+                    handlerUnit = units.getSuccOf(handlerUnit);
+                }
 
                 if(!(handlerUnit instanceof JIdentityStmt)) {
                     throw new RuntimeException("We expect a JIdentityStmt, but got " + handlerUnit.getClass());
