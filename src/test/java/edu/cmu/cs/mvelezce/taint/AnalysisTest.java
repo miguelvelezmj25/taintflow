@@ -2236,7 +2236,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(4);
+        infoflow.aggregateInfoflowResults(3);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -2359,7 +2359,7 @@ public class AnalysisTest {
 //        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
-        infoflow.aggregateInfoflowResults(4);
+        infoflow.aggregateInfoflowResults(3);
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
@@ -2490,7 +2490,7 @@ public class AnalysisTest {
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
-        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
@@ -2531,7 +2531,7 @@ public class AnalysisTest {
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
-        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
@@ -2572,7 +2572,7 @@ public class AnalysisTest {
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
-        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
