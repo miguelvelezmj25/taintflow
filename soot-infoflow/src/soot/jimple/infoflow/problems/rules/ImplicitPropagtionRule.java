@@ -159,9 +159,12 @@ public class ImplicitPropagtionRule extends AbstractTaintPropagationRule {
 		// If we have already tracked implicit flows through this method,
 		// there is no point in tracking explicit ones afterwards as well.
 		if (implicitTargets.containsKey(stmt) && (d1 == null || implicitTargets.get(stmt).contains(d1))) {
-			if (killAll != null)
-				killAll.value = true;
-			return null;
+			// TODO if the destination is not a java library, we do want to keep track of taints. This was an issue with static methods
+			if(dest.isJavaLibraryMethod()) {
+				if(killAll != null)
+					killAll.value = true;
+				return null;
+			}
 		}
 
 		// If no parameter is tainted, but we are in a conditional, we create a

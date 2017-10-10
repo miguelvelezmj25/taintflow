@@ -28,8 +28,8 @@ public class Nop extends BodyTransformer {
         PatchingChain<Unit> units = b.getUnits();
         Iterator<Unit> unitsIterator = b.getUnits().snapshotIterator();
 
-        SootClass sootClass = Scene.v().loadClassAndSupport("edu.cmu.cs.mvelezce.analysis.option.Noop");
-        SootMethod sootMethod = sootClass.getMethod("void noop()");
+        SootClass sootClass = Scene.v().loadClassAndSupport("edu.cmu.cs.mvelezce.analysis.option.Sink");
+        SootMethod sootMethod = sootClass.getMethod("void init()");
 
         while (unitsIterator.hasNext()) {
             Unit unit = unitsIterator.next();
@@ -57,7 +57,7 @@ public class Nop extends BodyTransformer {
                 bytecodeOffsetTag = new BytecodeOffsetTag(-1);
             }
 
-            StaticInvokeExpr invExpr = Jimple.v().newStaticInvokeExpr(sootMethod.makeRef(), new ArrayList<Value>());
+            StaticInvokeExpr invExpr = Jimple.v().newStaticInvokeExpr(sootMethod.makeRef());
             Stmt nop = Jimple.v().newInvokeStmt(invExpr);
 
 //            NopStmt nop = Jimple.v().newNopStmt();
