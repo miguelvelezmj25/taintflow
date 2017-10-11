@@ -5,11 +5,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
-import soot.Local;
-import soot.SootMethod;
-import soot.Unit;
-import soot.Value;
-import soot.ValueBox;
+import soot.*;
 import soot.jimple.Constant;
 import soot.jimple.DefinitionStmt;
 import soot.jimple.FieldRef;
@@ -36,6 +32,8 @@ import soot.jimple.infoflow.util.ByReferenceBoolean;
  *
  */
 public class ImplicitPropagtionRule extends AbstractTaintPropagationRule {
+
+	private String clinitSignature = "void <clinit>()";
 
 	private final MyConcurrentHashMap<Unit, Set<Abstraction>> implicitTargets =
 			new MyConcurrentHashMap<Unit, Set<Abstraction>>();
@@ -160,11 +158,14 @@ public class ImplicitPropagtionRule extends AbstractTaintPropagationRule {
 		// there is no point in tracking explicit ones afterwards as well.
 		if (implicitTargets.containsKey(stmt) && (d1 == null || implicitTargets.get(stmt).contains(d1))) {
 			// TODO if the destination is not a java library, we do want to keep track of taints. This was an issue with static methods
-			if(dest.isJavaLibraryMethod()) {
+			if(dest.isJavaLibraryMethod() || dest.getSubSignature().equals(this.clinitSignature)) {
 				if(killAll != null)
 					killAll.value = true;
 				return null;
 			}
+//			else {
+//				System.out.println();
+//			}
 		}
 
 		// If no parameter is tainted, but we are in a conditional, we create a
