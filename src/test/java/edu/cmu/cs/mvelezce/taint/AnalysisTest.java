@@ -86,7 +86,7 @@ public class AnalysisTest {
 //        InfoflowConfiguration.setMergeNeighbors(true);
 
 //        AnalysisTest.infoflowConfiguration.setSequentialPathProcessing(true);
-//        AnalysisTest.infoflowConfiguration.setDataFlowTimeout(900);
+        AnalysisTest.infoflowConfiguration.setDataFlowTimeout(300);
 
         // Incorrect results
 //        AnalysisTest.infoflowConfiguration.setIgnoreFlowsInSystemPackages(true);
@@ -1926,7 +1926,7 @@ public class AnalysisTest {
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
-        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
