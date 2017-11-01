@@ -1,0 +1,1634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Filter.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *   This program is free software: you can redistribute it and/or modify</div>
+<div>3&emsp;&emsp;&nbsp; *   it under the terms of the GNU General Public License as published by</div>
+<div>4&emsp;&emsp;&nbsp; *   the Free Software Foundation, either version 3 of the License, or</div>
+<div>5&emsp;&emsp;&nbsp; *   (at your option) any later version.</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; *   This program is distributed in the hope that it will be useful,</div>
+<div>8&emsp;&emsp;&nbsp; *   but WITHOUT ANY WARRANTY; without even the implied warranty of</div>
+<div>9&emsp;&emsp;&nbsp; *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</div>
+<div>10&emsp;&emsp;&nbsp; *   GNU General Public License for more details.</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; *   You should have received a copy of the GNU General Public License</div>
+<div>13&emsp;&emsp;&nbsp; *   along with this program.  If not, see &#60;http://www.gnu.org/licenses/>.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/*</div>
+<div>17&emsp;&emsp;&nbsp; *    Filter.java</div>
+<div>18&emsp;&emsp;&nbsp; *    Copyright (C) 1999-2012 University of Waikato, Hamilton, New Zealand</div>
+<div>19&emsp;&emsp;&nbsp; *</div>
+<div>20&emsp;&emsp;&nbsp; */</div>
+<div>21&emsp;&emsp;</div>
+<div>22&emsp;&emsp;package weka.filters;</div>
+<div>23&emsp;&emsp;</div>
+<div>24&emsp;&emsp;import weka.core.Capabilities;</div>
+<div>25&emsp;&emsp;import weka.core.Capabilities.Capability;</div>
+<div>26&emsp;&emsp;import weka.core.CapabilitiesHandler;</div>
+<div>27&emsp;&emsp;import weka.core.CapabilitiesIgnorer;</div>
+<div>28&emsp;&emsp;import weka.core.CommandlineRunnable;</div>
+<div>29&emsp;&emsp;import weka.core.Instance;</div>
+<div>30&emsp;&emsp;import weka.core.Instances;</div>
+<div>31&emsp;&emsp;import weka.core.Option;</div>
+<div>32&emsp;&emsp;import weka.core.OptionHandler;</div>
+<div>33&emsp;&emsp;import weka.core.Queue;</div>
+<div>34&emsp;&emsp;import weka.core.RelationalLocator;</div>
+<div>35&emsp;&emsp;import weka.core.RevisionHandler;</div>
+<div>36&emsp;&emsp;import weka.core.RevisionUtils;</div>
+<div>37&emsp;&emsp;import weka.core.SerializedObject;</div>
+<div>38&emsp;&emsp;import weka.core.StringLocator;</div>
+<div>39&emsp;&emsp;import weka.core.UnsupportedAttributeTypeException;</div>
+<div>40&emsp;&emsp;import weka.core.Utils;</div>
+<div>41&emsp;&emsp;import weka.core.Version;</div>
+<div>42&emsp;&emsp;import weka.core.converters.ConverterUtils.DataSource;</div>
+<div>43&emsp;&emsp;</div>
+<div>44&emsp;&emsp;import java.io.FileOutputStream;</div>
+<div>45&emsp;&emsp;import java.io.PrintWriter;</div>
+<div>46&emsp;&emsp;import java.io.Serializable;</div>
+<div>47&emsp;&emsp;import java.util.Date;</div>
+<div>48&emsp;&emsp;import java.util.Enumeration;</div>
+<div>49&emsp;&emsp;import java.util.Iterator;</div>
+<div>50&emsp;&emsp;import java.util.Vector;</div>
+<div>51&emsp;&emsp;</div>
+<div>52&emsp;&emsp;/**</div>
+<div>53&emsp;&emsp;&nbsp; * An abstract class for instance filters: objects that take instances as input,</div>
+<div>54&emsp;&emsp;&nbsp; * carry out some transformation on the instance and then output the instance.</div>
+<div>55&emsp;&emsp;&nbsp; * The method implementations in this class assume that most of the work will be</div>
+<div>56&emsp;&emsp;&nbsp; * done in the methods overridden by subclasses.</div>
+<div>57&emsp;&emsp;&nbsp; * &#60;p></div>
+<div>58&emsp;&emsp;&nbsp; * </div>
+<div>59&emsp;&emsp;&nbsp; * A simple example of filter use. This example doesn't remove instances from</div>
+<div>60&emsp;&emsp;&nbsp; * the output queue until all instances have been input, so has higher memory</div>
+<div>61&emsp;&emsp;&nbsp; * consumption than an approach that uses output instances as they are made</div>
+<div>62&emsp;&emsp;&nbsp; * available:</div>
+<div>63&emsp;&emsp;&nbsp; * &#60;p></div>
+<div>64&emsp;&emsp;&nbsp; * </div>
+<div>65&emsp;&emsp;&nbsp; * &#60;code> &#60;pre></div>
+<div>66&emsp;&emsp;&nbsp; *  Filter filter = ..some type of filter..</div>
+<div>67&emsp;&emsp;&nbsp; *  Instances instances = ..some instances..</div>
+<div>68&emsp;&emsp;&nbsp; *  for (int i = 0; i &#60; data.numInstances(); i++) {</div>
+<div>69&emsp;&emsp;&nbsp; *    filter.input(data.instance(i));</div>
+<div>70&emsp;&emsp;&nbsp; *  }</div>
+<div>71&emsp;&emsp;&nbsp; *  filter.batchFinished();</div>
+<div>72&emsp;&emsp;&nbsp; *  Instances newData = filter.outputFormat();</div>
+<div>73&emsp;&emsp;&nbsp; *  Instance processed;</div>
+<div>74&emsp;&emsp;&nbsp; *  while ((processed = filter.output()) != null) {</div>
+<div>75&emsp;&emsp;&nbsp; *    newData.add(processed);</div>
+<div>76&emsp;&emsp;&nbsp; *  }</div>
+<div>77&emsp;&emsp;&nbsp; *  ..do something with newData..</div>
+<div>78&emsp;&emsp;&nbsp; * &#60;/pre> &#60;/code></div>
+<div>79&emsp;&emsp;&nbsp; * </div>
+<div>80&emsp;&emsp;&nbsp; * @author Len Trigg (trigg@cs.waikato.ac.nz)</div>
+<div>81&emsp;&emsp;&nbsp; * @version $Revision: 13477 $</div>
+<div>82&emsp;&emsp;&nbsp; */</div>
+<div>83&emsp;&emsp;public abstract class Filter implements Serializable, CapabilitiesHandler,</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;  RevisionHandler, OptionHandler, CapabilitiesIgnorer, CommandlineRunnable {</div>
+<div>85&emsp;&emsp;</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;  /** for serialization */</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;  private static final long serialVersionUID = -8835063755891851218L;</div>
+<div>88&emsp;&emsp;</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;  /** The output format for instances */</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;  private Instances m_OutputFormat = null;</div>
+<div>91&emsp;&emsp;</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;  /** The output instance queue */</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;  private Queue m_OutputQueue = null;</div>
+<div>94&emsp;&emsp;</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;  /** Indices of string attributes in the output format */</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;  protected StringLocator m_OutputStringAtts = null;</div>
+<div>97&emsp;&emsp;</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;  /** Indices of string attributes in the input format */</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;  protected StringLocator m_InputStringAtts = null;</div>
+<div>100&emsp;&emsp;</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;  /** Indices of relational attributes in the output format */</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;  protected RelationalLocator m_OutputRelAtts = null;</div>
+<div>103&emsp;&emsp;</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;  /** Indices of relational attributes in the input format */</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;  protected RelationalLocator m_InputRelAtts = null;</div>
+<div>106&emsp;&emsp;</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;  /** The input format for instances */</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;  private Instances m_InputFormat = null;</div>
+<div>109&emsp;&emsp;</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;  /** Record whether the filter is at the start of a batch */</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;  protected boolean m_NewBatch = true;</div>
+<div>112&emsp;&emsp;</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;  /** True if the first batch has been done */</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;  protected boolean m_FirstBatchDone = false;</div>
+<div>115&emsp;&emsp;</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;  /** Whether the classifier is run in debug mode. */</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;  protected boolean m_Debug = false;</div>
+<div>118&emsp;&emsp;</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;  /** Whether capabilities should not be checked before classifier is built. */</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;  protected boolean m_DoNotCheckCapabilities = false;</div>
+<div>121&emsp;&emsp;</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns true if the a new batch was started, either a new instance of the</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * filter was created or the batchFinished() method got called.</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if a new batch has been initiated</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #m_NewBatch</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #batchFinished()</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;  public boolean isNewBatch() {</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_NewBatch;</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>133&emsp;&emsp;</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns true if the first batch of instances got processed. Necessary for</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * supervised filters, which "learn" from the first batch and then shouldn't</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * get updated with subsequent calls of batchFinished().</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if the first batch has been processed</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #m_FirstBatchDone</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #batchFinished()</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;  public boolean isFirstBatchDone() {</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_FirstBatchDone;</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>146&emsp;&emsp;</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Default implementation returns false. Some filters may not necessarily be</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * able to produce an instance for output for every instance input after the</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * first batch has been completed - such filters should override this method</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * and return true.</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return false by default</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;  public boolean mayRemoveInstanceAfterFirstBatchDone() {</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return false;</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>158&emsp;&emsp;</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the Capabilities of this filter. Derived filters have to override</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * this method to enable capabilities.</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the capabilities of this object</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see Capabilities</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;  public Capabilities getCapabilities() {</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Capabilities result;</div>
+<div>169&emsp;&emsp;</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = new Capabilities(this);</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.enableAll();</div>
+<div>172&emsp;&emsp;</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.setMinimumNumberInstances(0);</div>
+<div>174&emsp;&emsp;</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>177&emsp;&emsp;</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the revision string.</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the revision</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;  public String getRevision() {</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return RevisionUtils.extract("$Revision: 13477 $");</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>187&emsp;&emsp;</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the Capabilities of this filter, customized based on the data.</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * I.e., if removes all class capabilities, in case there's not class</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * attribute present or removes the NO_CLASS capability, in case that there's</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * a class present.</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param data the data to use for customization</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the capabilities of this object, based on the data</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #getCapabilities()</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;  public Capabilities getCapabilities(Instances data) {</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Capabilities result;</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Capabilities classes;</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Iterator&#60;Capability> iter;</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Capability cap;</div>
+<div>203&emsp;&emsp;</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = getCapabilities();</div>
+<div>205&emsp;&emsp;</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // no class? -> remove all class capabilites apart from NO_CLASS</div>
+<div style="background-color:limegreen;">207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (data.classIndex() == -1) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      classes = result.getClassCapabilities();</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      iter = classes.capabilities();</div>
+<div style="background-color:limegreen;">210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      while (iter.hasNext()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        cap = iter.next();</div>
+<div style="background-color:limegreen;">212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (cap != Capability.NO_CLASS) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          result.disable(cap);</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          result.disableDependency(cap);</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // class? -> remove NO_CLASS</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    else {</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result.disable(Capability.NO_CLASS);</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result.disableDependency(Capability.NO_CLASS);</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>223&emsp;&emsp;</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>226&emsp;&emsp;</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Sets the format of output instances. The derived class should use this</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * method once it has determined the outputformat. The output queue is</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * cleared.</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param outputFormat the new output format</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;  protected void setOutputFormat(Instances outputFormat) {</div>
+<div>235&emsp;&emsp;</div>
+<div style="background-color:limegreen;">236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (outputFormat != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_OutputFormat = outputFormat.stringFreeStructure();</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      initOutputLocators(m_OutputFormat, null);</div>
+<div>239&emsp;&emsp;</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Rename the relation</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String relationName =</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        outputFormat.relationName() + "-" + this.getClass().getName();</div>
+<div style="background-color:limegreen;">243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (this instanceof OptionHandler) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String[] options = ((OptionHandler) this).getOptions();</div>
+<div style="background-color:limegreen;">245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for (String option : options) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          relationName += option.trim();</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_OutputFormat.setRelationName(relationName);</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_OutputFormat = null;</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_OutputQueue = new Queue();</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>255&emsp;&emsp;</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Gets the currently set inputformat instances. This dataset may contain</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * buffered instances.</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the input Instances.</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;  protected Instances getInputFormat() {</div>
+<div>263&emsp;&emsp;</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_InputFormat;</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>266&emsp;&emsp;</div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Gets a copy of just the structure of the input format instances.</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a copy of the structure (attribute information) of the input</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * format instances</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;  public Instances getCopyOfInputFormat() {</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getInputFormat() == null ? null : new Instances(getInputFormat(), 0);</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>276&emsp;&emsp;</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns a reference to the current input format without copying it.</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a reference to the current input format</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;  protected Instances inputFormatPeek() {</div>
+<div>283&emsp;&emsp;</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_InputFormat;</div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>286&emsp;&emsp;</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>288&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns a reference to the current output format without copying it.</div>
+<div>289&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a reference to the current output format</div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;  protected Instances outputFormatPeek() {</div>
+<div>293&emsp;&emsp;</div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_OutputFormat;</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>296&emsp;&emsp;</div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>298&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Adds an output instance to the queue. The derived class should use this</div>
+<div>299&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * method for each output instance it makes available. Note that the instance</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * is only copied before it is added to the output queue if it has a reference</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * to a dataset.</div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param instance the instance to be added to the queue.</div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;  protected void push(Instance instance) {</div>
+<div>306&emsp;&emsp;</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    push(instance, true);</div>
+<div>308&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>309&emsp;&emsp;</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Adds an output instance to the queue. The derived class should use this</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * method for each output instance it makes available. Note that the instance</div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * is only copied before it is added to the output queue if copyInstance has</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * value true and if the instance has a reference to a dataset.</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param instance the instance to be added to the queue.</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param copyInstance whether instance is to be copied</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;  protected void push(Instance instance, boolean copyInstance) {</div>
+<div>320&emsp;&emsp;</div>
+<div style="background-color:limegreen;">321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (instance != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (instance.dataset() != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (copyInstance) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          instance = (Instance) instance.copy();</div>
+<div>325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        copyValues(instance, false);</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      instance.setDataset(m_OutputFormat);</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_OutputQueue.push(instance);</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>332&emsp;&emsp;</div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Clears the output queue.</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>336&emsp;&emsp;&nbsp;&nbsp;  protected void resetQueue() {</div>
+<div>337&emsp;&emsp;</div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_OutputQueue = new Queue();</div>
+<div>339&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>340&emsp;&emsp;</div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Adds the supplied input instance to the inputformat dataset for later</div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * processing. Use this method rather than getInputFormat().add(instance). Or</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * else. Note that the provided instance gets copied when buffered.</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param instance the &#60;code>Instance&#60;/code> to buffer.</div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;  protected void bufferInput(Instance instance) {</div>
+<div>349&emsp;&emsp;</div>
+<div style="background-color:limegreen;">350&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (instance != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      instance = (Instance)instance.copy(); // The copyValues() method *does* modify the instance!</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      copyValues(instance, true);</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_InputFormat.add(instance);</div>
+<div>354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>356&emsp;&emsp;</div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Initializes the input attribute locators. If indices is null then all</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * attributes of the data will be considered, otherwise only the ones that</div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * were provided.</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param data the data to initialize the locators with</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param indices if not null, the indices to which to restrict the locating</div>
+<div>364&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;  protected void initInputLocators(Instances data, int[] indices) {</div>
+<div style="background-color:limegreen;">366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (indices == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>367&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_InputStringAtts = new StringLocator(data);</div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_InputRelAtts = new RelationalLocator(data);</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_InputStringAtts = new StringLocator(data, indices);</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_InputRelAtts = new RelationalLocator(data, indices);</div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>374&emsp;&emsp;</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Initializes the output attribute locators. If indices is null then all</div>
+<div>377&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * attributes of the data will be considered, otherwise only the ones that</div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * were provided.</div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param data the data to initialize the locators with</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param indices if not null, the indices to which to restrict the locating</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;  protected void initOutputLocators(Instances data, int[] indices) {</div>
+<div style="background-color:limegreen;">384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (indices == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_OutputStringAtts = new StringLocator(data);</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_OutputRelAtts = new RelationalLocator(data);</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_OutputStringAtts = new StringLocator(data, indices);</div>
+<div>389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_OutputRelAtts = new RelationalLocator(data, indices);</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>392&emsp;&emsp;</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Copies string/relational values contained in the instance copied to a new</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * dataset. The Instance must already be assigned to a dataset. This dataset</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * and the destination dataset must have the same structure.</div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>398&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param instance the Instance containing the string/relational values to</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          copy.</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param isInput if true the input format and input attribute locators are</div>
+<div>401&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          used otherwise the output format and output locators</div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;  protected void copyValues(Instance instance, boolean isInput) {</div>
+<div>404&emsp;&emsp;</div>
+<div style="background-color:limegreen;">405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    RelationalLocator.copyRelationalValues(instance,&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      (isInput) ? m_InputFormat : m_OutputFormat,</div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      (isInput) ? m_InputRelAtts : m_OutputRelAtts);</div>
+<div>408&emsp;&emsp;</div>
+<div style="background-color:limegreen;">409&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    StringLocator.copyStringValues(instance,&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>410&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      (isInput) ? m_InputFormat : m_OutputFormat,</div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      (isInput) ? m_InputStringAtts : m_OutputStringAtts);</div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>413&emsp;&emsp;</div>
+<div>414&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Takes string/relational values referenced by an Instance and copies them</div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * from a source dataset to a destination dataset. The instance references are</div>
+<div>417&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * updated to be valid for the destination dataset. The instance may have the</div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * structure (i.e. number and attribute position) of either dataset (this</div>
+<div>419&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * affects where references are obtained from). Only works if the number of</div>
+<div>420&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * string/relational attributes is the same in both indices (implicitly these</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * string/relational attributes should be semantically same but just with</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * shifted positions).</div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>424&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param instance the instance containing references to strings/ relational</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          values in the source dataset that will have references updated to</div>
+<div>426&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          be valid for the destination dataset.</div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param instSrcCompat true if the instance structure is the same as the</div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          source, or false if it is the same as the destination (i.e. which</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          of the string/relational attribute indices contains the correct</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          locations for this instance).</div>
+<div>431&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param srcDataset the dataset for which the current instance</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          string/relational value references are valid (after any position</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          mapping if needed)</div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param destDataset the dataset for which the current instance</div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          string/relational value references need to be inserted (after any</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          position mapping if needed)</div>
+<div>437&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;  protected void copyValues(Instance instance, boolean instSrcCompat,</div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances srcDataset, Instances destDataset) {</div>
+<div>440&emsp;&emsp;</div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    RelationalLocator.copyRelationalValues(instance, instSrcCompat, srcDataset,</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_InputRelAtts, destDataset, m_OutputRelAtts);</div>
+<div>443&emsp;&emsp;</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    StringLocator.copyStringValues(instance, instSrcCompat, srcDataset,</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_InputStringAtts, destDataset, m_OutputStringAtts);</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>447&emsp;&emsp;</div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * This will remove all buffered instances from the inputformat dataset. Use</div>
+<div>450&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * this method rather than getInputFormat().delete();</div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;  protected void flushInput() {</div>
+<div>453&emsp;&emsp;</div>
+<div style="background-color:limegreen;">454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if ((m_InputStringAtts.getAttributeIndices().length > 0)&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      || (m_InputRelAtts.getAttributeIndices().length > 0)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_InputFormat = m_InputFormat.stringFreeStructure();</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_InputStringAtts =</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new StringLocator(m_InputFormat, m_InputStringAtts.getAllowedIndices());</div>
+<div>459&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_InputRelAtts = new RelationalLocator(m_InputFormat,</div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_InputRelAtts.getAllowedIndices());</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // This more efficient than new Instances(m_InputFormat, 0);</div>
+<div>463&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_InputFormat.delete();</div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>466&emsp;&emsp;</div>
+<div>467&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>468&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * tests the data whether the filter can actually handle it</div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param instanceInfo the data to test</div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the test fails</div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;  protected void testInputFormat(Instances instanceInfo) throws Exception {</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    getCapabilities(instanceInfo).testWithFail(instanceInfo);</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>476&emsp;&emsp;</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>478&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Sets the format of the input instances. If the filter is able to determine</div>
+<div>479&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the output format before seeing any input instances, it does so here. This</div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * default implementation clears the output format and output queue, and the</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * new batch flag is set. Overriders should call</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;code>super.setInputFormat(Instances)&#60;/code></div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param instanceInfo an Instances object containing the input instance</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          structure (any instances contained in the object are ignored -</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          only the structure is required).</div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if the outputFormat may be collected immediately</div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the inputFormat can't be set successfully</div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>490&emsp;&emsp;&nbsp;&nbsp;  public boolean setInputFormat(Instances instanceInfo) throws Exception {</div>
+<div>491&emsp;&emsp;</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    testInputFormat(instanceInfo);</div>
+<div>493&emsp;&emsp;</div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_InputFormat = instanceInfo.stringFreeStructure();</div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_OutputFormat = null;</div>
+<div>496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_OutputQueue = new Queue();</div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_NewBatch = true;</div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_FirstBatchDone = false;</div>
+<div>499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    initInputLocators(m_InputFormat, null);</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return false;</div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>502&emsp;&emsp;</div>
+<div>503&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Gets the format of the output instances. This should only be called after</div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * input() or batchFinished() has returned true. The relation name of the</div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * output instances should be changed to reflect the action of the filter (eg:</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * add the filter name and options).</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return an Instances object containing the output instance structure only.</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws NullPointerException if no input structure has been defined (or the</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *           output format hasn't been determined yet)</div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;  public Instances getOutputFormat() {</div>
+<div>514&emsp;&emsp;</div>
+<div style="background-color:limegreen;">515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_OutputFormat == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new NullPointerException("No output format defined.");</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return new Instances(m_OutputFormat, 0);</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>520&emsp;&emsp;</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Input an instance for filtering. Ordinarily the instance is processed and</div>
+<div>523&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * made available for output immediately. Some filters require all instances</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * be read before producing output, in which case output instances should be</div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * collected after calling batchFinished(). If the input marks the start of a</div>
+<div>526&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * new batch, the output queue is cleared. This default implementation assumes</div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * all instance conversion will occur when batchFinished() is called.</div>
+<div>528&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>529&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param instance the input instance</div>
+<div>530&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if the filtered instance may now be collected with output().</div>
+<div>531&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws NullPointerException if the input format has not been defined.</div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the input instance was not of the correct format or if</div>
+<div>533&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *           there was a problem with the filtering.</div>
+<div>534&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>535&emsp;&emsp;&nbsp;&nbsp;  public boolean input(Instance instance) throws Exception {</div>
+<div>536&emsp;&emsp;</div>
+<div>537&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (m_InputFormat == null) {</div>
+<div>538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new NullPointerException("No input instance format defined");</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>540&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (m_NewBatch) {</div>
+<div>541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_OutputQueue = new Queue();</div>
+<div>542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_NewBatch = false;</div>
+<div>543&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bufferInput(instance);</div>
+<div>545&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return false;</div>
+<div>546&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>547&emsp;&emsp;</div>
+<div>548&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Signify that this batch of input to the filter is finished. If the filter</div>
+<div>550&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * requires all instances prior to filtering, output() may now be called to</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * retrieve the filtered instances. Any subsequent instances filtered should</div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * be filtered based on setting obtained from the first batch (unless the</div>
+<div>553&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * inputFormat has been re-assigned or new options have been set). This</div>
+<div>554&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * default implementation assumes all instance processing occurs during</div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * inputFormat() and input().</div>
+<div>556&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>557&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if there are instances pending output</div>
+<div>558&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws NullPointerException if no input structure has been defined,</div>
+<div>559&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if there was a problem finishing the batch.</div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>561&emsp;&emsp;&nbsp;&nbsp;  public boolean batchFinished() throws Exception {</div>
+<div>562&emsp;&emsp;</div>
+<div>563&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (m_InputFormat == null) {</div>
+<div>564&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new NullPointerException("No input instance format defined");</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>566&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    flushInput();</div>
+<div>567&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_NewBatch = true;</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_FirstBatchDone = true;</div>
+<div>569&emsp;&emsp;</div>
+<div>570&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (m_OutputQueue.empty()) {</div>
+<div>571&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Clear out references to old strings/relationals occasionally</div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if ((m_OutputStringAtts.getAttributeIndices().length > 0)</div>
+<div>573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        || (m_OutputRelAtts.getAttributeIndices().length > 0)) {</div>
+<div>574&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_OutputFormat = m_OutputFormat.stringFreeStructure();</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_OutputStringAtts = new StringLocator(m_OutputFormat,</div>
+<div>576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_OutputStringAtts.getAllowedIndices());</div>
+<div>577&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>579&emsp;&emsp;</div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return (numPendingOutput() != 0);</div>
+<div>581&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>582&emsp;&emsp;</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>584&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Output an instance after filtering and remove from the output queue.</div>
+<div>585&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>586&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the instance that has most recently been filtered (or null if the</div>
+<div>587&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         queue is empty).</div>
+<div>588&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws NullPointerException if no output structure has been defined</div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>590&emsp;&emsp;&nbsp;&nbsp;  public Instance output() {</div>
+<div>591&emsp;&emsp;</div>
+<div style="background-color:limegreen;">592&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_OutputFormat == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>593&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new NullPointerException("No output instance format defined");</div>
+<div>594&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div style="background-color:limegreen;">595&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_OutputQueue.empty()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>596&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return null;</div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>598&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instance result = (Instance) m_OutputQueue.pop();</div>
+<div>599&emsp;&emsp;</div>
+<div>600&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Clear out references to old strings/relationals occasionally</div>
+<div>601&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>602&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * if (m_OutputQueue.empty() && m_NewBatch) { if (</div>
+<div>603&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * (m_OutputStringAtts.getAttributeIndices().length > 0) ||</div>
+<div>604&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * (m_OutputRelAtts.getAttributeIndices().length > 0) ) { m_OutputFormat =</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * m_OutputFormat.stringFreeStructure(); } }</div>
+<div>606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>608&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>609&emsp;&emsp;</div>
+<div>610&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Output an instance after filtering but do not remove from the output queue.</div>
+<div>612&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>613&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the instance that has most recently been filtered (or null if the</div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         queue is empty).</div>
+<div>615&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws NullPointerException if no input structure has been defined</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;  public Instance outputPeek() {</div>
+<div>618&emsp;&emsp;</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (m_OutputFormat == null) {</div>
+<div>620&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new NullPointerException("No output instance format defined");</div>
+<div>621&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>622&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (m_OutputQueue.empty()) {</div>
+<div>623&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return null;</div>
+<div>624&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>625&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instance result = (Instance) m_OutputQueue.peek();</div>
+<div>626&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>628&emsp;&emsp;</div>
+<div>629&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>630&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the number of instances pending output</div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>632&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the number of instances pending output</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws NullPointerException if no input structure has been defined</div>
+<div>634&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>635&emsp;&emsp;&nbsp;&nbsp;  public int numPendingOutput() {</div>
+<div>636&emsp;&emsp;</div>
+<div style="background-color:limegreen;">637&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_OutputFormat == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new NullPointerException("No output instance format defined");</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>640&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_OutputQueue.size();</div>
+<div>641&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>642&emsp;&emsp;</div>
+<div>643&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>644&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns whether the output format is ready to be collected</div>
+<div>645&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>646&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if the output format is set</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;  public boolean isOutputFormatDefined() {</div>
+<div>649&emsp;&emsp;</div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return (m_OutputFormat != null);</div>
+<div>651&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>652&emsp;&emsp;</div>
+<div>653&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>654&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Creates a deep copy of the given filter using serialization.</div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>656&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param model the filter to copy</div>
+<div>657&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a deep copy of the filter</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if an error occurs</div>
+<div>659&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>660&emsp;&emsp;&nbsp;&nbsp;  public static Filter makeCopy(Filter model) throws Exception {</div>
+<div>661&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return (Filter) new SerializedObject(model).getObject();</div>
+<div>662&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>663&emsp;&emsp;</div>
+<div>664&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>665&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Creates a given number of deep copies of the given filter using</div>
+<div>666&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * serialization.</div>
+<div>667&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>668&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param model the filter to copy</div>
+<div>669&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param num the number of filter copies to create.</div>
+<div>670&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return an array of filters.</div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if an error occurs</div>
+<div>672&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>673&emsp;&emsp;&nbsp;&nbsp;  public static Filter[] makeCopies(Filter model, int num) throws Exception {</div>
+<div>674&emsp;&emsp;</div>
+<div>675&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (model == null) {</div>
+<div>676&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("No model filter set");</div>
+<div>677&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Filter[] filters = new Filter[num];</div>
+<div>679&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    SerializedObject so = new SerializedObject(model);</div>
+<div>680&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; filters.length; i++) {</div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      filters[i] = (Filter) so.getObject();</div>
+<div>682&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>683&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return filters;</div>
+<div>684&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>685&emsp;&emsp;</div>
+<div>686&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Filters an entire set of instances through a filter and returns the new</div>
+<div>688&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * set.</div>
+<div>689&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>690&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param data the data to be filtered</div>
+<div>691&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param filter the filter to be used</div>
+<div>692&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the filtered set of data</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the filter can't be used successfully</div>
+<div>694&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>695&emsp;&emsp;&nbsp;&nbsp;  public static Instances useFilter(Instances data, Filter filter)</div>
+<div>696&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>697&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>698&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * System.err.println(filter.getClass().getName() + " in:" +</div>
+<div>699&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * data.numInstances());</div>
+<div>700&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div style="background-color:limegreen;">701&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; data.numInstances(); i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>702&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      filter.input(data.instance(i));</div>
+<div>703&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>704&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    filter.batchFinished();</div>
+<div>705&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances newData = filter.getOutputFormat();</div>
+<div>706&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instance processed;</div>
+<div style="background-color:limegreen;">707&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    while ((processed = filter.output()) != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>708&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      newData.add(processed);</div>
+<div>709&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>710&emsp;&emsp;</div>
+<div>711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>712&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * System.err.println(filter.getClass().getName() + " out:" +</div>
+<div>713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * newData.numInstances());</div>
+<div>714&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return newData;</div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>717&emsp;&emsp;</div>
+<div>718&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>719&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns a description of the filter, by default only the classname.</div>
+<div>720&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>721&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a string describing the filter</div>
+<div>722&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>723&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>724&emsp;&emsp;&nbsp;&nbsp;  public String toString() {</div>
+<div>725&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return this.getClass().getName();</div>
+<div>726&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>727&emsp;&emsp;</div>
+<div>728&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>729&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * generates source code from the filter</div>
+<div>730&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>731&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param filter the filter to output as source</div>
+<div>732&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param className the name of the generated class</div>
+<div>733&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param input the input data the header is generated for</div>
+<div>734&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param output the output data the header is generated for</div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the generated source code</div>
+<div>736&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if source code cannot be generated</div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>738&emsp;&emsp;&nbsp;&nbsp;  public static String wekaStaticWrapper(Sourcable filter, String className,</div>
+<div>739&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances input, Instances output) throws Exception {</div>
+<div>740&emsp;&emsp;</div>
+<div>741&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    StringBuffer result;</div>
+<div>742&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int i;</div>
+<div>743&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int n;</div>
+<div>744&emsp;&emsp;</div>
+<div>745&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = new StringBuffer();</div>
+<div>746&emsp;&emsp;</div>
+<div>747&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("// Generated with Weka " + Version.VERSION + "\n");</div>
+<div>748&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("//\n");</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result</div>
+<div>750&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .append("// This code is public domain and comes with no warranty.\n");</div>
+<div>751&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("//\n");</div>
+<div>752&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("// Timestamp: " + new Date() + "\n");</div>
+<div>753&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("// Relation: " + input.relationName() + "\n");</div>
+<div>754&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>755&emsp;&emsp;</div>
+<div>756&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("package weka.filters;\n");</div>
+<div>757&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>758&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("import weka.core.Attribute;\n");</div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("import weka.core.Capabilities;\n");</div>
+<div>760&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("import weka.core.Capabilities.Capability;\n");</div>
+<div>761&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("import weka.core.DenseInstance;\n");</div>
+<div>762&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("import weka.core.Instance;\n");</div>
+<div>763&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("import weka.core.Instances;\n");</div>
+<div>764&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("import weka.core.Utils;\n");</div>
+<div>765&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("import weka.filters.Filter;\n");</div>
+<div>766&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("import java.util.ArrayList;\n");</div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>768&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("public class WekaWrapper\n");</div>
+<div>769&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  extends Filter {\n");</div>
+<div>770&emsp;&emsp;</div>
+<div>771&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // globalInfo</div>
+<div>772&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>773&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  /**\n");</div>
+<div>774&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * Returns only the toString() method.\n");</div>
+<div>775&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   *\n");</div>
+<div>776&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * @return a string describing the filter\n");</div>
+<div>777&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   */\n");</div>
+<div>778&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  public String globalInfo() {\n");</div>
+<div>779&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    return toString();\n");</div>
+<div>780&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  }\n");</div>
+<div>781&emsp;&emsp;</div>
+<div>782&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // getCapabilities</div>
+<div>783&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>784&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  /**\n");</div>
+<div>785&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * Returns the capabilities of this filter.\n");</div>
+<div>786&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   *\n");</div>
+<div>787&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * @return the capabilities\n");</div>
+<div>788&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   */\n");</div>
+<div>789&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  public Capabilities getCapabilities() {\n");</div>
+<div>790&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append(((Filter) filter).getCapabilities().toSource("result", 4));</div>
+<div>791&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    return result;\n");</div>
+<div>792&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  }\n");</div>
+<div>793&emsp;&emsp;</div>
+<div>794&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // objectsToInstance</div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>796&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  /**\n");</div>
+<div>797&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * turns array of Objects into an Instance object\n");</div>
+<div>798&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   *\n");</div>
+<div>799&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result</div>
+<div>800&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .append("   * @param obj	the Object array to turn into an Instance\n");</div>
+<div>801&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * @param format	the data format to use\n");</div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * @return		the generated Instance object\n");</div>
+<div>803&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   */\n");</div>
+<div>804&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append(</div>
+<div>805&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "  protected Instance objectsToInstance(Object[] obj, Instances format) {\n");</div>
+<div>806&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    Instance		result;\n");</div>
+<div>807&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    double[]		values;\n");</div>
+<div>808&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    int		i;\n");</div>
+<div>809&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>810&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    values = new double[obj.length];\n");</div>
+<div>811&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>812&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    for (i = 0 ; i &#60; obj.length; i++) {\n");</div>
+<div>813&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("      if (obj[i] == null)\n");</div>
+<div>814&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("        values[i] = Utils.missingValue();\n");</div>
+<div>815&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("      else if (format.attribute(i).isNumeric())\n");</div>
+<div>816&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("        values[i] = (Double) obj[i];\n");</div>
+<div>817&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("      else if (format.attribute(i).isNominal())\n");</div>
+<div>818&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append(</div>
+<div>819&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "        values[i] = format.attribute(i).indexOfValue((String) obj[i]);\n");</div>
+<div>820&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    }\n");</div>
+<div>821&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>822&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    // create new instance\n");</div>
+<div>823&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    result = new DenseInstance(1.0, values);\n");</div>
+<div>824&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    result.setDataset(format);\n");</div>
+<div>825&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>826&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    return result;\n");</div>
+<div>827&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  }\n");</div>
+<div>828&emsp;&emsp;</div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // instanceToObjects</div>
+<div>830&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>831&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  /**\n");</div>
+<div>832&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * turns the Instance object into an array of Objects\n");</div>
+<div>833&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   *\n");</div>
+<div>834&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * @param inst	the instance to turn into an array\n");</div>
+<div>835&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append(</div>
+<div>836&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "   * @return		the Object array representing the instance\n");</div>
+<div>837&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   */\n");</div>
+<div>838&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  protected Object[] instanceToObjects(Instance inst) {\n");</div>
+<div>839&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    Object[]	result;\n");</div>
+<div>840&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    int		i;\n");</div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>842&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    result = new Object[inst.numAttributes()];\n");</div>
+<div>843&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    for (i = 0 ; i &#60; inst.numAttributes(); i++) {\n");</div>
+<div>845&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("      if (inst.isMissing(i))\n");</div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  	result[i] = null;\n");</div>
+<div>847&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("      else if (inst.attribute(i).isNumeric())\n");</div>
+<div>848&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  	result[i] = inst.value(i);\n");</div>
+<div>849&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("      else\n");</div>
+<div>850&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  	result[i] = inst.stringValue(i);\n");</div>
+<div>851&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    }\n");</div>
+<div>852&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>853&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    return result;\n");</div>
+<div>854&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  }\n");</div>
+<div>855&emsp;&emsp;</div>
+<div>856&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // instancesToObjects</div>
+<div>857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>858&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  /**\n");</div>
+<div>859&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * turns the Instances object into an array of Objects\n");</div>
+<div>860&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   *\n");</div>
+<div>861&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * @param data	the instances to turn into an array\n");</div>
+<div>862&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append(</div>
+<div>863&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "   * @return		the Object array representing the instances\n");</div>
+<div>864&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   */\n");</div>
+<div>865&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result</div>
+<div>866&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .append("  protected Object[][] instancesToObjects(Instances data) {\n");</div>
+<div>867&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    Object[][]	result;\n");</div>
+<div>868&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    int		i;\n");</div>
+<div>869&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>870&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    result = new Object[data.numInstances()][];\n");</div>
+<div>871&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>872&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    for (i = 0; i &#60; data.numInstances(); i++)\n");</div>
+<div>873&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("      result[i] = instanceToObjects(data.instance(i));\n");</div>
+<div>874&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>875&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    return result;\n");</div>
+<div>876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  }\n");</div>
+<div>877&emsp;&emsp;</div>
+<div>878&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // setInputFormat</div>
+<div>879&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>880&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  /**\n");</div>
+<div>881&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * Only tests the input data.\n");</div>
+<div>882&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   *\n");</div>
+<div>883&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result</div>
+<div>884&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .append("   * @param instanceInfo the format of the data to convert\n");</div>
+<div>885&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append(</div>
+<div>886&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "   * @return always true, to indicate that the output format can \n");</div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   *         be collected immediately.\n");</div>
+<div>888&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   */\n");</div>
+<div>889&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append(</div>
+<div>890&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "  public boolean setInputFormat(Instances instanceInfo) throws Exception {\n");</div>
+<div>891&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    super.setInputFormat(instanceInfo);\n");</div>
+<div>892&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    \n");</div>
+<div>893&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    // generate output format\n");</div>
+<div>894&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result</div>
+<div>895&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .append("    ArrayList&#60;Attribute> atts = new ArrayList&#60;Attribute>();\n");</div>
+<div>896&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    ArrayList&#60;String> attValues;\n");</div>
+<div>897&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (i = 0; i &#60; output.numAttributes(); i++) {</div>
+<div>898&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result.append("    // " + output.attribute(i).name() + "\n");</div>
+<div>899&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (output.attribute(i).isNumeric()) {</div>
+<div>900&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result.append("    atts.add(new Attribute(\""</div>
+<div>901&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + output.attribute(i).name() + "\"));\n");</div>
+<div>902&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else if (output.attribute(i).isNominal()) {</div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result.append("    attValues = new ArrayList&#60;String>();\n");</div>
+<div>904&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (n = 0; n &#60; output.attribute(i).numValues(); n++) {</div>
+<div>905&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          result.append(</div>
+<div>906&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            "    attValues.add(\"" + output.attribute(i).value(n) + "\");\n");</div>
+<div>907&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>908&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result.append("    atts.add(new Attribute(\""</div>
+<div>909&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + output.attribute(i).name() + "\", attValues));\n");</div>
+<div>910&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>911&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new UnsupportedAttributeTypeException(</div>
+<div>912&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          "Attribute type '" + output.attribute(i).type() + "' (position "</div>
+<div>913&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + (i + 1) + ") is not supported!");</div>
+<div>914&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>915&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>916&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    \n");</div>
+<div>917&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    Instances format = new Instances(\""</div>
+<div>918&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      + output.relationName() + "\", atts, 0);\n");</div>
+<div>919&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    format.setClassIndex(" + output.classIndex() + ");\n");</div>
+<div>920&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    setOutputFormat(format);\n");</div>
+<div>921&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    \n");</div>
+<div>922&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    return true;\n");</div>
+<div>923&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  }\n");</div>
+<div>924&emsp;&emsp;</div>
+<div>925&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // input</div>
+<div>926&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>927&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  /**\n");</div>
+<div>928&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * Directly filters the instance.\n");</div>
+<div>929&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   *\n");</div>
+<div>930&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * @param instance the instance to convert\n");</div>
+<div>931&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result</div>
+<div>932&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .append("   * @return always true, to indicate that the output can \n");</div>
+<div>933&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   *         be collected immediately.\n");</div>
+<div>934&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   */\n");</div>
+<div>935&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result</div>
+<div>936&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .append("  public boolean input(Instance instance) throws Exception {\n");</div>
+<div>937&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    Object[] filtered = " + className</div>
+<div>938&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      + ".filter(instanceToObjects(instance));\n");</div>
+<div>939&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result</div>
+<div>940&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .append("    push(objectsToInstance(filtered, getOutputFormat()));\n");</div>
+<div>941&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    return true;\n");</div>
+<div>942&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  }\n");</div>
+<div>943&emsp;&emsp;</div>
+<div>944&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // batchFinished</div>
+<div>945&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>946&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  /**\n");</div>
+<div>947&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append(</div>
+<div>948&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "   * Performs a batch filtering of the buffered data, if any available.\n");</div>
+<div>949&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   *\n");</div>
+<div>950&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result</div>
+<div>951&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .append("   * @return true if instances were filtered otherwise false\n");</div>
+<div>952&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   */\n");</div>
+<div>953&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  public boolean batchFinished() throws Exception {\n");</div>
+<div>954&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    if (getInputFormat() == null)\n");</div>
+<div>955&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append(</div>
+<div>956&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "      throw new NullPointerException(\"No input instance format defined\");;\n");</div>
+<div>957&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>958&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    Instances inst = getInputFormat();\n");</div>
+<div>959&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    if (inst.numInstances() > 0) {\n");</div>
+<div>960&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("      Object[][] filtered = " + className</div>
+<div>961&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      + ".filter(instancesToObjects(inst));\n");</div>
+<div>962&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("      for (int i = 0; i &#60; filtered.length; i++) {\n");</div>
+<div>963&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append(</div>
+<div>964&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "        push(objectsToInstance(filtered[i], getOutputFormat()));\n");</div>
+<div>965&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("      }\n");</div>
+<div>966&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    }\n");</div>
+<div>967&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>968&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    flushInput();\n");</div>
+<div>969&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    m_NewBatch = true;\n");</div>
+<div>970&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    m_FirstBatchDone = true;\n");</div>
+<div>971&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>972&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    return (inst.numInstances() > 0);\n");</div>
+<div>973&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  }\n");</div>
+<div>974&emsp;&emsp;</div>
+<div>975&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // toString</div>
+<div>976&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>977&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  /**\n");</div>
+<div>978&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append(</div>
+<div>979&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "   * Returns only the classnames and what filter it is based on.\n");</div>
+<div>980&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   *\n");</div>
+<div>981&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * @return a short description\n");</div>
+<div>982&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   */\n");</div>
+<div>983&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  public String toString() {\n");</div>
+<div>984&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    return \"Auto-generated filter wrapper, based on "</div>
+<div>985&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      + filter.getClass().getName() + " (generated with Weka " + Version.VERSION</div>
+<div>986&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      + ").\\n" + "\" + this.getClass().getName() + \"/" + className + "\";\n");</div>
+<div>987&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  }\n");</div>
+<div>988&emsp;&emsp;</div>
+<div>989&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // main</div>
+<div>990&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>991&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  /**\n");</div>
+<div>992&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * Runs the filter from commandline.\n");</div>
+<div>993&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   *\n");</div>
+<div>994&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   * @param args the commandline arguments\n");</div>
+<div>995&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("   */\n");</div>
+<div>996&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  public static void main(String args[]) {\n");</div>
+<div>997&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("    runFilter(new WekaWrapper(), args);\n");</div>
+<div>998&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("  }\n");</div>
+<div>999&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("}\n");</div>
+<div>1000&emsp;&emsp;</div>
+<div>1001&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // actual filter code</div>
+<div>1002&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append("\n");</div>
+<div>1003&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.append(filter.toSource(className, input));</div>
+<div>1004&emsp;&emsp;</div>
+<div>1005&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result.toString();</div>
+<div>1006&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1007&emsp;&emsp;</div>
+<div>1008&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1009&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Method for testing filters.</div>
+<div>1010&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1011&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param filter the filter to use</div>
+<div>1012&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param options should contain the following arguments: &#60;br/></div>
+<div>1013&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          -i input_file &#60;br/></div>
+<div>1014&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          -o output_file &#60;br/></div>
+<div>1015&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          -c class_index &#60;br/></div>
+<div>1016&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          -z classname (for filters implementing weka.filters.Sourcable)</div>
+<div>1017&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          &#60;br/></div>
+<div>1018&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          -decimal num (the number of decimal places to use in the output;</div>
+<div>1019&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          default = 6) &#60;br/></div>
+<div>1020&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          or -h for help on options</div>
+<div>1021&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong or the user requests help on</div>
+<div>1022&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *           command options</div>
+<div>1023&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1024&emsp;&emsp;&nbsp;&nbsp;  public static void filterFile(Filter filter, String[] options)</div>
+<div>1025&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>1026&emsp;&emsp;</div>
+<div>1027&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean debug = false;</div>
+<div>1028&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances data = null;</div>
+<div>1029&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    DataSource input = null;</div>
+<div>1030&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PrintWriter output = null;</div>
+<div>1031&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean helpRequest;</div>
+<div>1032&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String sourceCode = "";</div>
+<div>1033&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int maxDecimalPlaces = 6;</div>
+<div>1034&emsp;&emsp;</div>
+<div>1035&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>1036&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      helpRequest = Utils.getFlag('h', options);</div>
+<div>1037&emsp;&emsp;</div>
+<div>1038&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (Utils.getFlag('d', options)) {</div>
+<div>1039&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        debug = true;</div>
+<div>1040&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1041&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String infileName = Utils.getOption('i', options);</div>
+<div>1042&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String outfileName = Utils.getOption('o', options);</div>
+<div>1043&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String classIndex = Utils.getOption('c', options);</div>
+<div>1044&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (filter instanceof Sourcable) {</div>
+<div>1045&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        sourceCode = Utils.getOption('z', options);</div>
+<div>1046&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1047&emsp;&emsp;</div>
+<div>1048&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String tmpStr = Utils.getOption("decimal", options);</div>
+<div>1049&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (tmpStr.length() > 0) {</div>
+<div>1050&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        maxDecimalPlaces = Integer.parseInt(tmpStr);</div>
+<div>1051&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1052&emsp;&emsp;</div>
+<div>1053&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (filter instanceof OptionHandler) {</div>
+<div>1054&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((OptionHandler) filter).setOptions(options);</div>
+<div>1055&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1056&emsp;&emsp;</div>
+<div>1057&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Utils.checkForRemainingOptions(options);</div>
+<div>1058&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (helpRequest) {</div>
+<div>1059&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("Help requested.\n");</div>
+<div>1060&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1061&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (infileName.length() != 0) {</div>
+<div>1062&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        input = new DataSource(infileName);</div>
+<div>1063&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1064&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        input = new DataSource(System.in);</div>
+<div>1065&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1066&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (outfileName.length() != 0) {</div>
+<div>1067&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        output = new PrintWriter(new FileOutputStream(outfileName));</div>
+<div>1068&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1069&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        output = new PrintWriter(System.out);</div>
+<div>1070&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1071&emsp;&emsp;</div>
+<div>1072&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      data = input.getStructure();</div>
+<div>1073&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (classIndex.length() != 0) {</div>
+<div>1074&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (classIndex.equals("first")) {</div>
+<div>1075&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          data.setClassIndex(0);</div>
+<div>1076&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else if (classIndex.equals("last")) {</div>
+<div>1077&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          data.setClassIndex(data.numAttributes() - 1);</div>
+<div>1078&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1079&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          data.setClassIndex(Integer.parseInt(classIndex) - 1);</div>
+<div>1080&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1081&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1082&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (Exception ex) {</div>
+<div>1083&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String filterOptions = "";</div>
+<div>1084&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Output the error and also the valid options</div>
+<div>1085&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (filter instanceof OptionHandler) {</div>
+<div>1086&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        filterOptions += "\nFilter options:\n\n";</div>
+<div>1087&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Enumeration&#60;Option> enu = ((OptionHandler) filter).listOptions();</div>
+<div>1088&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        while (enu.hasMoreElements()) {</div>
+<div>1089&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Option option = enu.nextElement();</div>
+<div>1090&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          filterOptions +=</div>
+<div>1091&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            option.synopsis() + '\n' + option.description() + "\n";</div>
+<div>1092&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1093&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1094&emsp;&emsp;</div>
+<div>1095&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String genericOptions =</div>
+<div>1096&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        "\nGeneral options:\n\n" + "-h\n" + "\tGet help on available options.\n"</div>
+<div>1097&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "\t(use -b -h for help on batch mode.)\n" + "-i &#60;file>\n"</div>
+<div>1098&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "\tThe name of the file containing input instances.\n"</div>
+<div>1099&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "\tIf not supplied then instances will be read from stdin.\n"</div>
+<div>1100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "-o &#60;file>\n"</div>
+<div>1101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "\tThe name of the file output instances will be written to.\n"</div>
+<div>1102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "\tIf not supplied then instances will be written to stdout.\n"</div>
+<div>1103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "-c &#60;class index>\n"</div>
+<div>1104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "\tThe number of the attribute to use as the class.\n"</div>
+<div>1105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "\t\"first\" and \"last\" are also valid entries.\n"</div>
+<div>1106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "\tIf not supplied then no class is assigned.\n"</div>
+<div>1107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "-decimal &#60;integer>\n"</div>
+<div>1108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "\tThe maximum number of digits to print after the decimal\n"</div>
+<div>1109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "\tplace for numeric values (default: 6)\n";</div>
+<div>1110&emsp;&emsp;</div>
+<div>1111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (filter instanceof Sourcable) {</div>
+<div>1112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        genericOptions += "-z &#60;class name>\n"</div>
+<div>1113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "\tOutputs the source code representing the trained filter.\n";</div>
+<div>1114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1115&emsp;&emsp;</div>
+<div>1116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception(</div>
+<div>1117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        '\n' + ex.getMessage() + filterOptions + genericOptions);</div>
+<div>1118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1119&emsp;&emsp;</div>
+<div>1120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (debug) {</div>
+<div>1121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.err.println("Setting input format");</div>
+<div>1122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean printedHeader = false;</div>
+<div>1124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (filter.setInputFormat(data)) {</div>
+<div>1125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (debug) {</div>
+<div>1126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println("Getting output format");</div>
+<div>1127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      output.println(filter.getOutputFormat().toString());</div>
+<div>1129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      printedHeader = true;</div>
+<div>1130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1131&emsp;&emsp;</div>
+<div>1132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Pass all the instances to the filter</div>
+<div>1133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instance inst;</div>
+<div>1134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while (input.hasMoreElements(data)) {</div>
+<div>1135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      inst = input.nextElement(data);</div>
+<div>1136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (debug) {</div>
+<div>1137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println("Input instance to filter");</div>
+<div>1138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (filter.input(inst)) {</div>
+<div>1140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (debug) {</div>
+<div>1141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          System.err.println("Filter said collect immediately");</div>
+<div>1142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (!printedHeader) {</div>
+<div>1144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw new Error(</div>
+<div>1145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            "Filter didn't return true from setInputFormat() " + "earlier!");</div>
+<div>1146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (debug) {</div>
+<div>1148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          System.err.println("Getting output instance");</div>
+<div>1149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        output</div>
+<div>1151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          .println(filter.output().toStringMaxDecimalDigits(maxDecimalPlaces));</div>
+<div>1152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1154&emsp;&emsp;</div>
+<div>1155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Say that input has finished, and print any pending output instances</div>
+<div>1156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (debug) {</div>
+<div>1157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.err.println("Setting end of batch");</div>
+<div>1158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (filter.batchFinished()) {</div>
+<div>1160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (debug) {</div>
+<div>1161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println("Filter said collect output");</div>
+<div>1162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!printedHeader) {</div>
+<div>1164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (debug) {</div>
+<div>1165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          System.err.println("Getting output format");</div>
+<div>1166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        output.println(filter.getOutputFormat().toString());</div>
+<div>1168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (debug) {</div>
+<div>1170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println("Getting output instance");</div>
+<div>1171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      while (filter.numPendingOutput() > 0) {</div>
+<div>1173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        output</div>
+<div>1174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          .println(filter.output().toStringMaxDecimalDigits(maxDecimalPlaces));</div>
+<div>1175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (debug) {</div>
+<div>1176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          System.err.println("Getting output instance");</div>
+<div>1177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (debug) {</div>
+<div>1181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.err.println("Done");</div>
+<div>1182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1183&emsp;&emsp;</div>
+<div>1184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (output != null) {</div>
+<div>1185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      output.close();</div>
+<div>1186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1187&emsp;&emsp;</div>
+<div>1188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (sourceCode.length() != 0) {</div>
+<div>1189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println(wekaStaticWrapper((Sourcable) filter, sourceCode, data,</div>
+<div>1190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        filter.getOutputFormat()));</div>
+<div>1191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1192&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1193&emsp;&emsp;</div>
+<div>1194&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1195&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Method for testing filters ability to process multiple batches.</div>
+<div>1196&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1197&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param filter the filter to use</div>
+<div>1198&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param options should contain the following arguments: &#60;br/></div>
+<div>1199&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          -i (first) input file &#60;br/></div>
+<div>1200&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          -o (first) output file &#60;br/></div>
+<div>1201&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          -r (second) input file &#60;br/></div>
+<div>1202&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          -s (second) output file &#60;br/></div>
+<div>1203&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          -c class_index &#60;br/></div>
+<div>1204&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          -z classname (for filters implementing weka.filters.Sourcable)</div>
+<div>1205&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          &#60;br/></div>
+<div>1206&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          -decimal num (the number of decimal places to use in the output;</div>
+<div>1207&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          default = 6) &#60;br/></div>
+<div>1208&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          or -h for help on options</div>
+<div>1209&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong or the user requests help on</div>
+<div>1210&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *           command options</div>
+<div>1211&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1212&emsp;&emsp;&nbsp;&nbsp;  public static void batchFilterFile(Filter filter, String[] options)</div>
+<div>1213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>1214&emsp;&emsp;</div>
+<div>1215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances firstData = null;</div>
+<div>1216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances secondData = null;</div>
+<div>1217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    DataSource firstInput = null;</div>
+<div>1218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    DataSource secondInput = null;</div>
+<div>1219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PrintWriter firstOutput = null;</div>
+<div>1220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PrintWriter secondOutput = null;</div>
+<div>1221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean helpRequest;</div>
+<div>1222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String sourceCode = "";</div>
+<div>1223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int maxDecimalPlaces = 6;</div>
+<div>1224&emsp;&emsp;</div>
+<div>1225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>1226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      helpRequest = Utils.getFlag('h', options);</div>
+<div>1227&emsp;&emsp;</div>
+<div>1228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String fileName = Utils.getOption('i', options);</div>
+<div>1229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (fileName.length() != 0) {</div>
+<div>1230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        firstInput = new DataSource(fileName);</div>
+<div>1231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("No first input file given.\n");</div>
+<div>1233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1234&emsp;&emsp;</div>
+<div>1235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      fileName = Utils.getOption('r', options);</div>
+<div>1236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (fileName.length() != 0) {</div>
+<div>1237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        secondInput = new DataSource(fileName);</div>
+<div>1238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("No second input file given.\n");</div>
+<div>1240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1241&emsp;&emsp;</div>
+<div>1242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      fileName = Utils.getOption('o', options);</div>
+<div>1243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (fileName.length() != 0) {</div>
+<div>1244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        firstOutput = new PrintWriter(new FileOutputStream(fileName));</div>
+<div>1245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        firstOutput = new PrintWriter(System.out);</div>
+<div>1247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1248&emsp;&emsp;</div>
+<div>1249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      fileName = Utils.getOption('s', options);</div>
+<div>1250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (fileName.length() != 0) {</div>
+<div>1251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        secondOutput = new PrintWriter(new FileOutputStream(fileName));</div>
+<div>1252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        secondOutput = new PrintWriter(System.out);</div>
+<div>1254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String classIndex = Utils.getOption('c', options);</div>
+<div>1256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (filter instanceof Sourcable) {</div>
+<div>1257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        sourceCode = Utils.getOption('z', options);</div>
+<div>1258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1259&emsp;&emsp;</div>
+<div>1260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String tmpStr = Utils.getOption("decimal", options);</div>
+<div>1261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (tmpStr.length() > 0) {</div>
+<div>1262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        maxDecimalPlaces = Integer.parseInt(tmpStr);</div>
+<div>1263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1264&emsp;&emsp;</div>
+<div>1265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (filter instanceof OptionHandler) {</div>
+<div>1266&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((OptionHandler) filter).setOptions(options);</div>
+<div>1267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Utils.checkForRemainingOptions(options);</div>
+<div>1269&emsp;&emsp;</div>
+<div>1270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (helpRequest) {</div>
+<div>1271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("Help requested.\n");</div>
+<div>1272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      firstData = firstInput.getStructure();</div>
+<div>1274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      secondData = secondInput.getStructure();</div>
+<div>1275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!secondData.equalHeaders(firstData)) {</div>
+<div>1276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("Input file formats differ.\n"</div>
+<div>1277&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + secondData.equalHeadersMsg(firstData) + "\n");</div>
+<div>1278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (classIndex.length() != 0) {</div>
+<div>1280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (classIndex.equals("first")) {</div>
+<div>1281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          firstData.setClassIndex(0);</div>
+<div>1282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          secondData.setClassIndex(0);</div>
+<div>1283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else if (classIndex.equals("last")) {</div>
+<div>1284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          firstData.setClassIndex(firstData.numAttributes() - 1);</div>
+<div>1285&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          secondData.setClassIndex(secondData.numAttributes() - 1);</div>
+<div>1286&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          firstData.setClassIndex(Integer.parseInt(classIndex) - 1);</div>
+<div>1288&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          secondData.setClassIndex(Integer.parseInt(classIndex) - 1);</div>
+<div>1289&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (Exception ex) {</div>
+<div>1292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String filterOptions = "";</div>
+<div>1293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Output the error and also the valid options</div>
+<div>1294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (filter instanceof OptionHandler) {</div>
+<div>1295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        filterOptions += "\nFilter options:\n\n";</div>
+<div>1296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Enumeration&#60;Option> enu = ((OptionHandler) filter).listOptions();</div>
+<div>1297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        while (enu.hasMoreElements()) {</div>
+<div>1298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Option option = enu.nextElement();</div>
+<div>1299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          filterOptions +=</div>
+<div>1300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            option.synopsis() + '\n' + option.description() + "\n";</div>
+<div>1301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1303&emsp;&emsp;</div>
+<div>1304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String genericOptions = "\nGeneral options:\n\n" + "-h\n"</div>
+<div>1305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "\tGet help on available options.\n" + "-i &#60;filename>\n"</div>
+<div>1306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "\tThe file containing first input instances.\n" + "-o &#60;filename>\n"</div>
+<div>1307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "\tThe file first output instances will be written to.\n"</div>
+<div>1308&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "-r &#60;filename>\n" + "\tThe file containing second input instances.\n"</div>
+<div>1309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "-s &#60;filename>\n"</div>
+<div>1310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "\tThe file second output instances will be written to.\n"</div>
+<div>1311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "-c &#60;class index>\n"</div>
+<div>1312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "\tThe number of the attribute to use as the class.\n"</div>
+<div>1313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "\t\"first\" and \"last\" are also valid entries.\n"</div>
+<div>1314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "\tIf not supplied then no class is assigned.\n"</div>
+<div>1315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "-decimal &#60;integer>\n"</div>
+<div>1316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "\tThe maximum number of digits to print after the decimal\n"</div>
+<div>1317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "\tplace for numeric values (default: 6)\n";</div>
+<div>1318&emsp;&emsp;</div>
+<div>1319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (filter instanceof Sourcable) {</div>
+<div>1320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        genericOptions += "-z &#60;class name>\n"</div>
+<div>1321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "\tOutputs the source code representing the trained filter.\n";</div>
+<div>1322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1323&emsp;&emsp;</div>
+<div>1324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception(</div>
+<div>1325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        '\n' + ex.getMessage() + filterOptions + genericOptions);</div>
+<div>1326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean printedHeader = false;</div>
+<div>1328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (filter.setInputFormat(firstData)) {</div>
+<div>1329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      firstOutput.println(filter.getOutputFormat().toString());</div>
+<div>1330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      printedHeader = true;</div>
+<div>1331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1332&emsp;&emsp;</div>
+<div>1333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Pass all the instances to the filter</div>
+<div>1334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instance inst;</div>
+<div>1335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while (firstInput.hasMoreElements(firstData)) {</div>
+<div>1336&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      inst = firstInput.nextElement(firstData);</div>
+<div>1337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (filter.input(inst)) {</div>
+<div>1338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (!printedHeader) {</div>
+<div>1339&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw new Error(</div>
+<div>1340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            "Filter didn't return true from setInputFormat() " + "earlier!");</div>
+<div>1341&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        firstOutput</div>
+<div>1343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          .println(filter.output().toStringMaxDecimalDigits(maxDecimalPlaces));</div>
+<div>1344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1346&emsp;&emsp;</div>
+<div>1347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Say that input has finished, and print any pending output instances</div>
+<div>1348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (filter.batchFinished()) {</div>
+<div>1349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!printedHeader) {</div>
+<div>1350&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        firstOutput.println(filter.getOutputFormat().toString());</div>
+<div>1351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      while (filter.numPendingOutput() > 0) {</div>
+<div>1353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        firstOutput</div>
+<div>1354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          .println(filter.output().toStringMaxDecimalDigits(maxDecimalPlaces));</div>
+<div>1355&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1357&emsp;&emsp;</div>
+<div>1358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (firstOutput != null) {</div>
+<div>1359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      firstOutput.close();</div>
+<div>1360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    printedHeader = false;</div>
+<div>1362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (filter.isOutputFormatDefined()) {</div>
+<div>1363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      secondOutput.println(filter.getOutputFormat().toString());</div>
+<div>1364&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      printedHeader = true;</div>
+<div>1365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Pass all the second instances to the filter</div>
+<div>1367&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while (secondInput.hasMoreElements(secondData)) {</div>
+<div>1368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      inst = secondInput.nextElement(secondData);</div>
+<div>1369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (filter.input(inst)) {</div>
+<div>1370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (!printedHeader) {</div>
+<div>1371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw new Error("Filter didn't return true from"</div>
+<div>1372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + " isOutputFormatDefined() earlier!");</div>
+<div>1373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        secondOutput</div>
+<div>1375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          .println(filter.output().toStringMaxDecimalDigits(maxDecimalPlaces));</div>
+<div>1376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1377&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1378&emsp;&emsp;</div>
+<div>1379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Say that input has finished, and print any pending output instances</div>
+<div>1380&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (filter.batchFinished()) {</div>
+<div>1381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!printedHeader) {</div>
+<div>1382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        secondOutput.println(filter.getOutputFormat().toString());</div>
+<div>1383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      while (filter.numPendingOutput() > 0) {</div>
+<div>1385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        secondOutput</div>
+<div>1386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          .println(filter.output().toStringMaxDecimalDigits(maxDecimalPlaces));</div>
+<div>1387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (secondOutput != null) {</div>
+<div>1390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      secondOutput.close();</div>
+<div>1391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1392&emsp;&emsp;</div>
+<div>1393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (sourceCode.length() != 0) {</div>
+<div>1394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println(wekaStaticWrapper((Sourcable) filter, sourceCode,</div>
+<div>1395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        firstData, filter.getOutputFormat()));</div>
+<div>1396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1397&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1398&emsp;&emsp;</div>
+<div>1399&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1400&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * runs the filter instance with the given options.</div>
+<div>1401&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1402&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param filter the filter to run</div>
+<div>1403&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param options the commandline options</div>
+<div>1404&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1405&emsp;&emsp;&nbsp;&nbsp;  public static void runFilter(Filter filter, String[] options) {</div>
+<div>1406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>1407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      filter.preExecution();</div>
+<div>1408&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (Utils.getFlag('b', options)) {</div>
+<div>1409&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Filter.batchFilterFile(filter, options);</div>
+<div>1410&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Filter.filterFile(filter, options);</div>
+<div>1412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (Exception e) {</div>
+<div>1414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if ((e.toString().indexOf("Help requested") == -1)</div>
+<div>1415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        && (e.toString().indexOf("Filter options") == -1)) {</div>
+<div>1416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        e.printStackTrace();</div>
+<div>1417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println(e.getMessage());</div>
+<div>1419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>1422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      filter.postExecution();</div>
+<div>1423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (Exception ex) {</div>
+<div>1424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ex.printStackTrace();</div>
+<div>1425&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1426&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1427&emsp;&emsp;</div>
+<div>1428&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1429&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns an enumeration describing the available options.</div>
+<div>1430&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1431&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return an enumeration of all the available options.</div>
+<div>1432&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1433&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1434&emsp;&emsp;&nbsp;&nbsp;  public Enumeration&#60;Option> listOptions() {</div>
+<div>1435&emsp;&emsp;</div>
+<div>1436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Vector&#60;Option> newVector =</div>
+<div>1437&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Option.listOptionsForClassHierarchy(this.getClass(), Filter.class);</div>
+<div>1438&emsp;&emsp;</div>
+<div>1439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    newVector.addElement(new Option(</div>
+<div>1440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "\tIf set, filter is run in debug mode and\n"</div>
+<div>1441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "\tmay output additional info to the console",</div>
+<div>1442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "output-debug-info", 0, "-output-debug-info"));</div>
+<div>1443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    newVector.addElement(new Option(</div>
+<div>1444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "\tIf set, filter capabilities are not checked before filter is built\n"</div>
+<div>1445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "\t(use with caution).",</div>
+<div>1446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "-do-not-check-capabilities", 0, "-do-not-check-capabilities"));</div>
+<div>1447&emsp;&emsp;</div>
+<div>1448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return newVector.elements();</div>
+<div>1449&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1450&emsp;&emsp;</div>
+<div>1451&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1452&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Parses a given list of options. Valid options are:</div>
+<div>1453&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;p></div>
+<div>1454&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1455&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * -D &#60;br></div>
+<div>1456&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * If set, filter is run in debug mode and may output additional info to the</div>
+<div>1457&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * console.</div>
+<div>1458&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;p></div>
+<div>1459&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1460&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * -do-not-check-capabilities &#60;br></div>
+<div>1461&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * If set, filter capabilities are not checked before filter is built (use</div>
+<div>1462&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * with caution).</div>
+<div>1463&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;p></div>
+<div>1464&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1465&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param options the list of options as an array of strings</div>
+<div>1466&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @exception Exception if an option is not supported</div>
+<div>1467&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1468&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1469&emsp;&emsp;&nbsp;&nbsp;  public void setOptions(String[] options) throws Exception {</div>
+<div>1470&emsp;&emsp;</div>
+<div>1471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Option.setOptionsForHierarchy(options, this, Filter.class);</div>
+<div>1472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    setDebug(Utils.getFlag("output-debug-info", options));</div>
+<div>1473&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    setDoNotCheckCapabilities(</div>
+<div>1474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Utils.getFlag("do-not-check-capabilities", options));</div>
+<div>1475&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1476&emsp;&emsp;</div>
+<div>1477&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1478&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Gets the current settings of the filter.</div>
+<div>1479&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1480&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return an array of strings suitable for passing to setOptions</div>
+<div>1481&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1482&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1483&emsp;&emsp;&nbsp;&nbsp;  public String[] getOptions() {</div>
+<div>1484&emsp;&emsp;</div>
+<div>1485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Vector&#60;String> options = new Vector&#60;String>();</div>
+<div>1486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (String s : Option.getOptionsForHierarchy(this, Filter.class)) {</div>
+<div>1487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      options.add(s);</div>
+<div>1488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1489&emsp;&emsp;</div>
+<div>1490&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (getDebug()) {</div>
+<div>1491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      options.add("-output-debug-info");</div>
+<div>1492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (getDoNotCheckCapabilities()) {</div>
+<div>1494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      options.add("-do-not-check-capabilities");</div>
+<div>1495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1496&emsp;&emsp;</div>
+<div>1497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return options.toArray(new String[0]);</div>
+<div>1498&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1499&emsp;&emsp;</div>
+<div>1500&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1501&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Set debugging mode.</div>
+<div>1502&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1503&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param debug true if debug output should be printed</div>
+<div>1504&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1505&emsp;&emsp;&nbsp;&nbsp;  public void setDebug(boolean debug) {</div>
+<div>1506&emsp;&emsp;</div>
+<div>1507&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Debug = debug;</div>
+<div>1508&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1509&emsp;&emsp;</div>
+<div>1510&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1511&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get whether debugging is turned on.</div>
+<div>1512&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1513&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if debugging output is on</div>
+<div>1514&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1515&emsp;&emsp;&nbsp;&nbsp;  public boolean getDebug() {</div>
+<div>1516&emsp;&emsp;</div>
+<div>1517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_Debug;</div>
+<div>1518&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1519&emsp;&emsp;</div>
+<div>1520&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1521&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the tip text for this property</div>
+<div>1522&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1523&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return tip text for this property suitable for displaying in the</div>
+<div>1524&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         explorer/experimenter gui</div>
+<div>1525&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1526&emsp;&emsp;&nbsp;&nbsp;  public String debugTipText() {</div>
+<div>1527&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return "If set to true, filter may output additional info to "</div>
+<div>1528&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      + "the console.";</div>
+<div>1529&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1530&emsp;&emsp;</div>
+<div>1531&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1532&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Set whether not to check capabilities.</div>
+<div>1533&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1534&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param doNotCheckCapabilities true if capabilities are not to be checked.</div>
+<div>1535&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1536&emsp;&emsp;&nbsp;&nbsp;  public void setDoNotCheckCapabilities(boolean doNotCheckCapabilities) {</div>
+<div>1537&emsp;&emsp;</div>
+<div>1538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_DoNotCheckCapabilities = doNotCheckCapabilities;</div>
+<div>1539&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1540&emsp;&emsp;</div>
+<div>1541&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1542&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get whether capabilities checking is turned off.</div>
+<div>1543&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1544&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if capabilities checking is turned off.</div>
+<div>1545&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1546&emsp;&emsp;&nbsp;&nbsp;  public boolean getDoNotCheckCapabilities() {</div>
+<div>1547&emsp;&emsp;</div>
+<div>1548&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_DoNotCheckCapabilities;</div>
+<div>1549&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1550&emsp;&emsp;</div>
+<div>1551&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1552&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the tip text for this property</div>
+<div>1553&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1554&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return tip text for this property suitable for displaying in the</div>
+<div>1555&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         explorer/experimenter gui</div>
+<div>1556&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1557&emsp;&emsp;&nbsp;&nbsp;  public String doNotCheckCapabilitiesTipText() {</div>
+<div>1558&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return "If set, filters capabilities are not checked before filter is built"</div>
+<div>1559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      + " (Use with caution to reduce runtime).";</div>
+<div>1560&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1561&emsp;&emsp;</div>
+<div>1562&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1563&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Perform any setup stuff that might need to happen before commandline</div>
+<div>1564&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * execution. Subclasses should override if they need to do something here</div>
+<div>1565&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1566&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs during setup</div>
+<div>1567&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1568&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1569&emsp;&emsp;&nbsp;&nbsp;  public void preExecution() throws Exception {</div>
+<div>1570&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1571&emsp;&emsp;</div>
+<div>1572&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1573&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Execute the supplied object.</div>
+<div>1574&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1575&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param toRun the object to execute</div>
+<div>1576&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param options any options to pass to the object</div>
+<div>1577&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the object is not of the expected type.</div>
+<div>1578&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1579&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1580&emsp;&emsp;&nbsp;&nbsp;  public void run(Object toRun, String[] options) throws Exception {</div>
+<div>1581&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!(toRun instanceof Filter)) {</div>
+<div>1582&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new IllegalArgumentException("Object to run is not a Filter!");</div>
+<div>1583&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1584&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    runFilter((Filter) toRun, options);</div>
+<div>1585&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1586&emsp;&emsp;</div>
+<div>1587&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1588&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Perform any teardown stuff that might need to happen after execution.</div>
+<div>1589&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Subclasses should override if they need to do something here</div>
+<div>1590&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1591&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs during teardown</div>
+<div>1592&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1593&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1594&emsp;&emsp;&nbsp;&nbsp;  public void postExecution() throws Exception {</div>
+<div>1595&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1596&emsp;&emsp;</div>
+<div>1597&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1598&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Main method for testing this class.</div>
+<div>1599&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>1600&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param args should contain arguments to the filter: use -h for help</div>
+<div>1601&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1602&emsp;&emsp;&nbsp;&nbsp;  public static void main(String[] args) {</div>
+<div>1603&emsp;&emsp;</div>
+<div>1604&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>1605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (args.length == 0) {</div>
+<div>1606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception(</div>
+<div>1607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          "First argument must be the class name of a Filter");</div>
+<div>1608&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1609&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String fname = args[0];</div>
+<div>1610&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Filter f = (Filter) Class.forName(fname).newInstance();</div>
+<div>1611&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      args[0] = "";</div>
+<div>1612&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      runFilter(f, args);</div>
+<div>1613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (Exception ex) {</div>
+<div>1614&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ex.printStackTrace();</div>
+<div>1615&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.err.println(ex.getMessage());</div>
+<div>1616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1617&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1618&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

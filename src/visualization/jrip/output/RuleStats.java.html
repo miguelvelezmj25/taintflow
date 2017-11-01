@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>RuleStats.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *   This program is free software: you can redistribute it and/or modify</div>
+<div>3&emsp;&emsp;&nbsp; *   it under the terms of the GNU General Public License as published by</div>
+<div>4&emsp;&emsp;&nbsp; *   the Free Software Foundation, either version 3 of the License, or</div>
+<div>5&emsp;&emsp;&nbsp; *   (at your option) any later version.</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; *   This program is distributed in the hope that it will be useful,</div>
+<div>8&emsp;&emsp;&nbsp; *   but WITHOUT ANY WARRANTY; without even the implied warranty of</div>
+<div>9&emsp;&emsp;&nbsp; *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</div>
+<div>10&emsp;&emsp;&nbsp; *   GNU General Public License for more details.</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; *   You should have received a copy of the GNU General Public License</div>
+<div>13&emsp;&emsp;&nbsp; *   along with this program.  If not, see &#60;http://www.gnu.org/licenses/>.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/*</div>
+<div>17&emsp;&emsp;&nbsp; *    RuleStats.java</div>
+<div>18&emsp;&emsp;&nbsp; *    Copyright (C) 2001-2012 University of Waikato, Hamilton, New Zealand</div>
+<div>19&emsp;&emsp;&nbsp; */</div>
+<div>20&emsp;&emsp;</div>
+<div>21&emsp;&emsp;package weka.classifiers.rules;</div>
+<div>22&emsp;&emsp;</div>
+<div>23&emsp;&emsp;import java.io.Serializable;</div>
+<div>24&emsp;&emsp;import java.util.ArrayList;</div>
+<div>25&emsp;&emsp;import java.util.Enumeration;</div>
+<div>26&emsp;&emsp;import java.util.Random;</div>
+<div>27&emsp;&emsp;</div>
+<div>28&emsp;&emsp;import weka.core.Attribute;</div>
+<div>29&emsp;&emsp;import weka.core.Instance;</div>
+<div>30&emsp;&emsp;import weka.core.Instances;</div>
+<div>31&emsp;&emsp;import weka.core.RevisionHandler;</div>
+<div>32&emsp;&emsp;import weka.core.RevisionUtils;</div>
+<div>33&emsp;&emsp;import weka.core.Utils;</div>
+<div>34&emsp;&emsp;</div>
+<div>35&emsp;&emsp;/**</div>
+<div>36&emsp;&emsp;&nbsp; * This class implements the statistics functions used in the propositional rule</div>
+<div>37&emsp;&emsp;&nbsp; * learner, from the simpler ones like count of true/false positive/negatives,</div>
+<div>38&emsp;&emsp;&nbsp; * filter data based on the ruleset, etc. to the more sophisticated ones such as</div>
+<div>39&emsp;&emsp;&nbsp; * MDL calculation and rule variants generation for each rule in the ruleset.</div>
+<div>40&emsp;&emsp;&nbsp; * &#60;p></div>
+<div>41&emsp;&emsp;&nbsp; * </div>
+<div>42&emsp;&emsp;&nbsp; * Obviously the statistics functions listed above need the specific data and</div>
+<div>43&emsp;&emsp;&nbsp; * the specific ruleset, which are given in order to instantiate an object of</div>
+<div>44&emsp;&emsp;&nbsp; * this class.</div>
+<div>45&emsp;&emsp;&nbsp; * &#60;p></div>
+<div>46&emsp;&emsp;&nbsp; * </div>
+<div>47&emsp;&emsp;&nbsp; * @author Xin Xu (xx5@cs.waikato.ac.nz)</div>
+<div>48&emsp;&emsp;&nbsp; * @version $Revision: 10153 $</div>
+<div>49&emsp;&emsp;&nbsp; */</div>
+<div>50&emsp;&emsp;public class RuleStats implements Serializable, RevisionHandler {</div>
+<div>51&emsp;&emsp;</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;  /** for serialization */</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;  static final long serialVersionUID = -5708153367675298624L;</div>
+<div>54&emsp;&emsp;</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;  /** The data on which the stats calculation is based */</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;  private Instances m_Data;</div>
+<div>57&emsp;&emsp;</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;  /** The specific ruleset in question */</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;  private ArrayList&#60;Rule> m_Ruleset;</div>
+<div>60&emsp;&emsp;</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;  /** The simple stats of each rule */</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;  private ArrayList&#60;double[]> m_SimpleStats;</div>
+<div>63&emsp;&emsp;</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;  /** The set of instances filtered by the ruleset */</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;  private ArrayList&#60;Instances[]> m_Filtered;</div>
+<div>66&emsp;&emsp;</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * The total number of possible conditions that could appear in a rule</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;  private double m_Total;</div>
+<div>71&emsp;&emsp;</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;  /** The redundancy factor in theory description length */</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;  private static double REDUNDANCY_FACTOR = 0.5;</div>
+<div>74&emsp;&emsp;</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;  /** The theory weight in the MDL calculation */</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;  private double MDL_THEORY_WEIGHT = 1.0;</div>
+<div>77&emsp;&emsp;</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;  /** The class distributions predicted by each rule */</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;  private ArrayList&#60;double[]> m_Distributions;</div>
+<div>80&emsp;&emsp;</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;  /** Default constructor */</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;  public RuleStats() {</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Data = null;</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Ruleset = null;</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_SimpleStats = null;</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Filtered = null;</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Distributions = null;</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Total = -1;</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>90&emsp;&emsp;</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Constructor that provides ruleset and data</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param data the data</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param rules the ruleset</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;  public RuleStats(Instances data, ArrayList&#60;Rule> rules) {</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    this();</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Data = data;</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Ruleset = rules;</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>102&emsp;&emsp;</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Frees up memory after classifier has been built.</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;  public void cleanUp() {</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Data = null;</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Filtered = null;</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>110&emsp;&emsp;</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Set the number of all conditions that could appear in a rule in this</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * RuleStats object, if the number set is smaller than 0 (typically -1), then</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * it calcualtes based on the data store</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param total the set number</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;  public void setNumAllConds(double total) {</div>
+<div style="background-color:limegreen;">119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (total &#60; 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Total = numAllConditions(m_Data);</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Total = total;</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>125&emsp;&emsp;</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Set the data of the stats, overwriting the old one if any</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param data the data to be set</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;  public void setData(Instances data) {</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Data = data;</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>134&emsp;&emsp;</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get the data of the stats</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the data</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;  public Instances getData() {</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_Data;</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>143&emsp;&emsp;</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Set the ruleset of the stats, overwriting the old one if any</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param rules the set of rules to be set</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;  public void setRuleset(ArrayList&#60;Rule> rules) {</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Ruleset = rules;</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>152&emsp;&emsp;</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get the ruleset of the stats</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the set of rules</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;  public ArrayList&#60;Rule> getRuleset() {</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_Ruleset;</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>161&emsp;&emsp;</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get the size of the ruleset in the stats</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the size of ruleset</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;  public int getRulesetSize() {</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_Ruleset.size();</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>170&emsp;&emsp;</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get the simple stats of one rule, including 6 parameters: 0: coverage;</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * 1:uncoverage; 2: true positive; 3: true negatives; 4: false positives; 5:</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * false negatives</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param index the index of the rule</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the stats</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;  public double[] getSimpleStats(int index) {</div>
+<div style="background-color:limegreen;">180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if ((m_SimpleStats != null) && (index &#60; m_SimpleStats.size())) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_SimpleStats.get(index);</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>183&emsp;&emsp;</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return null;</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>186&emsp;&emsp;</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get the data after filtering the given rule</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param index the index of the rule</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the data covered and uncovered by the rule</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;  public Instances[] getFiltered(int index) {</div>
+<div>194&emsp;&emsp;</div>
+<div style="background-color:limegreen;">195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if ((m_Filtered != null) && (index &#60; m_Filtered.size())) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_Filtered.get(index);</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>198&emsp;&emsp;</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return null;</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>201&emsp;&emsp;</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get the class distribution predicted by the rule in given position</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param index the position index of the rule</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the class distributions</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;  public double[] getDistributions(int index) {</div>
+<div>209&emsp;&emsp;</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if ((m_Distributions != null) && (index &#60; m_Distributions.size())) {</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_Distributions.get(index);</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>213&emsp;&emsp;</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return null;</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>216&emsp;&emsp;</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Set the weight of theory in MDL calcualtion</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param weight the weight to be set</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;  public void setMDLTheoryWeight(double weight) {</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    MDL_THEORY_WEIGHT = weight;</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>225&emsp;&emsp;</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Compute the number of all possible conditions that could appear in a rule</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * of a given data. For nominal attributes, it's the number of values that</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * could appear; for numeric attributes, it's the number of values * 2, i.e.</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;= and >= are counted as different possible conditions.</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param data the given data</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return number of all conditions of the data</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;  public static double numAllConditions(Instances data) {</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double total = 0;</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Enumeration&#60;Attribute> attEnum = data.enumerateAttributes();</div>
+<div style="background-color:limegreen;">238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    while (attEnum.hasMoreElements()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute att = attEnum.nextElement();</div>
+<div style="background-color:limegreen;">240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (att.isNominal()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        total += att.numValues();</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        total += 2.0 * data.numDistinctValues(att);</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return total;</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>248&emsp;&emsp;</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Filter the data according to the ruleset and compute the basic stats:</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * coverage/uncoverage, true/false positive/negatives of each rule</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;  public void countData() {</div>
+<div style="background-color:limegreen;">254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if ((m_Filtered != null) || (m_Ruleset == null) || (m_Data == null)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return;</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>257&emsp;&emsp;</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int size = m_Ruleset.size();</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Filtered = new ArrayList&#60;Instances[]>(size);</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_SimpleStats = new ArrayList&#60;double[]>(size);</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Distributions = new ArrayList&#60;double[]>(size);</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances data = new Instances(m_Data);</div>
+<div>263&emsp;&emsp;</div>
+<div style="background-color:limegreen;">264&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; size; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] stats = new double[6]; // 6 statistics parameters</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] classCounts = new double[m_Data.classAttribute().numValues()];</div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances[] filtered = computeSimpleStats(i, data, stats, classCounts);</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Filtered.add(filtered);</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_SimpleStats.add(stats);</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Distributions.add(classCounts);</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      data = filtered[1]; // Data not covered</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>274&emsp;&emsp;</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Count data from the position index in the ruleset assuming that given data</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * are not covered by the rules in position 0...(index-1), and the statistics</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * of these rules are provided.&#60;br></div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * This procedure is typically useful when a temporary object of RuleStats is</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * constructed in order to efficiently calculate the relative DL of rule in</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * position index, thus all other stuff is not needed.</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param index the given position</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param uncovered the data not covered by rules before index</div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param prevRuleStats the provided stats of previous rules</div>
+<div>286&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;  public void countData(int index, Instances uncovered, double[][] prevRuleStats) {</div>
+<div style="background-color:limegreen;">288&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if ((m_Filtered != null) || (m_Ruleset == null)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>289&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return;</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>291&emsp;&emsp;</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int size = m_Ruleset.size();</div>
+<div>293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Filtered = new ArrayList&#60;Instances[]>(size);</div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_SimpleStats = new ArrayList&#60;double[]>(size);</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances[] data = new Instances[2];</div>
+<div>296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    data[1] = uncovered;</div>
+<div>297&emsp;&emsp;</div>
+<div style="background-color:limegreen;">298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; index; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_SimpleStats.add(prevRuleStats[i]);</div>
+<div style="background-color:limegreen;">300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (i + 1 == index) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Filtered.add(data);</div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Filtered.add(new Instances[0]); // Stuff sth.</div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>306&emsp;&emsp;</div>
+<div style="background-color:limegreen;">307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int j = index; j &#60; size; j++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>308&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] stats = new double[6]; // 6 statistics parameters</div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances[] filtered = computeSimpleStats(j, data[1], stats, null);</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Filtered.add(filtered);</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_SimpleStats.add(stats);</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      data = filtered; // Data not covered</div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>315&emsp;&emsp;</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Find all the instances in the dataset covered/not covered by the rule in</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * given index, and the correponding simple statistics and predicted class</div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * distributions are stored in the given double array, which can be obtained</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * by getSimpleStats() and getDistributions().&#60;br></div>
+<div>321&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>322&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param index the given index, assuming correct</div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param insts the dataset to be covered by the rule</div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param stats the given double array to hold stats, side-effected</div>
+<div>325&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param dist the given array to hold class distributions, side-effected if</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          null, the distribution is not necessary</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the instances covered and not covered by the rule</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;  private Instances[] computeSimpleStats(int index, Instances insts,</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] stats, double[] dist) {</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Rule rule = m_Ruleset.get(index);</div>
+<div>332&emsp;&emsp;</div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances[] data = new Instances[2];</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    data[0] = new Instances(insts, insts.numInstances());</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    data[1] = new Instances(insts, insts.numInstances());</div>
+<div>336&emsp;&emsp;</div>
+<div style="background-color:limegreen;">337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; insts.numInstances(); i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instance datum = insts.instance(i);</div>
+<div>339&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double weight = datum.weight();</div>
+<div style="background-color:limegreen;">340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (rule.covers(datum)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        data[0].add(datum); // Covered by this rule</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        stats[0] += weight; // Coverage</div>
+<div style="background-color:limegreen;">343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if ((int) datum.classValue() == (int) rule.getConsequent()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          stats[2] += weight; // True positives</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          stats[4] += weight; // False positives</div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div style="background-color:limegreen;">348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (dist != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          dist[(int) datum.classValue()] += weight;</div>
+<div>350&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        data[1].add(datum); // Not covered by this rule</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        stats[1] += weight;</div>
+<div style="background-color:limegreen;">354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if ((int) datum.classValue() != (int) rule.getConsequent()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          stats[3] += weight; // True negatives</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          stats[5] += weight; // False negatives</div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>361&emsp;&emsp;</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return data;</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>364&emsp;&emsp;</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add a rule to the ruleset and update the stats</div>
+<div>367&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param lastRule the rule to be added</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;  public void addAndUpdate(Rule lastRule) {</div>
+<div style="background-color:limegreen;">371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_Ruleset == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Ruleset = new ArrayList&#60;Rule>();</div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Ruleset.add(lastRule);</div>
+<div>375&emsp;&emsp;</div>
+<div style="background-color:limegreen;">376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    Instances data = (m_Filtered == null) ? m_Data : (m_Filtered.get(m_Filtered&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>377&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .size() - 1))[1];</div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] stats = new double[6];</div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] classCounts = new double[m_Data.classAttribute().numValues()];</div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances[] filtered = computeSimpleStats(m_Ruleset.size() - 1, data,</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      stats, classCounts);</div>
+<div>382&emsp;&emsp;</div>
+<div style="background-color:limegreen;">383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_Filtered == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Filtered = new ArrayList&#60;Instances[]>();</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Filtered.add(filtered);</div>
+<div>387&emsp;&emsp;</div>
+<div style="background-color:limegreen;">388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_SimpleStats == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_SimpleStats = new ArrayList&#60;double[]>();</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_SimpleStats.add(stats);</div>
+<div>392&emsp;&emsp;</div>
+<div style="background-color:limegreen;">393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_Distributions == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Distributions = new ArrayList&#60;double[]>();</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Distributions.add(classCounts);</div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>398&emsp;&emsp;</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Subset description length: &#60;br></div>
+<div>401&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * S(t,k,p) = -k*log2(p)-(n-k)log2(1-p)</div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Details see Quilan: "MDL and categorical theories (Continued)",ML95</div>
+<div>404&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param t the number of elements in a known set</div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param k the number of elements in a subset</div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param p the expected proportion of subset known by recipient</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the subset description length</div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>410&emsp;&emsp;&nbsp;&nbsp;  public static double subsetDL(double t, double k, double p) {</div>
+<div style="background-color:limegreen;">411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    double rt = Utils.gr(p, 0.0) ? (-k * Utils.log2(p)) : 0.0;&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    rt -= (t - k) * Utils.log2(1 - p);</div>
+<div>413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return rt;</div>
+<div>414&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>415&emsp;&emsp;</div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>417&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * The description length of the theory for a given rule. Computed as:&#60;br></div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * 0.5* [||k||+ S(t, k, k/t)]&#60;br></div>
+<div>419&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * where k is the number of antecedents of the rule; t is the total possible</div>
+<div>420&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * antecedents that could appear in a rule; ||K|| is the universal prior for k</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * , log2*(k) and S(t,k,p) = -k*log2(p)-(n-k)log2(1-p) is the subset encoding</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * length.</div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;p></div>
+<div>424&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Details see Quilan: "MDL and categorical theories (Continued)",ML95</div>
+<div>426&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param index the index of the given rule (assuming correct)</div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the theory DL, weighted if weight != 1.0</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;  public double theoryDL(int index) {</div>
+<div>431&emsp;&emsp;</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double k = m_Ruleset.get(index).size();</div>
+<div>433&emsp;&emsp;</div>
+<div style="background-color:limegreen;">434&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (k == 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return 0.0;</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>437&emsp;&emsp;</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double tdl = Utils.log2(k);</div>
+<div style="background-color:limegreen;">439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (k > 1) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      tdl += 2.0 * Utils.log2(tdl); // of log2 star</div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    tdl += subsetDL(m_Total, k, k / m_Total);</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // System.out.println("!!!theory: "+MDL_THEORY_WEIGHT * REDUNDANCY_FACTOR *</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // tdl);</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return MDL_THEORY_WEIGHT * REDUNDANCY_FACTOR * tdl;</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>447&emsp;&emsp;</div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * The description length of data given the parameters of the data based on</div>
+<div>450&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the ruleset.</div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;p></div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Details see Quinlan: "MDL and categorical theories (Continued)",ML95</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;p></div>
+<div>454&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>455&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param expFPOverErr expected FP/(FP+FN)</div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param cover coverage</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param uncover uncoverage</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param fp False Positive</div>
+<div>459&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param fn False Negative</div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the description length</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;  public static double dataDL(double expFPOverErr, double cover,</div>
+<div>463&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double uncover, double fp, double fn) {</div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double totalBits = Utils.log2(cover + uncover + 1.0); // how many data?</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double coverBits, uncoverBits; // What's the error?</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double expErr; // Expected FP or FN</div>
+<div>467&emsp;&emsp;</div>
+<div style="background-color:limegreen;">468&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (Utils.gr(cover, uncover)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      expErr = expFPOverErr * (fp + fn);</div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      coverBits = subsetDL(cover, fp, expErr / cover);</div>
+<div style="background-color:limegreen;">471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      uncoverBits = Utils.gr(uncover, 0.0) ? subsetDL(uncover, fn, fn / uncover)&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        : 0.0;</div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      expErr = (1.0 - expFPOverErr) * (fp + fn);</div>
+<div style="background-color:limegreen;">475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      coverBits = Utils.gr(cover, 0.0) ? subsetDL(cover, fp, fp / cover) : 0.0;&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      uncoverBits = subsetDL(uncover, fn, expErr / uncover);</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>478&emsp;&emsp;</div>
+<div>479&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * System.err.println("!!!cover: " + cover + "|uncover" + uncover +</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * "|coverBits: "+coverBits+"|uncBits: "+ uncoverBits+</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * "|FPRate: "+expFPOverErr + "|expErr: "+expErr+</div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * "|fp: "+fp+"|fn: "+fn+"|total: "+totalBits);</div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return (totalBits + coverBits + uncoverBits);</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>487&emsp;&emsp;</div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Calculate the potential to decrease DL of the ruleset, i.e. the possible DL</div>
+<div>490&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * that could be decreased by deleting the rule whose index and simple</div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * statstics are given. If there's no potentials (i.e. smOrEq 0 && error rate</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60; 0.5), it returns NaN.</div>
+<div>493&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;p></div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * The way this procedure does is copied from original RIPPER implementation</div>
+<div>496&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * and is quite bizzare because it does not update the following rules' stats</div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * recursively any more when testing each rule, which means it assumes after</div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * deletion no data covered by the following rules (or regards the deleted</div>
+<div>499&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * rule as the last rule). Reasonable assumption?</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;p></div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param index the index of the rule in m_Ruleset to be deleted</div>
+<div>503&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param expFPOverErr expected FP/(FP+FN)</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param rulesetStat the simple statistics of the ruleset, updated if the</div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          rule should be deleted</div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param ruleStat the simple statistics of the rule to be deleted</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param checkErr whether check if error rate >= 0.5</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the potential DL that could be decreased</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;  public double potential(int index, double expFPOverErr, double[] rulesetStat,</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] ruleStat, boolean checkErr) {</div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // System.out.println("!!!inside potential: ");</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Restore the stats if deleted</div>
+<div>514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double pcov = rulesetStat[0] - ruleStat[0];</div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double puncov = rulesetStat[1] + ruleStat[0];</div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double pfp = rulesetStat[4] - ruleStat[4];</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double pfn = rulesetStat[5] + ruleStat[2];</div>
+<div>518&emsp;&emsp;</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double dataDLWith = dataDL(expFPOverErr, rulesetStat[0], rulesetStat[1],</div>
+<div>520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[4], rulesetStat[5]);</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double theoryDLWith = theoryDL(index);</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double dataDLWithout = dataDL(expFPOverErr, pcov, puncov, pfp, pfn);</div>
+<div>523&emsp;&emsp;</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double potential = dataDLWith + theoryDLWith - dataDLWithout;</div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double err = ruleStat[4] / ruleStat[0];</div>
+<div>526&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * System.out.println("!!!"+dataDLWith +" | "+ theoryDLWith + " | "</div>
+<div>528&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * +dataDLWithout+"|"+ruleStat[4] + " / " + ruleStat[0]);</div>
+<div>529&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>530&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean overErr = Utils.grOrEq(err, 0.5);</div>
+<div style="background-color:limegreen;">531&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!checkErr) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      overErr = false;</div>
+<div>533&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>534&emsp;&emsp;</div>
+<div style="background-color:limegreen;">535&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (Utils.grOrEq(potential, 0.0) || overErr) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>536&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // If deleted, update ruleset stats. Other stats do not matter</div>
+<div>537&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[0] = pcov;</div>
+<div>538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[1] = puncov;</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[4] = pfp;</div>
+<div>540&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[5] = pfn;</div>
+<div>541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return potential;</div>
+<div>542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>543&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return Double.NaN;</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>545&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>546&emsp;&emsp;</div>
+<div>547&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>548&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Compute the minimal data description length of the ruleset if the rule in</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the given position is deleted.&#60;br></div>
+<div>550&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * The min_data_DL_if_deleted = data_DL_if_deleted - potential</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param index the index of the rule in question</div>
+<div>553&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param expFPRate expected FP/(FP+FN), used in dataDL calculation</div>
+<div>554&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param checkErr whether check if error rate >= 0.5</div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the minDataDL</div>
+<div>556&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>557&emsp;&emsp;&nbsp;&nbsp;  public double minDataDLIfDeleted(int index, double expFPRate, boolean checkErr) {</div>
+<div>558&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // System.out.println("!!!Enter without: ");</div>
+<div>559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] rulesetStat = new double[6]; // Stats of ruleset if deleted</div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int more = m_Ruleset.size() - 1 - index; // How many rules after?</div>
+<div>561&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ArrayList&#60;double[]> indexPlus = new ArrayList&#60;double[]>(more); // Their</div>
+<div>562&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                                                   // stats</div>
+<div>563&emsp;&emsp;</div>
+<div>564&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // 0...(index-1) are OK</div>
+<div style="background-color:limegreen;">565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int j = 0; j &#60; index; j++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>566&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Covered stats are cumulative</div>
+<div>567&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[0] += m_SimpleStats.get(j)[0];</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[2] += m_SimpleStats.get(j)[2];</div>
+<div>569&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[4] += m_SimpleStats.get(j)[4];</div>
+<div>570&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>571&emsp;&emsp;</div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Recount data from index+1</div>
+<div style="background-color:limegreen;">573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    Instances data = (index == 0) ? m_Data : m_Filtered.get(index - 1)[1];&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>574&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // System.out.println("!!!without: " + data.sumOfWeights());</div>
+<div>575&emsp;&emsp;</div>
+<div style="background-color:limegreen;">576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int j = (index + 1); j &#60; m_Ruleset.size(); j++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>577&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] stats = new double[6];</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances[] split = computeSimpleStats(j, data, stats, null);</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      indexPlus.add(stats);</div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[0] += stats[0];</div>
+<div>581&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[2] += stats[2];</div>
+<div>582&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[4] += stats[4];</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      data = split[1];</div>
+<div>584&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>585&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Uncovered stats are those of the last rule</div>
+<div style="background-color:limegreen;">586&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (more > 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>587&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[1] = indexPlus.get(indexPlus.size() - 1)[1];</div>
+<div>588&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[3] = indexPlus.get(indexPlus.size() - 1)[3];</div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[5] = indexPlus.get(indexPlus.size() - 1)[5];</div>
+<div style="background-color:limegreen;">590&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (index > 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>591&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[1] = m_SimpleStats.get(index - 1)[1];</div>
+<div>592&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[3] = m_SimpleStats.get(index - 1)[3];</div>
+<div>593&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[5] = m_SimpleStats.get(index - 1)[5];</div>
+<div>594&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else { // Null coverage</div>
+<div>595&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[1] = m_SimpleStats.get(0)[0] + m_SimpleStats.get(0)[1];</div>
+<div>596&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[3] = m_SimpleStats.get(0)[3] + m_SimpleStats.get(0)[4];</div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[5] = m_SimpleStats.get(0)[2] + m_SimpleStats.get(0)[5];</div>
+<div>598&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>599&emsp;&emsp;</div>
+<div>600&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Potential</div>
+<div>601&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double potential = 0;</div>
+<div style="background-color:limegreen;">602&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int k = index + 1; k &#60; m_Ruleset.size(); k++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>603&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] ruleStat = indexPlus.get(k - index - 1);</div>
+<div>604&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double ifDeleted = potential(k, expFPRate, rulesetStat, ruleStat,</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        checkErr);</div>
+<div style="background-color:limegreen;">606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!Double.isNaN(ifDeleted)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        potential += ifDeleted;</div>
+<div>608&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>609&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>610&emsp;&emsp;</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Data DL of the ruleset without the rule</div>
+<div>612&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Note that ruleset stats has already been updated to reflect</div>
+<div>613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // deletion if any potential</div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double dataDLWithout = dataDL(expFPRate, rulesetStat[0], rulesetStat[1],</div>
+<div>615&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[4], rulesetStat[5]);</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // System.out.println("!!!without: "+dataDLWithout + " |potential: "+</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // potential);</div>
+<div>618&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Why subtract potential again? To reflect change of theory DL??</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return (dataDLWithout - potential);</div>
+<div>620&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>621&emsp;&emsp;</div>
+<div>622&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>623&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Compute the minimal data description length of the ruleset if the rule in</div>
+<div>624&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the given position is NOT deleted.&#60;br></div>
+<div>625&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * The min_data_DL_if_n_deleted = data_DL_if_n_deleted - potential</div>
+<div>626&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param index the index of the rule in question</div>
+<div>628&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param expFPRate expected FP/(FP+FN), used in dataDL calculation</div>
+<div>629&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param checkErr whether check if error rate >= 0.5</div>
+<div>630&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the minDataDL</div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>632&emsp;&emsp;&nbsp;&nbsp;  public double minDataDLIfExists(int index, double expFPRate, boolean checkErr) {</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // System.out.println("!!!Enter with: ");</div>
+<div>634&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] rulesetStat = new double[6]; // Stats of ruleset if rule exists</div>
+<div style="background-color:limegreen;">635&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int j = 0; j &#60; m_SimpleStats.size(); j++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Covered stats are cumulative</div>
+<div>637&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[0] += m_SimpleStats.get(j)[0];</div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[2] += m_SimpleStats.get(j)[2];</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[4] += m_SimpleStats.get(j)[4];</div>
+<div style="background-color:limegreen;">640&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (j == m_SimpleStats.size() - 1) { // Last rule&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>641&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        rulesetStat[1] = m_SimpleStats.get(j)[1];</div>
+<div>642&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        rulesetStat[3] = m_SimpleStats.get(j)[3];</div>
+<div>643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        rulesetStat[5] = m_SimpleStats.get(j)[5];</div>
+<div>644&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>645&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>646&emsp;&emsp;</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Potential</div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double potential = 0;</div>
+<div style="background-color:limegreen;">649&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int k = index + 1; k &#60; m_SimpleStats.size(); k++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] ruleStat = getSimpleStats(k);</div>
+<div>651&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double ifDeleted = potential(k, expFPRate, rulesetStat, ruleStat,</div>
+<div>652&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        checkErr);</div>
+<div style="background-color:limegreen;">653&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!Double.isNaN(ifDeleted)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>654&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        potential += ifDeleted;</div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>656&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>657&emsp;&emsp;</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Data DL of the ruleset without the rule</div>
+<div>659&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Note that ruleset stats has already been updated to reflect deletion</div>
+<div>660&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // if any potential</div>
+<div>661&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double dataDLWith = dataDL(expFPRate, rulesetStat[0], rulesetStat[1],</div>
+<div>662&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[4], rulesetStat[5]);</div>
+<div>663&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // System.out.println("!!!with: "+dataDLWith + " |potential: "+</div>
+<div>664&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // potential);</div>
+<div>665&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return (dataDLWith - potential);</div>
+<div>666&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>667&emsp;&emsp;</div>
+<div>668&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>669&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * The description length (DL) of the ruleset relative to if the rule in the</div>
+<div>670&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * given position is deleted, which is obtained by: &#60;br></div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * MDL if the rule exists - MDL if the rule does not exist &#60;br></div>
+<div>672&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Note the minimal possible DL of the ruleset is calculated(i.e. some other</div>
+<div>673&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * rules may also be deleted) instead of the DL of the current ruleset.</div>
+<div>674&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;p></div>
+<div>675&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>676&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param index the given position of the rule in question (assuming correct)</div>
+<div>677&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param expFPRate expected FP/(FP+FN), used in dataDL calculation</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param checkErr whether check if error rate >= 0.5</div>
+<div>679&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the relative DL</div>
+<div>680&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;  public double relativeDL(int index, double expFPRate, boolean checkErr) {</div>
+<div>682&emsp;&emsp;</div>
+<div>683&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return (minDataDLIfExists(index, expFPRate, checkErr) + theoryDL(index) - minDataDLIfDeleted(</div>
+<div>684&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      index, expFPRate, checkErr));</div>
+<div>685&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>686&emsp;&emsp;</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>688&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Try to reduce the DL of the ruleset by testing removing the rules one by</div>
+<div>689&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * one in reverse order and update all the stats</div>
+<div>690&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>691&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param expFPRate expected FP/(FP+FN), used in dataDL calculation</div>
+<div>692&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param checkErr whether check if error rate >= 0.5</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>694&emsp;&emsp;&nbsp;&nbsp;  public void reduceDL(double expFPRate, boolean checkErr) {</div>
+<div>695&emsp;&emsp;</div>
+<div>696&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean needUpdate = false;</div>
+<div>697&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] rulesetStat = new double[6];</div>
+<div style="background-color:limegreen;">698&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int j = 0; j &#60; m_SimpleStats.size(); j++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>699&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Covered stats are cumulative</div>
+<div>700&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[0] += m_SimpleStats.get(j)[0];</div>
+<div>701&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[2] += m_SimpleStats.get(j)[2];</div>
+<div>702&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rulesetStat[4] += m_SimpleStats.get(j)[4];</div>
+<div style="background-color:limegreen;">703&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (j == m_SimpleStats.size() - 1) { // Last rule&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>704&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        rulesetStat[1] = m_SimpleStats.get(j)[1];</div>
+<div>705&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        rulesetStat[3] = m_SimpleStats.get(j)[3];</div>
+<div>706&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        rulesetStat[5] = m_SimpleStats.get(j)[5];</div>
+<div>707&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>708&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>709&emsp;&emsp;</div>
+<div>710&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Potential</div>
+<div style="background-color:limegreen;">711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int k = m_SimpleStats.size() - 1; k >= 0; k--) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>712&emsp;&emsp;</div>
+<div>713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] ruleStat = m_SimpleStats.get(k);</div>
+<div>714&emsp;&emsp;</div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // rulesetStat updated</div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double ifDeleted = potential(k, expFPRate, rulesetStat, ruleStat,</div>
+<div>717&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        checkErr);</div>
+<div style="background-color:limegreen;">718&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!Double.isNaN(ifDeleted)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>719&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        /*</div>
+<div>720&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * System.err.println("!!!deleted ("+k+"): save "+ifDeleted</div>
+<div>721&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * +" | "+rulesetStat[0] +" | "+rulesetStat[1] +" | "+rulesetStat[4]</div>
+<div>722&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         * +" | "+rulesetStat[5]);</div>
+<div>723&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;         */</div>
+<div>724&emsp;&emsp;</div>
+<div style="background-color:limegreen;">725&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (k == (m_SimpleStats.size() - 1)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>726&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          removeLast();</div>
+<div>727&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>728&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_Ruleset.remove(k);</div>
+<div>729&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          needUpdate = true;</div>
+<div>730&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>731&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>732&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>733&emsp;&emsp;</div>
+<div style="background-color:limegreen;">734&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (needUpdate) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Filtered = null;</div>
+<div>736&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_SimpleStats = null;</div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      countData();</div>
+<div>738&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>739&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>740&emsp;&emsp;</div>
+<div>741&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>742&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Remove the last rule in the ruleset as well as it's stats. It might be</div>
+<div>743&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * useful when the last rule was added for testing purpose and then the test</div>
+<div>744&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * failed</div>
+<div>745&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>746&emsp;&emsp;&nbsp;&nbsp;  public void removeLast() {</div>
+<div>747&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int last = m_Ruleset.size() - 1;</div>
+<div>748&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Ruleset.remove(last);</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Filtered.remove(last);</div>
+<div>750&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_SimpleStats.remove(last);</div>
+<div style="background-color:limegreen;">751&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_Distributions != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>752&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Distributions.remove(last);</div>
+<div>753&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>754&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>755&emsp;&emsp;</div>
+<div>756&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>757&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Static utility function to count the data covered by the rules after the</div>
+<div>758&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * given index in the given rules, and then remove them. It returns the data</div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * not covered by the successive rules.</div>
+<div>760&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>761&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param data the data to be processed</div>
+<div>762&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param rules the ruleset</div>
+<div>763&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param index the given index</div>
+<div>764&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the data after processing</div>
+<div>765&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>766&emsp;&emsp;&nbsp;&nbsp;  public static Instances rmCoveredBySuccessives(Instances data,</div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ArrayList&#60;Rule> rules, int index) {</div>
+<div>768&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances rt = new Instances(data, 0);</div>
+<div>769&emsp;&emsp;</div>
+<div style="background-color:limegreen;">770&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; data.numInstances(); i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>771&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instance datum = data.instance(i);</div>
+<div>772&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      boolean covered = false;</div>
+<div>773&emsp;&emsp;</div>
+<div style="background-color:limegreen;">774&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int j = index + 1; j &#60; rules.size(); j++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>775&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Rule rule = rules.get(j);</div>
+<div style="background-color:limegreen;">776&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (rule.covers(datum)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>777&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          covered = true;</div>
+<div>778&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>779&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>780&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>781&emsp;&emsp;</div>
+<div style="background-color:limegreen;">782&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!covered) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>783&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        rt.add(datum);</div>
+<div>784&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>785&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>786&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return rt;</div>
+<div>787&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>788&emsp;&emsp;</div>
+<div>789&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>790&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Stratify the given data into the given number of bags based on the class</div>
+<div>791&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * values. It differs from the &#60;code>Instances.stratify(int fold)&#60;/code> that</div>
+<div>792&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * before stratification it sorts the instances according to the class order</div>
+<div>793&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * in the header file. It assumes no missing values in the class.</div>
+<div>794&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param data the given data</div>
+<div>796&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param folds the given number of folds</div>
+<div>797&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param rand the random object used to randomize the instances</div>
+<div>798&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the stratified instances</div>
+<div>799&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>800&emsp;&emsp;&nbsp;&nbsp;  public static final Instances stratify(Instances data, int folds, Random rand) {</div>
+<div style="background-color:limegreen;">801&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!data.classAttribute().isNominal()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return data;</div>
+<div>803&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>804&emsp;&emsp;</div>
+<div>805&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances result = new Instances(data, 0);</div>
+<div>806&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances[] bagsByClasses = new Instances[data.numClasses()];</div>
+<div>807&emsp;&emsp;</div>
+<div style="background-color:limegreen;">808&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; bagsByClasses.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>809&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      bagsByClasses[i] = new Instances(data, 0);</div>
+<div>810&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>811&emsp;&emsp;</div>
+<div>812&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Sort by class</div>
+<div style="background-color:limegreen;">813&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int j = 0; j &#60; data.numInstances(); j++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>814&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instance datum = data.instance(j);</div>
+<div>815&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      bagsByClasses[(int) datum.classValue()].add(datum);</div>
+<div>816&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>817&emsp;&emsp;</div>
+<div>818&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Randomize each class</div>
+<div style="background-color:limegreen;">819&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (Instances bagsByClasse : bagsByClasses) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>820&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      bagsByClasse.randomize(rand);</div>
+<div>821&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>822&emsp;&emsp;</div>
+<div style="background-color:limegreen;">823&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int k = 0; k &#60; folds; k++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>824&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int offset = k, bag = 0;</div>
+<div>825&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      oneFold: while (true) {</div>
+<div style="background-color:limegreen;">826&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        while (offset >= bagsByClasses[bag].numInstances()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>827&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          offset -= bagsByClasses[bag].numInstances();</div>
+<div style="background-color:limegreen;">828&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (++bag >= bagsByClasses.length) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break oneFold;</div>
+<div>830&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>831&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>832&emsp;&emsp;</div>
+<div>833&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result.add(bagsByClasses[bag].instance(offset));</div>
+<div>834&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        offset += folds;</div>
+<div>835&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>836&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>837&emsp;&emsp;</div>
+<div>838&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>839&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>840&emsp;&emsp;</div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>842&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Compute the combined DL of the ruleset in this class, i.e. theory DL and</div>
+<div>843&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * data DL. Note this procedure computes the combined DL according to the</div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * current status of the ruleset in this class</div>
+<div>845&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param expFPRate expected FP/(FP+FN), used in dataDL calculation</div>
+<div>847&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param predicted the default classification if ruleset covers null</div>
+<div>848&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the combined class</div>
+<div>849&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>850&emsp;&emsp;&nbsp;&nbsp;  public double combinedDL(double expFPRate, double predicted) {</div>
+<div>851&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double rt = 0;</div>
+<div>852&emsp;&emsp;</div>
+<div>853&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (getRulesetSize() > 0) {</div>
+<div>854&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] stats = m_SimpleStats.get(m_SimpleStats.size() - 1);</div>
+<div>855&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int j = getRulesetSize() - 2; j >= 0; j--) {</div>
+<div>856&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        stats[0] += getSimpleStats(j)[0];</div>
+<div>857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        stats[2] += getSimpleStats(j)[2];</div>
+<div>858&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        stats[4] += getSimpleStats(j)[4];</div>
+<div>859&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>860&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rt += dataDL(expFPRate, stats[0], stats[1], stats[4], stats[5]); // Data</div>
+<div>861&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                                                       // DL</div>
+<div>862&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else { // Null coverage ruleset</div>
+<div>863&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double fn = 0.0;</div>
+<div>864&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int j = 0; j &#60; m_Data.numInstances(); j++) {</div>
+<div>865&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if ((int) m_Data.instance(j).classValue() == (int) predicted) {</div>
+<div>866&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          fn += m_Data.instance(j).weight();</div>
+<div>867&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>868&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>869&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rt += dataDL(expFPRate, 0.0, m_Data.sumOfWeights(), 0.0, fn);</div>
+<div>870&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>871&emsp;&emsp;</div>
+<div>872&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; getRulesetSize(); i++) {</div>
+<div>873&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      rt += theoryDL(i);</div>
+<div>874&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>875&emsp;&emsp;</div>
+<div>876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return rt;</div>
+<div>877&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>878&emsp;&emsp;</div>
+<div>879&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>880&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Patition the data into 2, first of which has (numFolds-1)/numFolds of the</div>
+<div>881&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * data and the second has 1/numFolds of the data</div>
+<div>882&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>883&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>884&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param data the given data</div>
+<div>885&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param numFolds the given number of folds</div>
+<div>886&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the patitioned instances</div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>888&emsp;&emsp;&nbsp;&nbsp;  public static final Instances[] partition(Instances data, int numFolds) {</div>
+<div>889&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances[] rt = new Instances[2];</div>
+<div>890&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int splits = data.numInstances() * (numFolds - 1) / numFolds;</div>
+<div>891&emsp;&emsp;</div>
+<div>892&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    rt[0] = new Instances(data, 0, splits);</div>
+<div>893&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    rt[1] = new Instances(data, splits, data.numInstances() - splits);</div>
+<div>894&emsp;&emsp;</div>
+<div>895&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return rt;</div>
+<div>896&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>897&emsp;&emsp;</div>
+<div>898&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>899&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the revision string.</div>
+<div>900&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>901&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the revision</div>
+<div>902&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>904&emsp;&emsp;&nbsp;&nbsp;  public String getRevision() {</div>
+<div>905&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return RevisionUtils.extract("$Revision: 10153 $");</div>
+<div>906&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>907&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DefaultPackageManager.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *   This program is free software: you can redistribute it and/or modify</div>
+<div>3&emsp;&emsp;&nbsp; *   it under the terms of the GNU General Public License as published by</div>
+<div>4&emsp;&emsp;&nbsp; *   the Free Software Foundation, either version 3 of the License, or</div>
+<div>5&emsp;&emsp;&nbsp; *   (at your option) any later version.</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; *   This program is distributed in the hope that it will be useful,</div>
+<div>8&emsp;&emsp;&nbsp; *   but WITHOUT ANY WARRANTY; without even the implied warranty of</div>
+<div>9&emsp;&emsp;&nbsp; *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</div>
+<div>10&emsp;&emsp;&nbsp; *   GNU General Public License for more details.</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; *   You should have received a copy of the GNU General Public License</div>
+<div>13&emsp;&emsp;&nbsp; *   along with this program.  If not, see &#60;http://www.gnu.org/licenses/>.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/*</div>
+<div>17&emsp;&emsp;&nbsp; *    DefaultPackageManager.java</div>
+<div>18&emsp;&emsp;&nbsp; *    Copyright (C) 2015 University of Waikato, Hamilton, New Zealand</div>
+<div>19&emsp;&emsp;&nbsp; *</div>
+<div>20&emsp;&emsp;&nbsp; */</div>
+<div>21&emsp;&emsp;package weka.core.packageManagement;</div>
+<div>22&emsp;&emsp;</div>
+<div>23&emsp;&emsp;import weka.core.Defaults;</div>
+<div>24&emsp;&emsp;import weka.core.Environment;</div>
+<div>25&emsp;&emsp;import weka.core.Settings;</div>
+<div>26&emsp;&emsp;</div>
+<div>27&emsp;&emsp;import java.io.BufferedInputStream;</div>
+<div>28&emsp;&emsp;import java.io.BufferedOutputStream;</div>
+<div>29&emsp;&emsp;import java.io.BufferedReader;</div>
+<div>30&emsp;&emsp;import java.io.ByteArrayOutputStream;</div>
+<div>31&emsp;&emsp;import java.io.File;</div>
+<div>32&emsp;&emsp;import java.io.FileInputStream;</div>
+<div>33&emsp;&emsp;import java.io.FileOutputStream;</div>
+<div>34&emsp;&emsp;import java.io.IOException;</div>
+<div>35&emsp;&emsp;import java.io.InputStream;</div>
+<div>36&emsp;&emsp;import java.io.InputStreamReader;</div>
+<div>37&emsp;&emsp;import java.io.ObjectInputStream;</div>
+<div>38&emsp;&emsp;import java.io.ObjectOutputStream;</div>
+<div>39&emsp;&emsp;import java.io.OutputStream;</div>
+<div>40&emsp;&emsp;import java.io.PrintStream;</div>
+<div>41&emsp;&emsp;import java.net.HttpURLConnection;</div>
+<div>42&emsp;&emsp;import java.net.URL;</div>
+<div>43&emsp;&emsp;import java.net.URLConnection;</div>
+<div>44&emsp;&emsp;import java.util.ArrayList;</div>
+<div>45&emsp;&emsp;import java.util.Enumeration;</div>
+<div>46&emsp;&emsp;import java.util.HashMap;</div>
+<div>47&emsp;&emsp;import java.util.Iterator;</div>
+<div>48&emsp;&emsp;import java.util.List;</div>
+<div>49&emsp;&emsp;import java.util.Map;</div>
+<div>50&emsp;&emsp;import java.util.Properties;</div>
+<div>51&emsp;&emsp;import java.util.zip.ZipEntry;</div>
+<div>52&emsp;&emsp;import java.util.zip.ZipFile;</div>
+<div>53&emsp;&emsp;import java.util.zip.ZipOutputStream;</div>
+<div>54&emsp;&emsp;</div>
+<div>55&emsp;&emsp;/**</div>
+<div>56&emsp;&emsp;&nbsp; * A concrete implementation of PackageManager that uses Java properties</div>
+<div>57&emsp;&emsp;&nbsp; * files/class to manage package meta data. Assumes that meta data for</div>
+<div>58&emsp;&emsp;&nbsp; * individual packages is stored on the central repository (accessible via http)</div>
+<div>59&emsp;&emsp;&nbsp; * in properties files that live in a subdirectory with the same name as the</div>
+<div>60&emsp;&emsp;&nbsp; * package. Furthermore, each property file is assumed to be named as the</div>
+<div>61&emsp;&emsp;&nbsp; * version number of the package in question with a ".props" extension. A</div>
+<div>62&emsp;&emsp;&nbsp; * "Latest.props" file should exist for each package and should always hold meta</div>
+<div>63&emsp;&emsp;&nbsp; * data on the latest version of a package.</div>
+<div>64&emsp;&emsp;&nbsp; * </div>
+<div>65&emsp;&emsp;&nbsp; * @author Mark Hall (mhall{[at]}pentaho{[dot]}com)</div>
+<div>66&emsp;&emsp;&nbsp; * @version $Revision: 52515 $</div>
+<div>67&emsp;&emsp;&nbsp; */</div>
+<div>68&emsp;&emsp;public class DefaultPackageManager extends PackageManager {</div>
+<div>69&emsp;&emsp;</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;  /** buffer size for copying files */</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;  protected static final int BUFF_SIZE = 100000;</div>
+<div>72&emsp;&emsp;</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;  /** buffer used in copying files */</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;  protected static final byte[] m_buffer = new byte[BUFF_SIZE];</div>
+<div>75&emsp;&emsp;</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;  protected static final String INSTALLED_PACKAGE_CACHE_FILE =</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    "installedPackageCache.ser";</div>
+<div>78&emsp;&emsp;</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;  protected static List&#60;Package> s_installedPackageList;</div>
+<div>80&emsp;&emsp;</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;  /** Timeout to use for comms */</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;  protected int m_timeout = DefaultPMDefaults.SOCKET_TIMEOUT;</div>
+<div>83&emsp;&emsp;</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;  /** Key for the socket timeout property */</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;  protected static final String TIMEOUT_PROPERTY =</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    "weka.packageManager.timeout";</div>
+<div>87&emsp;&emsp;</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Constructor</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;  public DefaultPackageManager() {</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // set timeout based on property (if set)</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String timeout = System.getProperty(TIMEOUT_PROPERTY);</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (timeout != null && timeout.length() > 0) {</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_timeout = Integer.parseInt(timeout);</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (NumberFormatException e) {</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // ignore quietly</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>102&emsp;&emsp;</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get the default settings for the default package manager</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the default settings</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;  public Defaults getDefaultSettings() {</div>
+<div>110&emsp;&emsp;</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return new DefaultPMDefaults();</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>113&emsp;&emsp;</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Apply settings.</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param settings the settings to apply</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;  public void applySettings(Settings settings) {</div>
+<div>121&emsp;&emsp;</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_timeout =</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      settings.getSetting(settings.getID(),</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        DefaultPMDefaults.SOCKET_TIMEOUT_KEY, DefaultPMDefaults.SOCKET_TIMEOUT,</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Environment.getSystemWide());</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>127&emsp;&emsp;</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Default settings for the default package manager implementation</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;  protected static final class DefaultPMDefaults extends Defaults {</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final String APP_ID = "defaultpackagemanager";</div>
+<div>133&emsp;&emsp;</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final Settings.SettingKey SOCKET_TIMEOUT_KEY =</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new Settings.SettingKey(APP_ID + ".timeout",</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        "Timeout (in ms) for socket " + "comms", "");</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** Default timeout for socket connections (5 seconds) */</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final int SOCKET_TIMEOUT = 5000;</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -1428588514991146709L;</div>
+<div>140&emsp;&emsp;</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public DefaultPMDefaults() {</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      super("defaultpackagemanager");</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_defaults.put(SOCKET_TIMEOUT_KEY, SOCKET_TIMEOUT);</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>146&emsp;&emsp;</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;  /*</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * protected File downloadPackage2(URL packageURL, PrintStream... progress)</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * throws Exception { String packageArchiveName = packageURL.toString();</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * packageArchiveName =</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * packageArchiveName.substring(packageArchiveName.lastIndexOf('/'),</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * packageArchiveName.length()); packageArchiveName =</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * packageArchiveName.substring(0, packageArchiveName.lastIndexOf('.'));</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * // make a temp file to hold the downloaded archive File tmpDownload =</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * File.createTempFile(packageArchiveName, ".zip");</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * for (int i = 0; i &#60; progress.length; i++) { progress[i].println(</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * "[Package Manager] Tmp file: " + tmpDownload.toString()); }</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * System.err.println("Here in downloadPackage..."); URLConnection conn =</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * null;</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * // setup the proxy (if we are using one) and open the connect if</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * (setProxyAuthentication()) { conn = packageURL.openConnection(m_httpProxy);</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * } else { conn = packageURL.openConnection(); }</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * if (conn instanceof HttpURLConnection) { System.err.println(</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * "We have a http url conn."); }</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * BufferedReader br = new BufferedReader(new</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * InputStreamReader(conn.getInputStream()));</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * String line = null;</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * while ((line = br.readLine()) != null) { System.err.println(line); }</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * br.close();</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * return null; }</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>182&emsp;&emsp;</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;  protected File downloadArchive(URL packageURL, String fileExtension,</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PrintStream... progress) throws Exception {</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String packageArchiveName = packageURL.toString();</div>
+<div>186&emsp;&emsp;</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    packageArchiveName =</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      packageArchiveName.substring(0,</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        packageArchiveName.lastIndexOf("." + fileExtension) + 3);</div>
+<div>190&emsp;&emsp;</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    packageArchiveName =</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      packageArchiveName.substring(0, packageArchiveName.lastIndexOf('.'));</div>
+<div>193&emsp;&emsp;</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    packageArchiveName =</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      packageArchiveName.substring(packageArchiveName.lastIndexOf('/'),</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        packageArchiveName.length());</div>
+<div>197&emsp;&emsp;</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // make a temp file to hold the downloaded archive</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    File tmpDownload =</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      File.createTempFile(packageArchiveName, "." + fileExtension);</div>
+<div>201&emsp;&emsp;</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (PrintStream progres : progress) {</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      progres.println("[DefaultPackageManager] Tmp file: "</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + tmpDownload.toString());</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>206&emsp;&emsp;</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URLConnection conn = getConnection(packageURL);</div>
+<div>208&emsp;&emsp;</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    BufferedInputStream bi = new BufferedInputStream(conn.getInputStream());</div>
+<div>210&emsp;&emsp;</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    BufferedOutputStream bo =</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new BufferedOutputStream(new FileOutputStream(tmpDownload));</div>
+<div>213&emsp;&emsp;</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // download the archive</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int totalBytesRead = 0;</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while (true) {</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      synchronized (m_buffer) {</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int amountRead = bi.read(m_buffer);</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (amountRead == -1) {</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          for (PrintStream progres : progress) {</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            progres.print("[DefaultPackageManager] downloaded "</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              + (totalBytesRead / 1000) + " KB\r");</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        bo.write(m_buffer, 0, amountRead);</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        totalBytesRead += amountRead;</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (PrintStream progres : progress) {</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          progres.print("%%[DefaultPackageManager] downloaded "</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + (totalBytesRead / 1000) + " KB\r");</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>234&emsp;&emsp;</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bi.close();</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bo.close();</div>
+<div>237&emsp;&emsp;</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return tmpDownload;</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>240&emsp;&emsp;</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get package information on the package at the given URL.</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageURL the URL to the package.</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a Package object encapsulating the package meta data</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the package meta data can't be retrieved.</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;  public Package getURLPackageInfo(URL packageURL) throws Exception {</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    File downloaded = downloadArchive(packageURL, "zip");</div>
+<div>251&emsp;&emsp;</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // return the package info</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getPackageArchiveInfo(downloaded);</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>255&emsp;&emsp;</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get package information on the named package from the repository. If</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * multiple versions of the package are available, it assumes that the most</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * recent is required.</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the package to get information about.</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a Package object encapsulating the package meta data.</div>
+<div>263&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the package meta data can't be retrieved.</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;  public Package getRepositoryPackageInfo(String packageName) throws Exception {</div>
+<div>267&emsp;&emsp;</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getRepositoryPackageInfo(packageName, "Latest");</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>270&emsp;&emsp;</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get a list of available versions of the named package.</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the package to get versions.</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a list of available versions (or null if not applicable)</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong while trying to retrieve the list</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *           of versions.</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;  public List&#60;Object> getRepositoryPackageVersions(String packageName)</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>282&emsp;&emsp;</div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (getPackageRepositoryURL() == null) {</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[DefaultPackageManager] No package repository set!!");</div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>286&emsp;&emsp;</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String versionsS =</div>
+<div>288&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_packageRepository.toString() + "/" + packageName + "/" + "versions.txt";</div>
+<div>289&emsp;&emsp;</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URL packageURL = new URL(versionsS);</div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URLConnection conn = getConnection(packageURL);</div>
+<div>292&emsp;&emsp;</div>
+<div>293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    BufferedReader bi =</div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new BufferedReader(new InputStreamReader(conn.getInputStream()));</div>
+<div>295&emsp;&emsp;</div>
+<div>296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ArrayList&#60;Object> versions = new ArrayList&#60;Object>();</div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String versionNumber;</div>
+<div>298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while ((versionNumber = bi.readLine()) != null) {</div>
+<div>299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      versions.add(versionNumber.trim());</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>301&emsp;&emsp;</div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bi.close();</div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return versions;</div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>305&emsp;&emsp;</div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get package information on the named package from the repository.</div>
+<div>308&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the package to get information about.</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param version the version of the package to retrieve (may be null if not</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          applicable).</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a Package object encapsulating the package meta data.</div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the package meta data can't be retrieved.</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;  public Package getRepositoryPackageInfo(String packageName, Object version)</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div style="background-color:limegreen;">318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (getPackageRepositoryURL() == null) {&nbsp;&#8594; [BATCHSIZE, PRUNE]</b></div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[DefaultPackageManager] No package repository set!!");</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>321&emsp;&emsp;</div>
+<div style="background-color:limegreen;">322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (version == null) {&nbsp;&#8594; [BATCHSIZE, PRUNE]</b></div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      version = "Latest";</div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>325&emsp;&emsp;</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String packageS =</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_packageRepository.toString() + "/" + packageName + "/"</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + version.toString() + ".props";</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URL packageURL = new URL(packageS);</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URLConnection conn = getConnection(packageURL);</div>
+<div>331&emsp;&emsp;</div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    BufferedInputStream bi = new BufferedInputStream(conn.getInputStream());</div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Properties packageProperties = new Properties();</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    packageProperties.load(bi);</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bi.close();</div>
+<div>336&emsp;&emsp;</div>
+<div>337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return new DefaultPackage(m_packageHome, this, packageProperties);</div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>339&emsp;&emsp;</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;  private Package getPackageArchiveInfo(File packageArchive) throws Exception {</div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getPackageArchiveInfo(packageArchive.getAbsolutePath());</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>343&emsp;&emsp;</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get package information from the supplied package archive file.</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageArchivePath the path to the package archive file</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a Package object encapsulating the package meta data.</div>
+<div>349&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the package meta data can't be retrieved.</div>
+<div>350&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;  public Package getPackageArchiveInfo(String packageArchivePath)</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ZipFile zip = new ZipFile(new File(packageArchivePath));</div>
+<div>355&emsp;&emsp;</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (Enumeration e = zip.entries(); e.hasMoreElements();) {</div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ZipEntry entry = (ZipEntry) e.nextElement();</div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (entry.getName().endsWith("Description.props")) {</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        InputStream is = zip.getInputStream(entry);</div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Properties packageProperties = new Properties();</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        packageProperties.load(new BufferedInputStream(is));</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        is.close();</div>
+<div>363&emsp;&emsp;</div>
+<div>364&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        DefaultPackage pkg =</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          new DefaultPackage(m_packageHome, this, packageProperties);</div>
+<div>366&emsp;&emsp;</div>
+<div>367&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return pkg;</div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>370&emsp;&emsp;</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throw new Exception("Unable to find Description file in package archive!");</div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>373&emsp;&emsp;</div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get package information on the named installed package.</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>377&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the package to get information about.</div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a Package object encapsulating the package meta data or null if the</div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         package is not installed.</div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the package meta data can't be retrieved.</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;  public Package getInstalledPackageInfo(String packageName) throws Exception {</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    File packageDescription =</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new File(m_packageHome.getAbsoluteFile() + File.separator + packageName</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + File.separator + "Description.props");</div>
+<div>388&emsp;&emsp;</div>
+<div style="background-color:limegreen;">389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!packageDescription.exists()) {&nbsp;&#8594; [BATCHSIZE, PRUNE]</b></div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return null;</div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>392&emsp;&emsp;</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    FileInputStream fis = new FileInputStream(packageDescription);</div>
+<div>394&emsp;&emsp;</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Properties packageProperties = new Properties();</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    packageProperties.load(fis);</div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    fis.close();</div>
+<div>398&emsp;&emsp;</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    DefaultPackage pkg =</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new DefaultPackage(m_packageHome, this, packageProperties);</div>
+<div>401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return pkg;</div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>403&emsp;&emsp;</div>
+<div>404&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Checks to see if the package home exists and creates it if necessary.</div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if the package home exists/was created successfully.</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;  protected boolean establishPackageHome() {</div>
+<div style="background-color:limegreen;">410&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_packageHome == null) {&nbsp;&#8594; [BATCHSIZE, PRUNE]</b></div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return false;</div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>413&emsp;&emsp;</div>
+<div style="background-color:limegreen;">414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!m_packageHome.exists()) {&nbsp;&#8594; [BATCHSIZE]</b></div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // create it for the user</div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!m_packageHome.mkdir()) {</div>
+<div>417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println("Unable to create packages directory ("</div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + m_packageHome.getAbsolutePath() + ")");</div>
+<div>419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return false;</div>
+<div>420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return true;</div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>424&emsp;&emsp;</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;  public static void deleteDir(File dir, PrintStream... progress)</div>
+<div>426&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>427&emsp;&emsp;</div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the contents</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    File[] contents = dir.listFiles();</div>
+<div>430&emsp;&emsp;</div>
+<div style="background-color:limegreen;">431&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (contents.length != 0) {&nbsp;&#8594; [BATCHSIZE]</b></div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // process contents</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (File f : contents) {</div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (f.isDirectory()) {</div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          deleteDir(f);</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>437&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          for (PrintStream progres : progress) {</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            progres</div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              .println("[DefaultPackageManager] removing: " + f.toString());</div>
+<div>440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (!f.delete()) {</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            System.err.println("[DefaultPackageManager] can't delete file "</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              + f.toString());</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            f.deleteOnExit();</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>449&emsp;&emsp;</div>
+<div>450&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // delete this directory</div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!dir.delete()) {</div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.err.println("[DefaultPackageManager] can't delete directory "</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + dir.toString());</div>
+<div>454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      dir.deleteOnExit();</div>
+<div>455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (PrintStream progres : progress) {</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      progres.println("[DefaultPackageManager] removing: " + dir.toString());</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>459&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>460&emsp;&emsp;</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Uninstall a package.</div>
+<div>463&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the package to uninstall.</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param progress optional varargs parameter, that, if supplied, is expected</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          to contain one or more PrintStream objects to write progress to.</div>
+<div>467&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the named package could not be removed for some</div>
+<div>468&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *           reason.</div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;  public void uninstallPackage(String packageName, PrintStream... progress)</div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    File packageToDel =</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new File(m_packageHome.toString() + File.separator + packageName);</div>
+<div>475&emsp;&emsp;</div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!packageToDel.exists()) {</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[DefaultPackageManager] Can't remove " + packageName</div>
+<div>478&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + " because it doesn't seem to be installed!");</div>
+<div>479&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>480&emsp;&emsp;</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    deleteDir(packageToDel, progress);</div>
+<div>482&emsp;&emsp;</div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // invalidate cache</div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    s_installedPackageList = null;</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    deleteInstalledPackageCacheFile();</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>487&emsp;&emsp;</div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Install a package from an archive on the local file system.</div>
+<div>490&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageArchivePath the path to the package archive file.</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param progress optional varargs parameter, that, if supplied, is expected</div>
+<div>493&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          to contain one or more PrintStream objects to write progress to.</div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the name of the package installed</div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the package can't be installed for some reason.</div>
+<div>496&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;  public String installPackageFromArchive(String packageArchivePath,</div>
+<div>499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PrintStream... progress) throws Exception {</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Properties packageProps =</div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      (Properties) getPackageArchiveInfo(packageArchivePath)</div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        .getPackageMetaData();</div>
+<div>503&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String packageName = packageProps.getProperty("PackageName");</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String additionalLibs = packageProps.getProperty("AdditionalLibs");</div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String[] additionalLibURLs = null;</div>
+<div>506&emsp;&emsp;</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (additionalLibs != null && additionalLibs.length() > 0) {</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      additionalLibURLs = additionalLibs.split(",");</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (packageName == null) {</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("Unable to find the name of the package in"</div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + " the Description file for " + packageArchivePath);</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>514&emsp;&emsp;</div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    installPackage(packageArchivePath, packageName, progress);</div>
+<div>516&emsp;&emsp;</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (additionalLibURLs != null) {</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      installAdditionalLibs(packageName, additionalLibURLs, progress);</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>520&emsp;&emsp;</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return packageName;</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>523&emsp;&emsp;</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Installs additional library jar files (as specified in the AdditionalLibs</div>
+<div>526&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * entry in the Description.props file).</div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>528&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the package that will receive the downloaded</div>
+<div>529&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          libraries into its lib directory</div>
+<div>530&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param additionalLibURLs an array of urls to the libraries to download</div>
+<div>531&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param progress for progress reporting</div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>533&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>534&emsp;&emsp;&nbsp;&nbsp;  protected void installAdditionalLibs(String packageName,</div>
+<div>535&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String[] additionalLibURLs, PrintStream... progress) throws Exception {</div>
+<div>536&emsp;&emsp;</div>
+<div>537&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!establishPackageHome()) {</div>
+<div>538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("Unable to install additional libraries"</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + " because package home (" + m_packageHome.getAbsolutePath()</div>
+<div>540&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + ") can't be established.");</div>
+<div>541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>542&emsp;&emsp;</div>
+<div>543&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (String libU : additionalLibURLs) {</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      libU = libU.trim();</div>
+<div>545&emsp;&emsp;</div>
+<div>546&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (libU.trim().length() > 0) {</div>
+<div>547&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        URL libURL = new URL(libU.trim());</div>
+<div>548&emsp;&emsp;</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        File libPath = downloadArchive(libURL, "jar", progress);</div>
+<div>550&emsp;&emsp;</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String destName = libU.substring(0, libU.lastIndexOf("." + "jar") + 3);</div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        destName = destName.substring(0, destName.lastIndexOf('.'));</div>
+<div>553&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        destName =</div>
+<div>554&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          destName.substring(destName.lastIndexOf('/'), destName.length());</div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        destName += ".jar";</div>
+<div>556&emsp;&emsp;</div>
+<div>557&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        File destDir =</div>
+<div>558&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          new File(m_packageHome, packageName + File.separator + "lib");</div>
+<div>559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (!destDir.mkdir()) {</div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // hopefully failure is because the directory already exists</div>
+<div>561&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>562&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        File destPath = new File(destDir, destName);</div>
+<div>563&emsp;&emsp;</div>
+<div>564&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        InputStream input =</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          new BufferedInputStream(new FileInputStream(libPath));</div>
+<div>566&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        OutputStream output =</div>
+<div>567&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          new BufferedOutputStream(new FileOutputStream(destPath));</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        copyStreams(input, output);</div>
+<div>569&emsp;&emsp;</div>
+<div>570&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        input.close();</div>
+<div>571&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        output.flush();</div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        output.close();</div>
+<div>573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>574&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>576&emsp;&emsp;</div>
+<div>577&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Installs all the packages in the supplied list.</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param toInstall a list of Packages to install.</div>
+<div>581&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param progress optional varargs parameter, that, if supplied, is expected</div>
+<div>582&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          to contain one or more PrintStream objects to write progress to.</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong during the installation process.</div>
+<div>584&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>585&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>586&emsp;&emsp;&nbsp;&nbsp;  public void installPackages(List&#60;Package> toInstall, PrintStream... progress)</div>
+<div>587&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>588&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    File[] archivePaths = new File[toInstall.size()];</div>
+<div>589&emsp;&emsp;</div>
+<div>590&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; toInstall.size(); i++) {</div>
+<div>591&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Package toDownload = toInstall.get(i);</div>
+<div>592&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (toDownload.isInstalled()) {</div>
+<div>593&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (PrintStream p : progress) {</div>
+<div>594&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          p.println("[DefaultPackageManager] cleanining installed package: "</div>
+<div>595&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + toDownload.getName());</div>
+<div>596&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          uninstallPackage(toDownload.getName(), progress);</div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>598&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>599&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      archivePaths[i] =</div>
+<div>600&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        downloadArchive(toDownload.getPackageURL(), "zip", progress);</div>
+<div>601&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>602&emsp;&emsp;</div>
+<div>603&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // OK, all downloaded successfully, now install them</div>
+<div>604&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (File archivePath : archivePaths) {</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      installPackageFromArchive(archivePath.getAbsolutePath(), progress);</div>
+<div>606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>607&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>608&emsp;&emsp;</div>
+<div>609&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>610&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Checks a given package's list of dependencies for any conflicts with the</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * packages in the supplied Map. Any packages from this packages dependency</div>
+<div>612&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * list that are not in the Map are simply added and checkDependencies is</div>
+<div>613&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * called recursively for each.</div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>615&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param toCheck the package to check.</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param lookup a Map of package name, Dependency pairs to check against.</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param conflicts a list of Dependency objects for any conflicts that are</div>
+<div>618&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          detected.</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if no conflicts are found.</div>
+<div>620&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs when checking for conflicts.</div>
+<div>621&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>622&emsp;&emsp;&nbsp;&nbsp;  protected static boolean checkDependencies(PackageConstraint toCheck,</div>
+<div>623&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Map&#60;String, Dependency> lookup, Map&#60;String, List&#60;Dependency>> conflicts)</div>
+<div>624&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>625&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean ok = true;</div>
+<div>626&emsp;&emsp;</div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the dependencies for the package to check</div>
+<div>628&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;Dependency> deps = toCheck.getPackage().getDependencies();</div>
+<div>629&emsp;&emsp;</div>
+<div>630&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (Dependency p : deps) {</div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String depName =</div>
+<div>632&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        p.getTarget().getPackage().getPackageMetaDataElement("PackageName")</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          .toString();</div>
+<div>634&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!lookup.containsKey(depName)) {</div>
+<div>635&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // just add this package to the lookup</div>
+<div>636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        lookup.put(depName, p);</div>
+<div>637&emsp;&emsp;</div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // check its dependencies</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ok = checkDependencies(p.getTarget(), lookup, conflicts);</div>
+<div>640&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>641&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // we have to see if the version number for this package is compatible</div>
+<div>642&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // with the one already in the lookup</div>
+<div>643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Dependency checkAgainst = lookup.get(depName);</div>
+<div>644&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        PackageConstraint result =</div>
+<div>645&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          checkAgainst.getTarget().checkConstraint(p.getTarget());</div>
+<div>646&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (result != null) {</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          checkAgainst.setTarget(result);</div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          lookup.put(depName, checkAgainst);</div>
+<div>649&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // there is a conflict here</div>
+<div>651&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          List&#60;Dependency> conflictList = conflicts.get(depName);</div>
+<div>652&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          conflictList.add(p);</div>
+<div>653&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          ok = false;</div>
+<div>654&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>656&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>657&emsp;&emsp;</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return ok;</div>
+<div>659&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>660&emsp;&emsp;</div>
+<div>661&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>662&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Gets a full list of packages (encapsulated in Dependency objects) that are</div>
+<div>663&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * required by directly and indirectly by the named target package. Also</div>
+<div>664&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * builds a Map of any packages that are required by more than one package and</div>
+<div>665&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * where there is a conflict of some sort (e.g. multiple conflicting</div>
+<div>666&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * versions). The keys of this map are package names (strings), and each</div>
+<div>667&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * associated value is a list of Dependency objects.</div>
+<div>668&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>669&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param target the package for which a list of dependencies is required.</div>
+<div>670&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param conflicts will hold any conflicts that are discovered while building</div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          the full dependency list.</div>
+<div>672&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a list of packages that are directly and indirectly required by the</div>
+<div>673&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         named target package.</div>
+<div>674&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs while building the dependency list.</div>
+<div>675&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>676&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>677&emsp;&emsp;&nbsp;&nbsp;  public List&#60;Dependency> getAllDependenciesForPackage(Package target,</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Map&#60;String, List&#60;Dependency>> conflicts) throws Exception {</div>
+<div>679&emsp;&emsp;</div>
+<div>680&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // start with the target package's list of dependencies</div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;Dependency> initialList = target.getDependencies();</div>
+<div>682&emsp;&emsp;</div>
+<div>683&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // load them into a map for quick lookup</div>
+<div>684&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Map&#60;String, Dependency> lookup = new HashMap&#60;String, Dependency>();</div>
+<div>685&emsp;&emsp;</div>
+<div>686&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (Dependency d : initialList) {</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      lookup.put(</div>
+<div>688&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        d.getTarget().getPackage().getPackageMetaDataElement("PackageName")</div>
+<div>689&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          .toString(), d);</div>
+<div>690&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ArrayList&#60;Dependency> deps = new ArrayList&#60;Dependency>();</div>
+<div>691&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      deps.add(d);</div>
+<div>692&emsp;&emsp;</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Pre-load a conficts Map</div>
+<div>694&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      conflicts.put(</div>
+<div>695&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        d.getTarget().getPackage().getPackageMetaDataElement("PackageName")</div>
+<div>696&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          .toString(), deps);</div>
+<div>697&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>698&emsp;&emsp;</div>
+<div>699&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // now process each of these to build the full list</div>
+<div>700&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (Dependency d : initialList) {</div>
+<div>701&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      checkDependencies(d.getTarget(), lookup, conflicts);</div>
+<div>702&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>703&emsp;&emsp;</div>
+<div>704&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;Dependency> fullList = new ArrayList&#60;Dependency>(lookup.values());</div>
+<div>705&emsp;&emsp;</div>
+<div>706&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Prune packages from conflicts Map that only have one</div>
+<div>707&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // item in their list (i.e. these ones have no conflicts)</div>
+<div>708&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ArrayList&#60;String> removeList = new ArrayList&#60;String>();</div>
+<div>709&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Iterator&#60;String> keyIt = conflicts.keySet().iterator();</div>
+<div>710&emsp;&emsp;</div>
+<div>711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while (keyIt.hasNext()) {</div>
+<div>712&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String key = keyIt.next();</div>
+<div>713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      List&#60;Dependency> tempD = conflicts.get(key);</div>
+<div>714&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (tempD.size() == 1) {</div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // remove this one</div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        removeList.add(key);</div>
+<div>717&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>718&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>719&emsp;&emsp;</div>
+<div>720&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (String s : removeList) {</div>
+<div>721&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      conflicts.remove(s);</div>
+<div>722&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>723&emsp;&emsp;</div>
+<div>724&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return fullList;</div>
+<div>725&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>726&emsp;&emsp;</div>
+<div>727&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>728&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Install a package sourced from the repository.</div>
+<div>729&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>730&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the package to install</div>
+<div>731&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param version the version of the package to install (may be null if not</div>
+<div>732&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          applicable).</div>
+<div>733&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param progress optional varargs parameter, that, if supplied, is expected</div>
+<div>734&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          to contain one or more PrintStream objects to write progress to.</div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the package can't be installed for some reason.</div>
+<div>736&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>738&emsp;&emsp;&nbsp;&nbsp;  public void installPackageFromRepository(String packageName, Object version,</div>
+<div>739&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PrintStream... progress) throws Exception {</div>
+<div>740&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Package toInstall = getRepositoryPackageInfo(packageName, version);</div>
+<div>741&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (toInstall.isInstalled()) {</div>
+<div>742&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (PrintStream p : progress) {</div>
+<div>743&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        p.println("[DefaultPackageManager] cleanining installed package: "</div>
+<div>744&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + toInstall.getName());</div>
+<div>745&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        uninstallPackage(toInstall.getName(), progress);</div>
+<div>746&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>747&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>748&emsp;&emsp;</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String urlString =</div>
+<div>750&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      toInstall.getPackageMetaDataElement("PackageURL").toString();</div>
+<div>751&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URL packageURL = new URL(urlString);</div>
+<div>752&emsp;&emsp;</div>
+<div>753&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    installPackageFromURL(packageURL, progress);</div>
+<div>754&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>755&emsp;&emsp;</div>
+<div>756&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>757&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Install a package sourced from a given URL.</div>
+<div>758&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageURL the URL to the package.</div>
+<div>760&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param progress optional varargs parameter, that, if supplied, is expected</div>
+<div>761&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          to contain one or more PrintStream objects to write progress to.</div>
+<div>762&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the name of the package installed</div>
+<div>763&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the package can't be installed for some reason.</div>
+<div>764&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>765&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>766&emsp;&emsp;&nbsp;&nbsp;  public String installPackageFromURL(URL packageURL, PrintStream... progress)</div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>768&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    File downloaded = downloadArchive(packageURL, "zip", progress);</div>
+<div>769&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return installPackageFromArchive(downloaded.getAbsolutePath(), progress);</div>
+<div>770&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>771&emsp;&emsp;</div>
+<div>772&emsp;&emsp;&nbsp;&nbsp;  private static void copyStreams(InputStream input, OutputStream output)</div>
+<div>773&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws IOException {</div>
+<div>774&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int count;</div>
+<div>775&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    byte data[] = new byte[1024];</div>
+<div>776&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while ((count = input.read(data, 0, 1024)) != -1) {</div>
+<div>777&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      output.write(data, 0, count);</div>
+<div>778&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>779&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>780&emsp;&emsp;</div>
+<div>781&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>782&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Installs a package from a zip/jar archive.</div>
+<div>783&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>784&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageArchivePath the full path to the archived package to install.</div>
+<div>785&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the package to install.</div>
+<div>786&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param progress optional varargs parameter, that, if supplied, is expected</div>
+<div>787&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          to contain one or more PrintStream objects to write progress to.</div>
+<div>788&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the package can't be installed for some reason.</div>
+<div>789&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>790&emsp;&emsp;&nbsp;&nbsp;  protected void installPackage(String packageArchivePath, String packageName,</div>
+<div>791&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PrintStream... progress) throws Exception {</div>
+<div>792&emsp;&emsp;</div>
+<div>793&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!establishPackageHome()) {</div>
+<div>794&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("Unable to install " + packageArchivePath</div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + " because package home (" + m_packageHome.getAbsolutePath()</div>
+<div>796&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + ") can't be established.");</div>
+<div>797&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>798&emsp;&emsp;</div>
+<div>799&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    File destDir = new File(m_packageHome, packageName);</div>
+<div>800&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!destDir.mkdir()) {</div>
+<div>801&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      /*</div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;       * throw new Exception("Unable to create package directory " +</div>
+<div>803&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;       * destDir.getAbsolutePath());</div>
+<div>804&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;       */</div>
+<div>805&emsp;&emsp;</div>
+<div>806&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // hopefully failure is because the directory already exists</div>
+<div>807&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>808&emsp;&emsp;</div>
+<div>809&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    InputStream input = null;</div>
+<div>810&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    OutputStream output = null;</div>
+<div>811&emsp;&emsp;</div>
+<div>812&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ZipFile zipFile = new ZipFile(packageArchivePath);</div>
+<div>813&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Enumeration enumeration = zipFile.entries();</div>
+<div>814&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while (enumeration.hasMoreElements()) {</div>
+<div>815&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ZipEntry zipEntry = (ZipEntry) enumeration.nextElement();</div>
+<div>816&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (zipEntry.isDirectory()) {</div>
+<div>817&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new File(destDir, zipEntry.getName()).mkdirs();</div>
+<div>818&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        continue;</div>
+<div>819&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>820&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        File temp = new File(destDir, zipEntry.getName()).getParentFile();</div>
+<div>821&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (temp != null && !temp.exists()) {</div>
+<div>822&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          temp.mkdirs();</div>
+<div>823&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>824&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>825&emsp;&emsp;</div>
+<div>826&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (PrintStream progres : progress) {</div>
+<div>827&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        progres.println("[DefaultPackageManager] Installing: "</div>
+<div>828&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + zipEntry.getName());</div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>830&emsp;&emsp;</div>
+<div>831&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      input = new BufferedInputStream(zipFile.getInputStream(zipEntry));</div>
+<div>832&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      File destFile = new File(destDir, zipEntry.getName());</div>
+<div>833&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      FileOutputStream fos = new FileOutputStream(destFile);</div>
+<div>834&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      output = new BufferedOutputStream(fos);</div>
+<div>835&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      copyStreams(input, output);</div>
+<div>836&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      input.close();</div>
+<div>837&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      output.flush();</div>
+<div>838&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      output.close();</div>
+<div>839&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>840&emsp;&emsp;</div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // invalidate the cache</div>
+<div>842&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    s_installedPackageList = null;</div>
+<div>843&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    deleteInstalledPackageCacheFile();</div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>845&emsp;&emsp;</div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;  private URLConnection getConnection(String urlString) throws IOException {</div>
+<div>847&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URL connURL = new URL(urlString);</div>
+<div>848&emsp;&emsp;</div>
+<div>849&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getConnection(connURL);</div>
+<div>850&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>851&emsp;&emsp;</div>
+<div>852&emsp;&emsp;&nbsp;&nbsp;  private URLConnection openConnection(URL connURL) throws IOException {</div>
+<div>853&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URLConnection conn = null;</div>
+<div>854&emsp;&emsp;</div>
+<div>855&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // setup the proxy (if we are using one) and open the connect</div>
+<div>856&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (setProxyAuthentication(connURL)) {</div>
+<div>857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      conn = connURL.openConnection(m_httpProxy);</div>
+<div>858&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>859&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      conn = connURL.openConnection();</div>
+<div>860&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>861&emsp;&emsp;</div>
+<div>862&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Set a timeout for establishing the connection</div>
+<div>863&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    conn.setConnectTimeout(m_timeout);</div>
+<div>864&emsp;&emsp;</div>
+<div>865&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return conn;</div>
+<div>866&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>867&emsp;&emsp;</div>
+<div>868&emsp;&emsp;&nbsp;&nbsp;  private URLConnection getConnection(URL connURL) throws IOException {</div>
+<div>869&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URLConnection conn = openConnection(connURL);</div>
+<div>870&emsp;&emsp;</div>
+<div>871&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (conn instanceof HttpURLConnection) {</div>
+<div>872&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int status = 0;</div>
+<div>873&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>874&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        status = ((HttpURLConnection) conn).getResponseCode();</div>
+<div>875&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (Exception ex) {</div>
+<div>876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (connURL.toString().startsWith("https://")) {</div>
+<div>877&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String newURL = connURL.toString().replace("https://", "http://");</div>
+<div>878&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          conn = openConnection(new URL(newURL));</div>
+<div>879&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          status = ((HttpURLConnection) conn).getResponseCode();</div>
+<div>880&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>881&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw ex;</div>
+<div>882&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>883&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>884&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int redirectCount = 0;</div>
+<div>885&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      while (status == HttpURLConnection.HTTP_MOVED_TEMP</div>
+<div>886&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        || status == HttpURLConnection.HTTP_MOVED_PERM</div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        || status == HttpURLConnection.HTTP_SEE_OTHER) {</div>
+<div>888&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        redirectCount++;</div>
+<div>889&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (redirectCount > 2) {</div>
+<div>890&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw new IOException(</div>
+<div>891&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            "Three redirects were generated when trying to " + "download "</div>
+<div>892&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              + connURL);</div>
+<div>893&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>894&emsp;&emsp;</div>
+<div>895&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String newURL = conn.getHeaderField("Location");</div>
+<div>896&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>897&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          conn = openConnection(new URL(newURL));</div>
+<div>898&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          status = ((HttpURLConnection) conn).getResponseCode();</div>
+<div>899&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (Exception ex) {</div>
+<div>900&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (newURL.startsWith("https://")) {</div>
+<div>901&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // try http instead</div>
+<div>902&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            System.out.println("[DefaultPackageManager] trying http instead "</div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              + "of https for " + newURL);</div>
+<div>904&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            newURL = newURL.replace("https://", "http://");</div>
+<div>905&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            conn = openConnection(new URL(newURL));</div>
+<div>906&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            status = ((HttpURLConnection) conn).getResponseCode();</div>
+<div>907&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>908&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw ex;</div>
+<div>909&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>910&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>911&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>912&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>913&emsp;&emsp;</div>
+<div>914&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return conn;</div>
+<div>915&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>916&emsp;&emsp;</div>
+<div>917&emsp;&emsp;&nbsp;&nbsp;  private void transToBAOS(BufferedInputStream bi, ByteArrayOutputStream bos)</div>
+<div>918&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>919&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while (true) {</div>
+<div>920&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      synchronized (m_buffer) {</div>
+<div>921&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int amountRead = bi.read(m_buffer);</div>
+<div>922&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (amountRead == -1) {</div>
+<div>923&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>924&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>925&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        bos.write(m_buffer, 0, amountRead);</div>
+<div>926&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>927&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>928&emsp;&emsp;</div>
+<div>929&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bi.close();</div>
+<div>930&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>931&emsp;&emsp;</div>
+<div>932&emsp;&emsp;&nbsp;&nbsp;  private void writeZipEntryForPackage(String packageName, ZipOutputStream zos)</div>
+<div>933&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>934&emsp;&emsp;</div>
+<div>935&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ZipEntry packageDir = new ZipEntry(packageName + "/");</div>
+<div>936&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.putNextEntry(packageDir);</div>
+<div>937&emsp;&emsp;</div>
+<div>938&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ZipEntry z = new ZipEntry(packageName + "/Latest.props");</div>
+<div>939&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ZipEntry z2 = new ZipEntry(packageName + "/Latest.html");</div>
+<div>940&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URLConnection conn =</div>
+<div>941&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getConnection(m_packageRepository.toString() + "/" + packageName</div>
+<div>942&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "/Latest.props");</div>
+<div>943&emsp;&emsp;</div>
+<div>944&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    BufferedInputStream bi = new BufferedInputStream(conn.getInputStream());</div>
+<div>945&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ByteArrayOutputStream bos = new ByteArrayOutputStream();</div>
+<div>946&emsp;&emsp;</div>
+<div>947&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    transToBAOS(bi, bos);</div>
+<div>948&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.putNextEntry(z);</div>
+<div>949&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.write(bos.toByteArray());</div>
+<div>950&emsp;&emsp;</div>
+<div>951&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    conn =</div>
+<div>952&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getConnection(m_packageRepository.toString() + "/" + packageName</div>
+<div>953&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "/Latest.html");</div>
+<div>954&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bi = new BufferedInputStream(conn.getInputStream());</div>
+<div>955&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bos = new ByteArrayOutputStream();</div>
+<div>956&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    transToBAOS(bi, bos);</div>
+<div>957&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.putNextEntry(z2);</div>
+<div>958&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.write(bos.toByteArray());</div>
+<div>959&emsp;&emsp;</div>
+<div>960&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // write the versions.txt file to the zip</div>
+<div>961&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    z = new ZipEntry(packageName + "/versions.txt");</div>
+<div>962&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    conn =</div>
+<div>963&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getConnection(m_packageRepository.toString() + "/" + packageName</div>
+<div>964&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "/versions.txt");</div>
+<div>965&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bi = new BufferedInputStream(conn.getInputStream());</div>
+<div>966&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bos = new ByteArrayOutputStream();</div>
+<div>967&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    transToBAOS(bi, bos);</div>
+<div>968&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.putNextEntry(z);</div>
+<div>969&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.write(bos.toByteArray());</div>
+<div>970&emsp;&emsp;</div>
+<div>971&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // write the index.html to the zip</div>
+<div>972&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    z = new ZipEntry(packageName + "/index.html");</div>
+<div>973&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    conn =</div>
+<div>974&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getConnection(m_packageRepository.toString() + "/" + packageName</div>
+<div>975&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "/index.html");</div>
+<div>976&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bi = new BufferedInputStream(conn.getInputStream());</div>
+<div>977&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bos = new ByteArrayOutputStream();</div>
+<div>978&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    transToBAOS(bi, bos);</div>
+<div>979&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.putNextEntry(z);</div>
+<div>980&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.write(bos.toByteArray());</div>
+<div>981&emsp;&emsp;</div>
+<div>982&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Now process the available versions</div>
+<div>983&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;Object> versions = getRepositoryPackageVersions(packageName);</div>
+<div>984&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (Object o : versions) {</div>
+<div>985&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      conn =</div>
+<div>986&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getConnection(m_packageRepository.toString() + "/" + packageName + "/"</div>
+<div>987&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + o.toString() + ".props");</div>
+<div>988&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      z = new ZipEntry(packageName + "/" + o.toString() + ".props");</div>
+<div>989&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      bi = new BufferedInputStream(conn.getInputStream());</div>
+<div>990&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      bos = new ByteArrayOutputStream();</div>
+<div>991&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      transToBAOS(bi, bos);</div>
+<div>992&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      zos.putNextEntry(z);</div>
+<div>993&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      zos.write(bos.toByteArray());</div>
+<div>994&emsp;&emsp;</div>
+<div>995&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      conn =</div>
+<div>996&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getConnection(m_packageRepository.toString() + "/" + packageName + "/"</div>
+<div>997&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + o.toString() + ".html");</div>
+<div>998&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      z = new ZipEntry(packageName + "/" + o.toString() + ".html");</div>
+<div>999&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      bi = new BufferedInputStream(conn.getInputStream());</div>
+<div>1000&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      bos = new ByteArrayOutputStream();</div>
+<div>1001&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      transToBAOS(bi, bos);</div>
+<div>1002&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      zos.putNextEntry(z);</div>
+<div>1003&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      zos.write(bos.toByteArray());</div>
+<div>1004&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1005&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1006&emsp;&emsp;</div>
+<div>1007&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1008&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Gets an array of bytes containing a zip of all the repository meta data and</div>
+<div>1009&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * supporting files. Does *not* contain any package archives etc., only a</div>
+<div>1010&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * snapshot of the meta data. Could be used by clients to establish a cache of</div>
+<div>1011&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * meta data.</div>
+<div>1012&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1013&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a zip compressed array of bytes.</div>
+<div>1014&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1015&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1016&emsp;&emsp;&nbsp;&nbsp;  public byte[] getRepositoryPackageMetaDataOnlyAsZip(PrintStream... progress)</div>
+<div>1017&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>1018&emsp;&emsp;</div>
+<div>1019&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (getPackageRepositoryURL() == null) {</div>
+<div>1020&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[DefaultPackageManager] No package repository set!!");</div>
+<div>1021&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1022&emsp;&emsp;</div>
+<div>1023&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>1024&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String repoZip = m_packageRepository.toString() + "/repo.zip";</div>
+<div>1025&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      URLConnection conn = null;</div>
+<div>1026&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      conn = getConnection(repoZip);</div>
+<div>1027&emsp;&emsp;</div>
+<div>1028&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      BufferedInputStream bi = new BufferedInputStream(conn.getInputStream());</div>
+<div>1029&emsp;&emsp;</div>
+<div>1030&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ByteArrayOutputStream bos = new ByteArrayOutputStream();</div>
+<div>1031&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // ZipOutputStream zos = new ZipOutputStream(bos);</div>
+<div>1032&emsp;&emsp;</div>
+<div>1033&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int totalBytesRead = 0;</div>
+<div>1034&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      while (true) {</div>
+<div>1035&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        synchronized (m_buffer) {</div>
+<div>1036&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          int amountRead = bi.read(m_buffer);</div>
+<div>1037&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (amountRead == -1) {</div>
+<div>1038&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            for (PrintStream progres : progress) {</div>
+<div>1039&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              progres.println("[DefaultPackageManager] downloaded "</div>
+<div>1040&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                + (totalBytesRead / 1000) + " KB\r");</div>
+<div>1041&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1042&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>1043&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1044&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          bos.write(m_buffer, 0, amountRead);</div>
+<div>1045&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          totalBytesRead += amountRead;</div>
+<div>1046&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          for (PrintStream progres : progress) {</div>
+<div>1047&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            progres.print("[DefaultPackageManager] downloaded "</div>
+<div>1048&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              + (totalBytesRead / 1000) + " KB\r");</div>
+<div>1049&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1050&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1051&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1052&emsp;&emsp;</div>
+<div>1053&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      bi.close();</div>
+<div>1054&emsp;&emsp;</div>
+<div>1055&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return bos.toByteArray();</div>
+<div>1056&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (Exception ex) {</div>
+<div>1057&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.err.println("Unable to download repository zip archve " + "("</div>
+<div>1058&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + ex.getMessage() + ") - trying legacy routine...");</div>
+<div>1059&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return getRepositoryPackageMetaDataOnlyAsZipLegacy(progress);</div>
+<div>1060&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1061&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1062&emsp;&emsp;</div>
+<div>1063&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1064&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Gets an array of bytes containing a zip of all the repository meta data and</div>
+<div>1065&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * supporting files using the legacy approach. Does *not* contain any package</div>
+<div>1066&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * archives etc., only a snapshot of the meta data. Could be used by clients</div>
+<div>1067&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * to establish a cache of meta data.</div>
+<div>1068&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1069&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a zip compressed array of bytes.</div>
+<div>1070&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1071&emsp;&emsp;&nbsp;&nbsp;  public byte[] getRepositoryPackageMetaDataOnlyAsZipLegacy(</div>
+<div>1072&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PrintStream... progress) throws Exception {</div>
+<div>1073&emsp;&emsp;</div>
+<div>1074&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (getPackageRepositoryURL() == null) {</div>
+<div>1075&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[DefaultPackageManager] No package repository set!!");</div>
+<div>1076&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1077&emsp;&emsp;</div>
+<div>1078&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String packageList = m_packageRepository.toString() + "/packageList.txt";</div>
+<div>1079&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String packageListWithVersion =</div>
+<div>1080&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_packageRepository.toString() + "/packageListWithVersion.txt";</div>
+<div>1081&emsp;&emsp;</div>
+<div>1082&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URLConnection conn = null;</div>
+<div>1083&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    conn = getConnection(packageList);</div>
+<div>1084&emsp;&emsp;</div>
+<div>1085&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    BufferedReader bi =</div>
+<div>1086&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new BufferedReader(new InputStreamReader(conn.getInputStream()));</div>
+<div>1087&emsp;&emsp;</div>
+<div>1088&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ByteArrayOutputStream bos = new ByteArrayOutputStream();</div>
+<div>1089&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ZipOutputStream zos = new ZipOutputStream(bos);</div>
+<div>1090&emsp;&emsp;</div>
+<div>1091&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Process the packages</div>
+<div>1092&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String packageName;</div>
+<div>1093&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while ((packageName = bi.readLine()) != null) {</div>
+<div>1094&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (PrintStream p : progress) {</div>
+<div>1095&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        p.println("Fetching meta data for " + packageName);</div>
+<div>1096&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1097&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      writeZipEntryForPackage(packageName, zos);</div>
+<div>1098&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1099&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bi.close();</div>
+<div>1100&emsp;&emsp;</div>
+<div>1101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // include the package list (legacy) in the zip</div>
+<div>1102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    conn = getConnection(packageList);</div>
+<div>1103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ZipEntry z = new ZipEntry("packageList.txt");</div>
+<div>1104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    BufferedInputStream bi2 = new BufferedInputStream(conn.getInputStream());</div>
+<div>1105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ByteArrayOutputStream bos2 = new ByteArrayOutputStream();</div>
+<div>1106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    transToBAOS(bi2, bos2);</div>
+<div>1107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.putNextEntry(z);</div>
+<div>1108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.write(bos2.toByteArray());</div>
+<div>1109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bi2.close();</div>
+<div>1110&emsp;&emsp;</div>
+<div>1111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // include the package list with latest version numbers</div>
+<div>1112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    conn = getConnection(packageListWithVersion);</div>
+<div>1113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    z = new ZipEntry("packageListWithVersion.txt");</div>
+<div>1114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bi2 = new BufferedInputStream(conn.getInputStream());</div>
+<div>1115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bos2 = new ByteArrayOutputStream();</div>
+<div>1116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    transToBAOS(bi2, bos2);</div>
+<div>1117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.putNextEntry(z);</div>
+<div>1118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.write(bos2.toByteArray());</div>
+<div>1119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bi2.close();</div>
+<div>1120&emsp;&emsp;</div>
+<div>1121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Include the top level images</div>
+<div>1122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String imageList = m_packageRepository.toString() + "/images.txt";</div>
+<div>1123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    conn = getConnection(imageList);</div>
+<div>1124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bi = new BufferedReader(new InputStreamReader(conn.getInputStream()));</div>
+<div>1125&emsp;&emsp;</div>
+<div>1126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String imageName;</div>
+<div>1127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while ((imageName = bi.readLine()) != null) {</div>
+<div>1128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // System.err.println("Processing " + imageName);</div>
+<div>1129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      z = new ZipEntry(imageName);</div>
+<div>1130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      URLConnection conn2 =</div>
+<div>1131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getConnection(m_packageRepository.toString() + "/" + imageName);</div>
+<div>1132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      bi2 = new BufferedInputStream(conn2.getInputStream());</div>
+<div>1133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      bos2 = new ByteArrayOutputStream();</div>
+<div>1134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      transToBAOS(bi2, bos2);</div>
+<div>1135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      zos.putNextEntry(z);</div>
+<div>1136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      zos.write(bos2.toByteArray());</div>
+<div>1137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      bi2.close();</div>
+<div>1138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1139&emsp;&emsp;</div>
+<div>1140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // include the image list in the zip</div>
+<div>1141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    conn = getConnection(imageList);</div>
+<div>1142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    z = new ZipEntry("images.txt");</div>
+<div>1143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bi2 = new BufferedInputStream(conn.getInputStream());</div>
+<div>1144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bos2 = new ByteArrayOutputStream();</div>
+<div>1145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    transToBAOS(bi2, bos2);</div>
+<div>1146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.putNextEntry(z);</div>
+<div>1147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.write(bos2.toByteArray());</div>
+<div>1148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    bi2.close();</div>
+<div>1149&emsp;&emsp;</div>
+<div>1150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zos.close();</div>
+<div>1151&emsp;&emsp;</div>
+<div>1152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return bos.toByteArray();</div>
+<div>1153&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1154&emsp;&emsp;</div>
+<div>1155&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1156&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get all packages that the system knows about (i.e. all packages contained</div>
+<div>1157&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * in the repository).</div>
+<div>1158&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1159&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param progress optional varargs parameter, that, if supplied is expected</div>
+<div>1160&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          to contain one or more PrintStream objects to write progress to.</div>
+<div>1161&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a list of all packages.</div>
+<div>1162&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a list of packages can't be determined.</div>
+<div>1163&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1164&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1165&emsp;&emsp;&nbsp;&nbsp;  public List&#60;Package> getAllPackages(PrintStream... progress) throws Exception {</div>
+<div>1166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ArrayList&#60;Package> allPackages = new ArrayList&#60;Package>();</div>
+<div>1167&emsp;&emsp;</div>
+<div>1168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (getPackageRepositoryURL() == null) {</div>
+<div>1169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[DefaultPackageManager] No package repository set!!");</div>
+<div>1170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1171&emsp;&emsp;</div>
+<div>1172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String packageList = m_packageRepository.toString() + "/packageList.txt";</div>
+<div>1173&emsp;&emsp;</div>
+<div>1174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URL packageListURL = new URL(packageList);</div>
+<div>1175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URLConnection conn = getConnection(packageListURL);</div>
+<div>1176&emsp;&emsp;</div>
+<div>1177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    BufferedReader bi =</div>
+<div>1178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new BufferedReader(new InputStreamReader(conn.getInputStream()));</div>
+<div>1179&emsp;&emsp;</div>
+<div>1180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String packageName;</div>
+<div>1181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while ((packageName = bi.readLine()) != null) {</div>
+<div>1182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Package temp = getRepositoryPackageInfo(packageName);</div>
+<div>1183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      allPackages.add(temp);</div>
+<div>1184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1185&emsp;&emsp;</div>
+<div>1186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return allPackages;</div>
+<div>1187&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1188&emsp;&emsp;</div>
+<div>1189&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1190&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get a list of packages that are not currently installed.</div>
+<div>1191&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1192&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a list of packages that are not currently installed.</div>
+<div>1193&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a list of packages can't be determined.</div>
+<div>1194&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1195&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1196&emsp;&emsp;&nbsp;&nbsp;  public List&#60;Package> getAvailablePackages() throws Exception {</div>
+<div>1197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;Package> allP = getAllPackages();</div>
+<div>1198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;Package> available = new ArrayList&#60;Package>();</div>
+<div>1199&emsp;&emsp;</div>
+<div>1200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; allP.size(); i++) {</div>
+<div>1201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!allP.get(i).isInstalled()) {</div>
+<div>1202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        available.add(allP.get(i));</div>
+<div>1203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1205&emsp;&emsp;</div>
+<div>1206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return available;</div>
+<div>1207&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1208&emsp;&emsp;</div>
+<div>1209&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1210&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get a list of installed packages.</div>
+<div>1211&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1212&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a list of installed packages.</div>
+<div>1213&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a list of packages can't be determined.</div>
+<div>1214&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1215&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1216&emsp;&emsp;&nbsp;&nbsp;  public List&#60;Package> getInstalledPackages() throws Exception {</div>
+<div style="background-color:limegreen;">1217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!establishPackageHome()) {&nbsp;&#8594; [BATCHSIZE, PRUNE]</b></div>
+<div>1218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("Unable to get list of installed packages "</div>
+<div>1219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "because package home (" + m_packageHome.getAbsolutePath()</div>
+<div>1220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + ") can't be established.");</div>
+<div>1221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1222&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (s_installedPackageList != null) {&nbsp;&#8594; [BATCHSIZE, PRUNE]</b></div>
+<div>1224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return s_installedPackageList;</div>
+<div>1225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1226&emsp;&emsp;</div>
+<div>1227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    s_installedPackageList = loadInstalledPackageCache();</div>
+<div style="background-color:limegreen;">1228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (s_installedPackageList != null) {&nbsp;&#8594; [BATCHSIZE]</b></div>
+<div>1229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return s_installedPackageList;</div>
+<div>1230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1231&emsp;&emsp;</div>
+<div>1232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;Package> installedP = new ArrayList&#60;Package>();</div>
+<div>1233&emsp;&emsp;</div>
+<div>1234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    File[] contents = m_packageHome.listFiles();</div>
+<div>1235&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (File content : contents) {&nbsp;&#8594; [BATCHSIZE, PRUNE]</b></div>
+<div style="background-color:limegreen;">1237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (content.isDirectory()) {&nbsp;&#8594; [BATCHSIZE]</b></div>
+<div>1238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        File description =</div>
+<div>1239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          new File(content.getAbsolutePath() + File.separator</div>
+<div>1240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + "Description.props");</div>
+<div>1241&emsp;&emsp;</div>
+<div>1242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (description.exists()) {</div>
+<div>1243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          try {</div>
+<div>1244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Properties packageProperties = new Properties();</div>
+<div>1245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            BufferedInputStream bi =</div>
+<div>1246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              new BufferedInputStream(new FileInputStream(description));</div>
+<div>1247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            packageProperties.load(bi);</div>
+<div>1248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            bi.close();</div>
+<div>1249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            bi = null;</div>
+<div>1250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            DefaultPackage pkg =</div>
+<div>1251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              new DefaultPackage(m_packageHome, this, packageProperties);</div>
+<div>1252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            installedP.add(pkg);</div>
+<div>1253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } catch (Exception ex) {</div>
+<div>1254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // ignore if we can't load the description file for some reason</div>
+<div>1255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1259&emsp;&emsp;</div>
+<div>1260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    s_installedPackageList = installedP;</div>
+<div>1261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    saveInstalledPackageCache(installedP);</div>
+<div>1262&emsp;&emsp;</div>
+<div>1263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return installedP;</div>
+<div>1264&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1265&emsp;&emsp;</div>
+<div>1266&emsp;&emsp;&nbsp;&nbsp;  protected void deleteInstalledPackageCacheFile() throws Exception {</div>
+<div>1267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!establishPackageHome()) {</div>
+<div>1268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("Unable to delete installed package cache file "</div>
+<div>1269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "because package home (" + m_packageHome.getAbsolutePath()</div>
+<div>1270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + ") can't be established.");</div>
+<div>1271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1272&emsp;&emsp;</div>
+<div>1273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    File cache = new File(m_packageHome, INSTALLED_PACKAGE_CACHE_FILE);</div>
+<div>1274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (cache.exists()) {</div>
+<div>1275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!cache.delete()) {</div>
+<div>1276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println("Unable to delete installed package cache file '"</div>
+<div>1277&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + cache.toString() + "'");</div>
+<div>1278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        cache.deleteOnExit();</div>
+<div>1279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1281&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1282&emsp;&emsp;</div>
+<div>1283&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1284&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Save the supplied list of Packages to the installed package cache file</div>
+<div>1285&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1286&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param cacheToSave the list of packages to save</div>
+<div>1287&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>1288&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1289&emsp;&emsp;&nbsp;&nbsp;  protected void saveInstalledPackageCache(List&#60;Package> cacheToSave)</div>
+<div>1290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>1291&emsp;&emsp;</div>
+<div>1292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!establishPackageHome()) {</div>
+<div>1293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("Unable to save installed package cache file "</div>
+<div>1294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "because package home (" + m_packageHome.getAbsolutePath()</div>
+<div>1295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + ") can't be established.");</div>
+<div>1296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1297&emsp;&emsp;</div>
+<div>1298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ObjectOutputStream oos = null;</div>
+<div>1299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>1300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      oos =</div>
+<div>1301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new ObjectOutputStream(new BufferedOutputStream(new FileOutputStream(</div>
+<div>1302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          new File(m_packageHome, INSTALLED_PACKAGE_CACHE_FILE))));</div>
+<div>1303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      oos.writeObject(cacheToSave);</div>
+<div>1304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      oos.flush();</div>
+<div>1305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } finally {</div>
+<div style="background-color:limegreen;">1306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (oos != null) {&nbsp;&#8594; [BATCHSIZE]</b></div>
+<div>1307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        oos.close();</div>
+<div>1308&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1310&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1311&emsp;&emsp;</div>
+<div>1312&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1313&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Load the serialized installed package cache file</div>
+<div>1314&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1315&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a list of installed packages (loaded from the cache file)</div>
+<div>1316&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>1317&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1318&emsp;&emsp;&nbsp;&nbsp;  protected List&#60;Package> loadInstalledPackageCache() throws Exception {</div>
+<div style="background-color:limegreen;">1319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!establishPackageHome()) {&nbsp;&#8594; [BATCHSIZE]</b></div>
+<div>1320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("Unable to load installed package cache file "</div>
+<div>1321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "because package home (" + m_packageHome.getAbsolutePath()</div>
+<div>1322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + ") can't be established.");</div>
+<div>1323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1324&emsp;&emsp;</div>
+<div>1325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;Package> installedP = null;</div>
+<div>1326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (new File(m_packageHome, INSTALLED_PACKAGE_CACHE_FILE).exists()) {</div>
+<div>1327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ObjectInputStream ois = null;</div>
+<div>1328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>1329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ois =</div>
+<div>1330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          new ObjectInputStream(new BufferedInputStream(new FileInputStream(</div>
+<div>1331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new File(m_packageHome.toString(), INSTALLED_PACKAGE_CACHE_FILE))));</div>
+<div>1332&emsp;&emsp;</div>
+<div>1333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        installedP = (List) ois.readObject();</div>
+<div>1334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (Exception ex) {</div>
+<div>1335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        deleteInstalledPackageCacheFile();</div>
+<div>1336&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } finally {</div>
+<div style="background-color:limegreen;">1337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (ois != null) {&nbsp;&#8594; [BATCHSIZE]</b></div>
+<div>1338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          ois.close();</div>
+<div>1339&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1341&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1342&emsp;&emsp;</div>
+<div>1343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (installedP != null) {</div>
+<div>1344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (Package p : installedP) {</div>
+<div>1345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (p instanceof DefaultPackage) {</div>
+<div>1346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          ((DefaultPackage) p).setPackageManager(this);</div>
+<div>1347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1350&emsp;&emsp;</div>
+<div>1351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return installedP;</div>
+<div>1352&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1353&emsp;&emsp;</div>
+<div>1354&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1355&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Pads a string to a specified length, inserting spaces on the left as</div>
+<div>1356&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * required. If the string is too long, characters are removed (from the</div>
+<div>1357&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * right).</div>
+<div>1358&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1359&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param inString the input string</div>
+<div>1360&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param length the desired length of the output string</div>
+<div>1361&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the output string</div>
+<div>1362&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1363&emsp;&emsp;&nbsp;&nbsp;  protected static String padLeft(String inString, int length) {</div>
+<div>1364&emsp;&emsp;</div>
+<div>1365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return fixStringLength(inString, length, false);</div>
+<div>1366&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1367&emsp;&emsp;</div>
+<div>1368&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1369&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Pads a string to a specified length, inserting spaces on the right as</div>
+<div>1370&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * required. If the string is too long, characters are removed (from the</div>
+<div>1371&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * right).</div>
+<div>1372&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1373&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param inString the input string</div>
+<div>1374&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param length the desired length of the output string</div>
+<div>1375&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the output string</div>
+<div>1376&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1377&emsp;&emsp;&nbsp;&nbsp;  protected static String padRight(String inString, int length) {</div>
+<div>1378&emsp;&emsp;</div>
+<div>1379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return fixStringLength(inString, length, true);</div>
+<div>1380&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1381&emsp;&emsp;</div>
+<div>1382&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1383&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Pads a string to a specified length, inserting spaces as required. If the</div>
+<div>1384&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * string is too long, characters are removed (from the right).</div>
+<div>1385&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1386&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param inString the input string</div>
+<div>1387&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param length the desired length of the output string</div>
+<div>1388&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param right true if inserted spaces should be added to the right</div>
+<div>1389&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the output string</div>
+<div>1390&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1391&emsp;&emsp;&nbsp;&nbsp;  private static/* @pure@ */String fixStringLength(String inString, int length,</div>
+<div>1392&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean right) {</div>
+<div>1393&emsp;&emsp;</div>
+<div>1394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (inString.length() &#60; length) {</div>
+<div>1395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      while (inString.length() &#60; length) {</div>
+<div>1396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        inString = (right ? inString.concat(" ") : " ".concat(inString));</div>
+<div>1397&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else if (inString.length() > length) {</div>
+<div>1399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      inString = inString.substring(0, length);</div>
+<div>1400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return inString;</div>
+<div>1402&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1403&emsp;&emsp;</div>
+<div>1404&emsp;&emsp;&nbsp;&nbsp;  /*</div>
+<div>1405&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * public void printPackageInfo(String packagePath) throws Exception {</div>
+<div>1406&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Properties packageProps = (Properties)getPackageArchiveInfo(packagePath);</div>
+<div>1407&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Enumeration&#60;?> e = packageProps.propertyNames(); while</div>
+<div>1408&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * (e.hasMoreElements()) { String key = (String) e.nextElement(); String value</div>
+<div>1409&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * = packageProps.getProperty(key); System.out.println(padLeft(key, 11) +</div>
+<div>1410&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * ":\t" + value); } }</div>
+<div>1411&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1412&emsp;&emsp;</div>
+<div>1413&emsp;&emsp;&nbsp;&nbsp;  public static void main(String[] args) {</div>
+<div>1414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>1415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      URL url = new URL(args[0]);</div>
+<div>1416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      DefaultPackageManager pm = new DefaultPackageManager();</div>
+<div>1417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      pm.downloadArchive(url, args[1], System.out);</div>
+<div>1418&emsp;&emsp;</div>
+<div>1419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (Exception ex) {</div>
+<div>1420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ex.printStackTrace();</div>
+<div>1421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1422&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1423&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

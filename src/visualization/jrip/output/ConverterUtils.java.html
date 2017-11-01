@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ConverterUtils.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *   This program is free software: you can redistribute it and/or modify</div>
+<div>3&emsp;&emsp;&nbsp; *   it under the terms of the GNU General Public License as published by</div>
+<div>4&emsp;&emsp;&nbsp; *   the Free Software Foundation, either version 3 of the License, or</div>
+<div>5&emsp;&emsp;&nbsp; *   (at your option) any later version.</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; *   This program is distributed in the hope that it will be useful,</div>
+<div>8&emsp;&emsp;&nbsp; *   but WITHOUT ANY WARRANTY; without even the implied warranty of</div>
+<div>9&emsp;&emsp;&nbsp; *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</div>
+<div>10&emsp;&emsp;&nbsp; *   GNU General Public License for more details.</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; *   You should have received a copy of the GNU General Public License</div>
+<div>13&emsp;&emsp;&nbsp; *   along with this program.  If not, see &#60;http://www.gnu.org/licenses/>.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/*</div>
+<div>17&emsp;&emsp;&nbsp; *    ConverterUtils.java</div>
+<div>18&emsp;&emsp;&nbsp; *    Copyright (C) 2000-2012 University of Waikato, Hamilton, New Zealand</div>
+<div>19&emsp;&emsp;&nbsp; *</div>
+<div>20&emsp;&emsp;&nbsp; */</div>
+<div>21&emsp;&emsp;</div>
+<div>22&emsp;&emsp;package weka.core.converters;</div>
+<div>23&emsp;&emsp;</div>
+<div>24&emsp;&emsp;import java.io.File;</div>
+<div>25&emsp;&emsp;import java.io.IOException;</div>
+<div>26&emsp;&emsp;import java.io.InputStream;</div>
+<div>27&emsp;&emsp;import java.io.OutputStream;</div>
+<div>28&emsp;&emsp;import java.io.Serializable;</div>
+<div>29&emsp;&emsp;import java.io.StreamTokenizer;</div>
+<div>30&emsp;&emsp;import java.net.URL;</div>
+<div>31&emsp;&emsp;import java.util.Arrays;</div>
+<div>32&emsp;&emsp;import java.util.Collections;</div>
+<div>33&emsp;&emsp;import java.util.Enumeration;</div>
+<div>34&emsp;&emsp;import java.util.Hashtable;</div>
+<div>35&emsp;&emsp;import java.util.Properties;</div>
+<div>36&emsp;&emsp;import java.util.Vector;</div>
+<div>37&emsp;&emsp;</div>
+<div>38&emsp;&emsp;import weka.core.ClassDiscovery;</div>
+<div>39&emsp;&emsp;import weka.core.Instance;</div>
+<div>40&emsp;&emsp;import weka.core.Instances;</div>
+<div>41&emsp;&emsp;import weka.core.RevisionHandler;</div>
+<div>42&emsp;&emsp;import weka.core.RevisionUtils;</div>
+<div>43&emsp;&emsp;import weka.core.WekaPackageClassLoaderManager;</div>
+<div>44&emsp;&emsp;import weka.gui.GenericObjectEditor;</div>
+<div>45&emsp;&emsp;import weka.gui.GenericPropertiesCreator;</div>
+<div>46&emsp;&emsp;</div>
+<div>47&emsp;&emsp;/**</div>
+<div>48&emsp;&emsp;&nbsp; * Utility routines for the converter package.</div>
+<div>49&emsp;&emsp;&nbsp; * </div>
+<div>50&emsp;&emsp;&nbsp; * @author Mark Hall (mhall@cs.waikato.ac.nz)</div>
+<div>51&emsp;&emsp;&nbsp; * @author FracPete (fracpete at waikato dot ac dot nz)</div>
+<div>52&emsp;&emsp;&nbsp; * @version $Revision: 13477 $</div>
+<div>53&emsp;&emsp;&nbsp; * @see Serializable</div>
+<div>54&emsp;&emsp;&nbsp; */</div>
+<div>55&emsp;&emsp;public class ConverterUtils implements Serializable, RevisionHandler {</div>
+<div>56&emsp;&emsp;</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;  /** for serialization. */</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;  static final long serialVersionUID = -2460855349276148760L;</div>
+<div>59&emsp;&emsp;</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Helper class for loading data from files and URLs. Via the ConverterUtils</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * class it determines which converter to use for loading the data into</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * memory. If the chosen converter is an incremental one, then the data will</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * be loaded incrementally, otherwise as batch. In both cases the same</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * interface will be used (&#60;code>hasMoreElements&#60;/code>,</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;code>nextElement&#60;/code>). Before the data can be read again, one has to</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * call the &#60;code>reset&#60;/code> method. The data source can also be initialized</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * with an Instances object, in order to provide a unified interface to files</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * and already loaded datasets.</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @author FracPete (fracpete at waikato dot ac dot nz)</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @version $Revision: 13477 $</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #hasMoreElements(Instances)</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #nextElement(Instances)</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #reset()</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see DataSink</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;  public static class DataSource implements Serializable, RevisionHandler {</div>
+<div>79&emsp;&emsp;</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** for serialization. */</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -613122395928757332L;</div>
+<div>82&emsp;&emsp;</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the file to load. */</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected File m_File;</div>
+<div>85&emsp;&emsp;</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the URL to load. */</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected URL m_URL;</div>
+<div>88&emsp;&emsp;</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the loader. */</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Loader m_Loader;</div>
+<div>91&emsp;&emsp;</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** whether the loader is incremental. */</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected boolean m_Incremental;</div>
+<div>94&emsp;&emsp;</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the instance counter for the batch case. */</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected int m_BatchCounter;</div>
+<div>97&emsp;&emsp;</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the last internally read instance. */</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Instance m_IncrementalBuffer;</div>
+<div>100&emsp;&emsp;</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the batch buffer. */</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Instances m_BatchBuffer;</div>
+<div>103&emsp;&emsp;</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Tries to load the data from the file. Can be either a regular file or a</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * web location (http://, https://, ftp:// or file://).</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param location the name of the file to load</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if initialization fails</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public DataSource(String location) throws Exception {</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      super();</div>
+<div>113&emsp;&emsp;</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // file or URL?</div>
+<div style="background-color:limegreen;">115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (location.startsWith("http://") || location.startsWith("https://")&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        || location.startsWith("ftp://") || location.startsWith("file://")) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_URL = new URL(location);</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_File = new File(location);</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>121&emsp;&emsp;</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // quick check: is it ARFF?</div>
+<div style="background-color:limegreen;">123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (isArff(location)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Loader = new ArffLoader();</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div style="background-color:limegreen;">126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_File != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_Loader = ConverterUtils.getLoaderForFile(location);</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_Loader = ConverterUtils.getURLLoaderForFile(location);</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>131&emsp;&emsp;</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // do we have a converter?</div>
+<div style="background-color:limegreen;">133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_Loader == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw new IllegalArgumentException(</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            "No suitable converter found for '" + location + "'!");</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>138&emsp;&emsp;</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // incremental loader?</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Incremental = (m_Loader instanceof IncrementalConverter);</div>
+<div>141&emsp;&emsp;</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      reset();</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>144&emsp;&emsp;</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Initializes the datasource with the given dataset.</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param inst the dataset to use</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public DataSource(Instances inst) {</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      super();</div>
+<div>152&emsp;&emsp;</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_BatchBuffer = inst;</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Loader = null;</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_File = null;</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_URL = null;</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Incremental = false;</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>159&emsp;&emsp;</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Initializes the datasource with the given Loader.</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param loader the Loader to use</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public DataSource(Loader loader) {</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      super();</div>
+<div>167&emsp;&emsp;</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_BatchBuffer = null;</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Loader = loader;</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_File = null;</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_URL = null;</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Incremental = (m_Loader instanceof IncrementalConverter);</div>
+<div>173&emsp;&emsp;</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      initBatchBuffer();</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>176&emsp;&emsp;</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Initializes the datasource with the given input stream. This stream is</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * always interpreted as ARFF.</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param stream the stream to use</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public DataSource(InputStream stream) {</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      super();</div>
+<div>185&emsp;&emsp;</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_BatchBuffer = null;</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Loader = new ArffLoader();</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Loader.setSource(stream);</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (Exception e) {</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Loader = null;</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_File = null;</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_URL = null;</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Incremental = (m_Loader instanceof IncrementalConverter);</div>
+<div>196&emsp;&emsp;</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      initBatchBuffer();</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>199&emsp;&emsp;</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * initializes the batch buffer if necessary, i.e., for non-incremental</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * loaders.</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void initBatchBuffer() {</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (!isIncremental()) {</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_BatchBuffer = m_Loader.getDataSet();</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_BatchBuffer = null;</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (Exception e) {</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        e.printStackTrace();</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>215&emsp;&emsp;</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * returns whether the extension of the location is likely to be of ARFF</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * format, i.e., ending in ".arff" or ".arff.gz" (case-insensitive).</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param location the file location to check</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return true if the location seems to be of ARFF format</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static boolean isArff(String location) {</div>
+<div style="background-color:limegreen;">224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (location.toLowerCase().endsWith(&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ArffLoader.FILE_EXTENSION.toLowerCase())</div>
+<div style="background-color:limegreen;">226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        || location.toLowerCase().endsWith(&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          ArffLoader.FILE_EXTENSION_COMPRESSED.toLowerCase())) {</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return true;</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return false;</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>233&emsp;&emsp;</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * returns whether the loader is an incremental one.</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return true if the loader is a true incremental one</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean isIncremental() {</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_Incremental;</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>242&emsp;&emsp;</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * returns the determined loader, null if the DataSource was initialized</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * with data alone and not a file/URL.</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the loader used for retrieving the data</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Loader getLoader() {</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_Loader;</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>252&emsp;&emsp;</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * returns the full dataset, can be null in case of an error.</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the full dataset</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if resetting of loader fails</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Instances getDataSet() throws Exception {</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances result;</div>
+<div>261&emsp;&emsp;</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = null;</div>
+<div>263&emsp;&emsp;</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // reset the loader</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      reset();</div>
+<div>266&emsp;&emsp;</div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div style="background-color:limegreen;">268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_BatchBuffer == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          result = m_Loader.getDataSet();</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          result = m_BatchBuffer;</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (Exception e) {</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        e.printStackTrace();</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result = null;</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>277&emsp;&emsp;</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>280&emsp;&emsp;</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * returns the full dataset with the specified class index set, can be null</div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * in case of an error.</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param classIndex the class index for the dataset</div>
+<div>286&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the full dataset</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if resetting of loader fails</div>
+<div>288&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>289&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Instances getDataSet(int classIndex) throws Exception {</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances result;</div>
+<div>291&emsp;&emsp;</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = getDataSet();</div>
+<div style="background-color:limegreen;">293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (result != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result.setClassIndex(classIndex);</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>296&emsp;&emsp;</div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>299&emsp;&emsp;</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * resets the loader.</div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if resetting fails</div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void reset() throws Exception {</div>
+<div style="background-color:limegreen;">306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_File != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((AbstractFileLoader) m_Loader).setFile(m_File);</div>
+<div style="background-color:limegreen;">308&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      } else if (m_URL != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ((URLSourcedLoader) m_Loader).setURL(m_URL.toString());</div>
+<div style="background-color:limegreen;">310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      } else if (m_Loader != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Loader.reset();</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>313&emsp;&emsp;</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_BatchCounter = 0;</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_IncrementalBuffer = null;</div>
+<div>316&emsp;&emsp;</div>
+<div style="background-color:limegreen;">317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Loader != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!isIncremental()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_BatchBuffer = m_Loader.getDataSet();</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_BatchBuffer = null;</div>
+<div>322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>325&emsp;&emsp;</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * returns the structure of the data.</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the structure of the data</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Instances getStructure() throws Exception {</div>
+<div style="background-color:limegreen;">333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_BatchBuffer == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return m_Loader.getStructure();</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>336&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return new Instances(m_BatchBuffer, 0);</div>
+<div>337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>339&emsp;&emsp;</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * returns the structure of the data, with the defined class index.</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param classIndex the class index for the dataset</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the structure of the data</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Instances getStructure(int classIndex) throws Exception {</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances result;</div>
+<div>349&emsp;&emsp;</div>
+<div>350&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = getStructure();</div>
+<div style="background-color:limegreen;">351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (result != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result.setClassIndex(classIndex);</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>354&emsp;&emsp;</div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>357&emsp;&emsp;</div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * returns whether there are more Instance objects in the data.</div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param structure the structure of the dataset</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return true if there are more Instance objects available</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @see #nextElement(Instances)</div>
+<div>364&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean hasMoreElements(Instances structure) {</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      boolean result;</div>
+<div>367&emsp;&emsp;</div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = false;</div>
+<div>369&emsp;&emsp;</div>
+<div style="background-color:limegreen;">370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (isIncremental()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // user still hasn't collected the last one?</div>
+<div style="background-color:limegreen;">372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_IncrementalBuffer != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          result = true;</div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          try {</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_IncrementalBuffer = m_Loader.getNextInstance(structure);</div>
+<div style="background-color:limegreen;">377&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            result = (m_IncrementalBuffer != null);&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } catch (Exception e) {</div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            e.printStackTrace();</div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            result = false;</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div style="background-color:limegreen;">384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        result = (m_BatchCounter &#60; m_BatchBuffer.numInstances());&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>386&emsp;&emsp;</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>389&emsp;&emsp;</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * returns the next element and sets the specified dataset, null if none</div>
+<div>392&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * available.</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param dataset the dataset to set for the instance</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the next Instance</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Instance nextElement(Instances dataset) {</div>
+<div>398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instance result;</div>
+<div>399&emsp;&emsp;</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = null;</div>
+<div>401&emsp;&emsp;</div>
+<div style="background-color:limegreen;">402&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (isIncremental()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // is there still an instance in the buffer?</div>
+<div style="background-color:limegreen;">404&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_IncrementalBuffer != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          result = m_IncrementalBuffer;</div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_IncrementalBuffer = null;</div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          try {</div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            result = m_Loader.getNextInstance(dataset);</div>
+<div>410&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } catch (Exception e) {</div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            e.printStackTrace();</div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            result = null;</div>
+<div>413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div style="background-color:limegreen;">416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_BatchCounter &#60; m_BatchBuffer.numInstances()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          result = m_BatchBuffer.instance(m_BatchCounter);</div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_BatchCounter++;</div>
+<div>419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>421&emsp;&emsp;</div>
+<div style="background-color:limegreen;">422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (result != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result.setDataset(dataset);</div>
+<div>424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>425&emsp;&emsp;</div>
+<div>426&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>428&emsp;&emsp;</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * convencience method for loading a dataset in batch mode.</div>
+<div>431&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param location the dataset to load</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the dataset</div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if loading fails</div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static Instances read(String location) throws Exception {</div>
+<div>437&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      DataSource source;</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances result;</div>
+<div>439&emsp;&emsp;</div>
+<div>440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      source = new DataSource(location);</div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = source.getDataSet();</div>
+<div>442&emsp;&emsp;</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>445&emsp;&emsp;</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * convencience method for loading a dataset in batch mode from a stream.</div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param stream the stream to load the dataset from</div>
+<div>450&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the dataset</div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if loading fails</div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static Instances read(InputStream stream) throws Exception {</div>
+<div>454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      DataSource source;</div>
+<div>455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances result;</div>
+<div>456&emsp;&emsp;</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      source = new DataSource(stream);</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = source.getDataSet();</div>
+<div>459&emsp;&emsp;</div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>462&emsp;&emsp;</div>
+<div>463&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * convencience method for loading a dataset in batch mode.</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param loader the loader to get the dataset from</div>
+<div>467&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the dataset</div>
+<div>468&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if loading fails</div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static Instances read(Loader loader) throws Exception {</div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      DataSource source;</div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances result;</div>
+<div>473&emsp;&emsp;</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      source = new DataSource(loader);</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = source.getDataSet();</div>
+<div>476&emsp;&emsp;</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>478&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>479&emsp;&emsp;</div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * for testing only - takes a data file as input.</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param args the commandline arguments</div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static void main(String[] args) throws Exception {</div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (args.length != 1) {</div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println("\nUsage: " + DataSource.class.getName()</div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + " &#60;file>\n");</div>
+<div>490&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.exit(1);</div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>492&emsp;&emsp;</div>
+<div>493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      DataSource loader = new DataSource(args[0]);</div>
+<div>494&emsp;&emsp;</div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("Incremental? " + loader.isIncremental());</div>
+<div>496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("Loader: " + loader.getLoader().getClass().getName());</div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("Data:\n");</div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances structure = loader.getStructure();</div>
+<div>499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println(structure);</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      while (loader.hasMoreElements(structure)) {</div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println(loader.nextElement(structure));</div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>503&emsp;&emsp;</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances inst = loader.getDataSet();</div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      loader = new DataSource(inst);</div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("\n\nProxy-Data:\n");</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println(loader.getStructure());</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      while (loader.hasMoreElements(structure)) {</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println(loader.nextElement(inst));</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>512&emsp;&emsp;</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the revision string.</div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the revision</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String getRevision() {</div>
+<div>520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return RevisionUtils.extract("$Revision: 13477 $");</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>523&emsp;&emsp;</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Helper class for saving data to files. Via the ConverterUtils class it</div>
+<div>526&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * determines which converter to use for saving the data. It is the logical</div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * counterpart to &#60;code>DataSource&#60;/code>.</div>
+<div>528&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>529&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @author FracPete (fracpete at waikato dot ac dot nz)</div>
+<div>530&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @version $Revision: 13477 $</div>
+<div>531&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see DataSource</div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>533&emsp;&emsp;&nbsp;&nbsp;  public static class DataSink implements Serializable, RevisionHandler {</div>
+<div>534&emsp;&emsp;</div>
+<div>535&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** for serialization. */</div>
+<div>536&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -1504966891136411204L;</div>
+<div>537&emsp;&emsp;</div>
+<div>538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the saver to use for storing the data. */</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Saver m_Saver = null;</div>
+<div>540&emsp;&emsp;</div>
+<div>541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the stream to store the data in (always in ARFF format). */</div>
+<div>542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected OutputStream m_Stream = null;</div>
+<div>543&emsp;&emsp;</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>545&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * initializes the sink to save the data to the given file.</div>
+<div>546&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>547&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param filename the file to save data to</div>
+<div>548&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if set of saver fails</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>550&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public DataSink(String filename) throws Exception {</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Stream = null;</div>
+<div>552&emsp;&emsp;</div>
+<div style="background-color:limegreen;">553&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (DataSource.isArff(filename)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>554&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Saver = new ArffSaver();</div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>556&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Saver = getSaverForFile(filename);</div>
+<div>557&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>558&emsp;&emsp;</div>
+<div>559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ((AbstractFileSaver) m_Saver).setFile(new File(filename));</div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>561&emsp;&emsp;</div>
+<div>562&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>563&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * initializes the sink to save the data to the given Saver (expected to be</div>
+<div>564&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * fully configured).</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>566&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param saver the saver to use for saving the data</div>
+<div>567&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public DataSink(Saver saver) {</div>
+<div>569&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Saver = saver;</div>
+<div>570&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Stream = null;</div>
+<div>571&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>572&emsp;&emsp;</div>
+<div>573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>574&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * initializes the sink to save the data in the stream (always in ARFF</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * format).</div>
+<div>576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>577&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param stream the output stream to use for storing the data in ARFF</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          format</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public DataSink(OutputStream stream) {</div>
+<div>581&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Saver = null;</div>
+<div>582&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Stream = stream;</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>584&emsp;&emsp;</div>
+<div>585&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>586&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * writes the given data either via the saver or to the defined output</div>
+<div>587&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * stream (depending on the constructor). In case of the stream, the stream</div>
+<div>588&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * is only flushed, but not closed.</div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>590&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param data the data to save</div>
+<div>591&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if saving fails</div>
+<div>592&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>593&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void write(Instances data) throws Exception {</div>
+<div style="background-color:limegreen;">594&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Saver != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>595&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Saver.setInstances(data);</div>
+<div>596&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Saver.writeBatch();</div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>598&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Stream.write(data.toString().getBytes());</div>
+<div>599&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Stream.flush();</div>
+<div>600&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>601&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>602&emsp;&emsp;</div>
+<div>603&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>604&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * writes the data to the given file.</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param filename the file to write the data to</div>
+<div>607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param data the data to store</div>
+<div>608&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if writing fails</div>
+<div>609&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>610&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static void write(String filename, Instances data) throws Exception {</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      DataSink sink;</div>
+<div>612&emsp;&emsp;</div>
+<div>613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      sink = new DataSink(filename);</div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      sink.write(data);</div>
+<div>615&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>616&emsp;&emsp;</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>618&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * writes the data via the given saver.</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>620&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param saver the saver to use for writing the data</div>
+<div>621&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param data the data to store</div>
+<div>622&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if writing fails</div>
+<div>623&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>624&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static void write(Saver saver, Instances data) throws Exception {</div>
+<div>625&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      DataSink sink;</div>
+<div>626&emsp;&emsp;</div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      sink = new DataSink(saver);</div>
+<div>628&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      sink.write(data);</div>
+<div>629&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>630&emsp;&emsp;</div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>632&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * writes the data to the given stream (always in ARFF format).</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>634&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param stream the stream to write the data to (ARFF format)</div>
+<div>635&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param data the data to store</div>
+<div>636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if writing fails</div>
+<div>637&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static void write(OutputStream stream, Instances data)</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div>640&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      DataSink sink;</div>
+<div>641&emsp;&emsp;</div>
+<div>642&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      sink = new DataSink(stream);</div>
+<div>643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      sink.write(data);</div>
+<div>644&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>645&emsp;&emsp;</div>
+<div>646&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * for testing only - takes a data file as input and a data file for the</div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * output.</div>
+<div>649&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param args the commandline arguments</div>
+<div>651&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>652&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>653&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static void main(String[] args) throws Exception {</div>
+<div>654&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (args.length != 2) {</div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println("\nUsage: " + DataSource.class.getName()</div>
+<div>656&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + " &#60;input-file> &#60;output-file>\n");</div>
+<div>657&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.exit(1);</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>659&emsp;&emsp;</div>
+<div>660&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // load data</div>
+<div>661&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances data = DataSource.read(args[0]);</div>
+<div>662&emsp;&emsp;</div>
+<div>663&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // save data</div>
+<div>664&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      DataSink.write(args[1], data);</div>
+<div>665&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>666&emsp;&emsp;</div>
+<div>667&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>668&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the revision string.</div>
+<div>669&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>670&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the revision</div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>672&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>673&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String getRevision() {</div>
+<div>674&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return RevisionUtils.extract("$Revision: 13477 $");</div>
+<div>675&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>676&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>677&emsp;&emsp;</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>679&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the core loaders - hardcoded list necessary for RMI/Remote Experiments</div>
+<div>680&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * (comma-separated list).</div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>682&emsp;&emsp;&nbsp;&nbsp;  public final static String CORE_FILE_LOADERS = weka.core.converters.ArffLoader.class</div>
+<div>683&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    .getName()</div>
+<div>684&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + ","</div>
+<div>685&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // + weka.core.converters.C45Loader.class.getName() + ","</div>
+<div>686&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + weka.core.converters.CSVLoader.class.getName()</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + ","</div>
+<div>688&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + weka.core.converters.DatabaseConverter.class.getName()</div>
+<div>689&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + ","</div>
+<div>690&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // + weka.core.converters.LibSVMLoader.class.getName() + ","</div>
+<div>691&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // + weka.core.converters.MatlabLoader.class.getName() + ","</div>
+<div>692&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // + weka.core.converters.SVMLightLoader.class.getName() + ","</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + weka.core.converters.SerializedInstancesLoader.class.getName()</div>
+<div>694&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + ","</div>
+<div>695&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + weka.core.converters.TextDirectoryLoader.class.getName()</div>
+<div>696&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + ","</div>
+<div>697&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + weka.core.converters.XRFFLoader.class.getName();</div>
+<div>698&emsp;&emsp;</div>
+<div>699&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>700&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the core savers - hardcoded list necessary for RMI/Remote Experiments</div>
+<div>701&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * (comma-separated list).</div>
+<div>702&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>703&emsp;&emsp;&nbsp;&nbsp;  public final static String CORE_FILE_SAVERS = weka.core.converters.ArffSaver.class</div>
+<div>704&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    .getName()</div>
+<div>705&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + ","</div>
+<div>706&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // + weka.core.converters.C45Saver.class.getName() + ","</div>
+<div>707&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + weka.core.converters.CSVSaver.class.getName()</div>
+<div>708&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + ","</div>
+<div>709&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + weka.core.converters.DatabaseConverter.class.getName()</div>
+<div>710&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + ","</div>
+<div>711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // + weka.core.converters.LibSVMSaver.class.getName() + ","</div>
+<div>712&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // + weka.core.converters.MatlabSaver.class.getName() + ","</div>
+<div>713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // + weka.core.converters.SVMLightSaver.class.getName() + ","</div>
+<div>714&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + weka.core.converters.SerializedInstancesSaver.class.getName()</div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + ","</div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + weka.core.converters.XRFFSaver.class.getName();</div>
+<div>717&emsp;&emsp;</div>
+<div>718&emsp;&emsp;&nbsp;&nbsp;  /** all available loaders (extension &lt;-&gt; classname). */</div>
+<div>719&emsp;&emsp;&nbsp;&nbsp;  protected static Hashtable&#60;String, String> m_FileLoaders;</div>
+<div>720&emsp;&emsp;</div>
+<div>721&emsp;&emsp;&nbsp;&nbsp;  /** all available URL loaders (extension &lt;-&gt; classname). */</div>
+<div>722&emsp;&emsp;&nbsp;&nbsp;  protected static Hashtable&#60;String, String> m_URLFileLoaders;</div>
+<div>723&emsp;&emsp;</div>
+<div>724&emsp;&emsp;&nbsp;&nbsp;  /** all available savers (extension &lt;-&gt; classname). */</div>
+<div>725&emsp;&emsp;&nbsp;&nbsp;  protected static Hashtable&#60;String, String> m_FileSavers;</div>
+<div>726&emsp;&emsp;</div>
+<div>727&emsp;&emsp;&nbsp;&nbsp;  // determine all loaders/savers</div>
+<div>728&emsp;&emsp;&nbsp;&nbsp;  static {</div>
+<div>729&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    initialize();</div>
+<div>730&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>731&emsp;&emsp;</div>
+<div>732&emsp;&emsp;&nbsp;&nbsp;  public static void initialize() {</div>
+<div>733&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Vector&#60;String> classnames;</div>
+<div>734&emsp;&emsp;</div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>736&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // init</div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_FileLoaders = new Hashtable&#60;String, String>();</div>
+<div>738&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_URLFileLoaders = new Hashtable&#60;String, String>();</div>
+<div>739&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_FileSavers = new Hashtable&#60;String, String>();</div>
+<div>740&emsp;&emsp;</div>
+<div>741&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // generate properties</div>
+<div>742&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Note: does NOT work with RMI, hence m_FileLoadersCore/m_FileSaversCore</div>
+<div>743&emsp;&emsp;</div>
+<div>744&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Properties props = GenericPropertiesCreator.getGlobalOutputProperties();</div>
+<div style="background-color:limegreen;">745&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (props == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>746&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        GenericPropertiesCreator creator = new GenericPropertiesCreator();</div>
+<div>747&emsp;&emsp;</div>
+<div>748&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        creator.execute(false);</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        props = creator.getOutputProperties();</div>
+<div>750&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>751&emsp;&emsp;</div>
+<div>752&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // loaders</div>
+<div>753&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_FileLoaders = getFileConverters(</div>
+<div>754&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        props.getProperty(Loader.class.getName(), CORE_FILE_LOADERS),</div>
+<div>755&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new String[] { FileSourcedConverter.class.getName() });</div>
+<div>756&emsp;&emsp;</div>
+<div>757&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // URL loaders</div>
+<div>758&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_URLFileLoaders = getFileConverters(</div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        props.getProperty(Loader.class.getName(), CORE_FILE_LOADERS),</div>
+<div>760&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new String[] { FileSourcedConverter.class.getName(),</div>
+<div>761&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          URLSourcedLoader.class.getName() });</div>
+<div>762&emsp;&emsp;</div>
+<div>763&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // savers</div>
+<div>764&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_FileSavers = getFileConverters(</div>
+<div>765&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        props.getProperty(Saver.class.getName(), CORE_FILE_SAVERS),</div>
+<div>766&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new String[] { FileSourcedConverter.class.getName() });</div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (Exception e) {</div>
+<div>768&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      e.printStackTrace();</div>
+<div>769&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // ignore</div>
+<div>770&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } finally {</div>
+<div>771&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // loaders</div>
+<div style="background-color:limegreen;">772&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_FileLoaders.size() == 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>773&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        classnames = GenericObjectEditor.getClassnames(AbstractFileLoader.class</div>
+<div>774&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          .getName());</div>
+<div style="background-color:limegreen;">775&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (classnames.size() > 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>776&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_FileLoaders = getFileConverters(classnames,</div>
+<div>777&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new String[] { FileSourcedConverter.class.getName() });</div>
+<div>778&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>779&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_FileLoaders = getFileConverters(CORE_FILE_LOADERS,</div>
+<div>780&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new String[] { FileSourcedConverter.class.getName() });</div>
+<div>781&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>782&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>783&emsp;&emsp;</div>
+<div>784&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // URL loaders</div>
+<div style="background-color:limegreen;">785&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_URLFileLoaders.size() == 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>786&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        classnames = GenericObjectEditor.getClassnames(AbstractFileLoader.class</div>
+<div>787&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          .getName());</div>
+<div style="background-color:limegreen;">788&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (classnames.size() > 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>789&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_URLFileLoaders = getFileConverters(classnames,</div>
+<div>790&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new String[] { FileSourcedConverter.class.getName(),</div>
+<div>791&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              URLSourcedLoader.class.getName() });</div>
+<div>792&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>793&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_URLFileLoaders = getFileConverters(CORE_FILE_LOADERS,</div>
+<div>794&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new String[] { FileSourcedConverter.class.getName(),</div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              URLSourcedLoader.class.getName() });</div>
+<div>796&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>797&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>798&emsp;&emsp;</div>
+<div>799&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // savers</div>
+<div style="background-color:limegreen;">800&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_FileSavers.size() == 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>801&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        classnames = GenericObjectEditor.getClassnames(AbstractFileSaver.class</div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          .getName());</div>
+<div style="background-color:limegreen;">803&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (classnames.size() > 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>804&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_FileSavers = getFileConverters(classnames,</div>
+<div>805&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new String[] { FileSourcedConverter.class.getName() });</div>
+<div>806&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>807&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_FileSavers = getFileConverters(CORE_FILE_SAVERS,</div>
+<div>808&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            new String[] { FileSourcedConverter.class.getName() });</div>
+<div>809&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>810&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>811&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>812&emsp;&emsp;</div>
+<div>813&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    weka.gui.ConverterFileChooser.initDefaultFilters();</div>
+<div>814&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>815&emsp;&emsp;</div>
+<div>816&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>817&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns a hashtable with the association</div>
+<div>818&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * "file extension &lt;-&gt; converter classname" for the comma-separated list</div>
+<div>819&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * of converter classnames.</div>
+<div>820&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>821&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classnames comma-separated list of converter classnames</div>
+<div>822&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param intf interfaces the converters have to implement</div>
+<div>823&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return hashtable with ExtensionFileFilters</div>
+<div>824&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>825&emsp;&emsp;&nbsp;&nbsp;  protected static Hashtable&#60;String, String> getFileConverters(</div>
+<div>826&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String classnames, String[] intf) {</div>
+<div>827&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Vector&#60;String> list;</div>
+<div>828&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String[] names;</div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int i;</div>
+<div>830&emsp;&emsp;</div>
+<div>831&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    list = new Vector&#60;String>();</div>
+<div>832&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    names = classnames.split(",");</div>
+<div style="background-color:limegreen;">833&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (i = 0; i &#60; names.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>834&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      list.add(names[i]);</div>
+<div>835&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>836&emsp;&emsp;</div>
+<div>837&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getFileConverters(list, intf);</div>
+<div>838&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>839&emsp;&emsp;</div>
+<div>840&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns a hashtable with the association</div>
+<div>842&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * "file extension &lt;-&gt; converter classname" for the list of converter</div>
+<div>843&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * classnames.</div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>845&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classnames list of converter classnames</div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param intf interfaces the converters have to implement</div>
+<div>847&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return hashtable with ExtensionFileFilters</div>
+<div>848&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>849&emsp;&emsp;&nbsp;&nbsp;  protected static Hashtable&#60;String, String> getFileConverters(</div>
+<div>850&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Vector&#60;String> classnames, String[] intf) {</div>
+<div>851&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Hashtable&#60;String, String> result;</div>
+<div>852&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String classname;</div>
+<div>853&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Class&#60;?> cls;</div>
+<div>854&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String[] ext;</div>
+<div>855&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    FileSourcedConverter converter;</div>
+<div>856&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int i;</div>
+<div>857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int n;</div>
+<div>858&emsp;&emsp;</div>
+<div>859&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = new Hashtable&#60;String, String>();</div>
+<div>860&emsp;&emsp;</div>
+<div style="background-color:limegreen;">861&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (i = 0; i &#60; classnames.size(); i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>862&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      classname = classnames.get(i);</div>
+<div>863&emsp;&emsp;</div>
+<div>864&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // all necessary interfaces implemented?</div>
+<div style="background-color:limegreen;">865&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (n = 0; n &#60; intf.length; n++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">866&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!ClassDiscovery.hasInterface(intf[n], classname)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>867&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          continue;</div>
+<div>868&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>869&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>870&emsp;&emsp;</div>
+<div>871&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get data from converter</div>
+<div>872&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>873&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        cls = WekaPackageClassLoaderManager.forName(classname);</div>
+<div>874&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        converter = (FileSourcedConverter) cls.newInstance();</div>
+<div>875&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ext = converter.getFileExtensions();</div>
+<div>876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (Exception e) {</div>
+<div>877&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        cls = null;</div>
+<div>878&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        converter = null;</div>
+<div>879&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ext = new String[0];</div>
+<div>880&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>881&emsp;&emsp;</div>
+<div style="background-color:limegreen;">882&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (converter == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>883&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        continue;</div>
+<div>884&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>885&emsp;&emsp;</div>
+<div style="background-color:limegreen;">886&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (n = 0; n &#60; ext.length; n++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result.put(ext[n], classname);</div>
+<div>888&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>889&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>890&emsp;&emsp;</div>
+<div>891&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>892&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>893&emsp;&emsp;</div>
+<div>894&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>895&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Gets token, skipping empty lines.</div>
+<div>896&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>897&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param tokenizer the stream tokenizer</div>
+<div>898&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws IOException if reading the next token fails</div>
+<div>899&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>900&emsp;&emsp;&nbsp;&nbsp;  public static void getFirstToken(StreamTokenizer tokenizer)</div>
+<div>901&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws IOException {</div>
+<div>902&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    StreamTokenizerUtils.getFirstToken(tokenizer);</div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>904&emsp;&emsp;</div>
+<div>905&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>906&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Gets token.</div>
+<div>907&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>908&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param tokenizer the stream tokenizer</div>
+<div>909&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws IOException if reading the next token fails</div>
+<div>910&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>911&emsp;&emsp;&nbsp;&nbsp;  public static void getToken(StreamTokenizer tokenizer) throws IOException {</div>
+<div>912&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    StreamTokenizerUtils.getToken(tokenizer);</div>
+<div>913&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>914&emsp;&emsp;</div>
+<div>915&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>916&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Throws error message with line number and last token read.</div>
+<div>917&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>918&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param theMsg the error message to be thrown</div>
+<div>919&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param tokenizer the stream tokenizer</div>
+<div>920&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws IOException containing the error message</div>
+<div>921&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>922&emsp;&emsp;&nbsp;&nbsp;  public static void errms(StreamTokenizer tokenizer, String theMsg)</div>
+<div>923&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws IOException {</div>
+<div>924&emsp;&emsp;</div>
+<div>925&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throw new IOException(theMsg + ", read " + tokenizer.toString());</div>
+<div>926&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>927&emsp;&emsp;</div>
+<div>928&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>929&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns a vector with the classnames of all the loaders from the given</div>
+<div>930&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * hashtable.</div>
+<div>931&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>932&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param ht the hashtable with the extension/converter relation</div>
+<div>933&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the classnames of the loaders</div>
+<div>934&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>935&emsp;&emsp;&nbsp;&nbsp;  protected static Vector&#60;String> getConverters(Hashtable&#60;String, String> ht) {</div>
+<div>936&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Vector&#60;String> result;</div>
+<div>937&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Enumeration&#60;String> enm;</div>
+<div>938&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String converter;</div>
+<div>939&emsp;&emsp;</div>
+<div>940&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = new Vector&#60;String>();</div>
+<div>941&emsp;&emsp;</div>
+<div>942&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get all classnames</div>
+<div>943&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    enm = ht.elements();</div>
+<div style="background-color:limegreen;">944&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    while (enm.hasMoreElements()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>945&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      converter = enm.nextElement();</div>
+<div style="background-color:limegreen;">946&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!result.contains(converter)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>947&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result.add(converter);</div>
+<div>948&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>949&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>950&emsp;&emsp;</div>
+<div>951&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // sort names</div>
+<div>952&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Collections.sort(result);</div>
+<div>953&emsp;&emsp;</div>
+<div>954&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>955&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>956&emsp;&emsp;</div>
+<div>957&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>958&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * tries to determine the converter to use for this kind of file, returns null</div>
+<div>959&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * if none can be found in the given hashtable.</div>
+<div>960&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>961&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param filename the file to return a converter for</div>
+<div>962&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param ht the hashtable with the relation extension/converter</div>
+<div>963&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the converter if one was found, null otherwise</div>
+<div>964&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>965&emsp;&emsp;&nbsp;&nbsp;  protected static Object getConverterForFile(String filename,</div>
+<div>966&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Hashtable&#60;String, String> ht) {</div>
+<div>967&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Object result;</div>
+<div>968&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String extension;</div>
+<div>969&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int index;</div>
+<div>970&emsp;&emsp;</div>
+<div>971&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = null;</div>
+<div>972&emsp;&emsp;</div>
+<div>973&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    index = filename.lastIndexOf('.');</div>
+<div style="background-color:limegreen;">974&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (index > -1) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>975&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      extension = filename.substring(index).toLowerCase();</div>
+<div>976&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = getConverterForExtension(extension, ht);</div>
+<div>977&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // is it a compressed format?</div>
+<div style="background-color:limegreen;">978&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (extension.equals(".gz") && result == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>979&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        index = filename.lastIndexOf('.', index - 1);</div>
+<div>980&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        extension = filename.substring(index).toLowerCase();</div>
+<div>981&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result = getConverterForExtension(extension, ht);</div>
+<div>982&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>983&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>984&emsp;&emsp;</div>
+<div>985&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>986&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>987&emsp;&emsp;</div>
+<div>988&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>989&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * tries to determine the loader to use for this kind of extension, returns</div>
+<div>990&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * null if none can be found.</div>
+<div>991&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>992&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param extension the file extension to return a converter for</div>
+<div>993&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param ht the hashtable with the relation extension/converter</div>
+<div>994&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the converter if one was found, null otherwise</div>
+<div>995&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>996&emsp;&emsp;&nbsp;&nbsp;  protected static Object getConverterForExtension(String extension,</div>
+<div>997&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Hashtable&#60;String, String> ht) {</div>
+<div>998&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Object result;</div>
+<div>999&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String classname;</div>
+<div>1000&emsp;&emsp;</div>
+<div>1001&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = null;</div>
+<div>1002&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    classname = ht.get(extension);</div>
+<div style="background-color:limegreen;">1003&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (classname != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1004&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>1005&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result = WekaPackageClassLoaderManager.forName(classname).newInstance();</div>
+<div>1006&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (Exception e) {</div>
+<div>1007&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result = null;</div>
+<div>1008&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        e.printStackTrace();</div>
+<div>1009&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1010&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1011&emsp;&emsp;</div>
+<div>1012&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>1013&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1014&emsp;&emsp;</div>
+<div>1015&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1016&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * checks whether the given class is one of the hardcoded core file loaders.</div>
+<div>1017&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1018&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classname the class to check</div>
+<div>1019&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if the class is one of the core loaders</div>
+<div>1020&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #CORE_FILE_LOADERS</div>
+<div>1021&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1022&emsp;&emsp;&nbsp;&nbsp;  public static boolean isCoreFileLoader(String classname) {</div>
+<div>1023&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean result;</div>
+<div>1024&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String[] classnames;</div>
+<div>1025&emsp;&emsp;</div>
+<div>1026&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    classnames = CORE_FILE_LOADERS.split(",");</div>
+<div>1027&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = (Arrays.binarySearch(classnames, classname) >= 0);</div>
+<div>1028&emsp;&emsp;</div>
+<div>1029&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>1030&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1031&emsp;&emsp;</div>
+<div>1032&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1033&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns a vector with the classnames of all the file loaders.</div>
+<div>1034&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1035&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the classnames of the loaders</div>
+<div>1036&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1037&emsp;&emsp;&nbsp;&nbsp;  public static Vector&#60;String> getFileLoaders() {</div>
+<div>1038&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getConverters(m_FileLoaders);</div>
+<div>1039&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1040&emsp;&emsp;</div>
+<div>1041&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1042&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * tries to determine the loader to use for this kind of file, returns null if</div>
+<div>1043&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * none can be found.</div>
+<div>1044&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1045&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param filename the file to return a converter for</div>
+<div>1046&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the converter if one was found, null otherwise</div>
+<div>1047&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1048&emsp;&emsp;&nbsp;&nbsp;  public static AbstractFileLoader getLoaderForFile(String filename) {</div>
+<div>1049&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return (AbstractFileLoader) getConverterForFile(filename, m_FileLoaders);</div>
+<div>1050&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1051&emsp;&emsp;</div>
+<div>1052&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1053&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * tries to determine the loader to use for this kind of file, returns null if</div>
+<div>1054&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * none can be found.</div>
+<div>1055&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1056&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param file the file to return a converter for</div>
+<div>1057&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the converter if one was found, null otherwise</div>
+<div>1058&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1059&emsp;&emsp;&nbsp;&nbsp;  public static AbstractFileLoader getLoaderForFile(File file) {</div>
+<div>1060&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getLoaderForFile(file.getAbsolutePath());</div>
+<div>1061&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1062&emsp;&emsp;</div>
+<div>1063&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1064&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * tries to determine the loader to use for this kind of extension, returns</div>
+<div>1065&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * null if none can be found.</div>
+<div>1066&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1067&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param extension the file extension to return a converter for</div>
+<div>1068&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the converter if one was found, null otherwise</div>
+<div>1069&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1070&emsp;&emsp;&nbsp;&nbsp;  public static AbstractFileLoader getLoaderForExtension(String extension) {</div>
+<div>1071&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return (AbstractFileLoader) getConverterForExtension(extension,</div>
+<div>1072&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_FileLoaders);</div>
+<div>1073&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1074&emsp;&emsp;</div>
+<div>1075&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1076&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns a vector with the classnames of all the URL file loaders.</div>
+<div>1077&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1078&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the classnames of the loaders</div>
+<div>1079&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1080&emsp;&emsp;&nbsp;&nbsp;  public static Vector&#60;String> getURLFileLoaders() {</div>
+<div>1081&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getConverters(m_URLFileLoaders);</div>
+<div>1082&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1083&emsp;&emsp;</div>
+<div>1084&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1085&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * tries to determine the URL loader to use for this kind of file, returns</div>
+<div>1086&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * null if none can be found.</div>
+<div>1087&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1088&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param filename the file to return a URL converter for</div>
+<div>1089&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the converter if one was found, null otherwise</div>
+<div>1090&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1091&emsp;&emsp;&nbsp;&nbsp;  public static AbstractFileLoader getURLLoaderForFile(String filename) {</div>
+<div>1092&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return (AbstractFileLoader) getConverterForFile(filename, m_URLFileLoaders);</div>
+<div>1093&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1094&emsp;&emsp;</div>
+<div>1095&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1096&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * tries to determine the URL loader to use for this kind of file, returns</div>
+<div>1097&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * null if none can be found.</div>
+<div>1098&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1099&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param file the file to return a URL converter for</div>
+<div>1100&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the converter if one was found, null otherwise</div>
+<div>1101&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1102&emsp;&emsp;&nbsp;&nbsp;  public static AbstractFileLoader getURLLoaderForFile(File file) {</div>
+<div>1103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getURLLoaderForFile(file.getAbsolutePath());</div>
+<div>1104&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1105&emsp;&emsp;</div>
+<div>1106&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1107&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * tries to determine the URL loader to use for this kind of extension,</div>
+<div>1108&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns null if none can be found.</div>
+<div>1109&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1110&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param extension the file extension to return a URL converter for</div>
+<div>1111&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the converter if one was found, null otherwise</div>
+<div>1112&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1113&emsp;&emsp;&nbsp;&nbsp;  public static AbstractFileLoader getURLLoaderForExtension(String extension) {</div>
+<div>1114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return (AbstractFileLoader) getConverterForExtension(extension,</div>
+<div>1115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_URLFileLoaders);</div>
+<div>1116&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1117&emsp;&emsp;</div>
+<div>1118&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1119&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * checks whether the given class is one of the hardcoded core file savers.</div>
+<div>1120&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1121&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classname the class to check</div>
+<div>1122&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if the class is one of the core savers</div>
+<div>1123&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #CORE_FILE_SAVERS</div>
+<div>1124&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1125&emsp;&emsp;&nbsp;&nbsp;  public static boolean isCoreFileSaver(String classname) {</div>
+<div>1126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean result;</div>
+<div>1127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String[] classnames;</div>
+<div>1128&emsp;&emsp;</div>
+<div>1129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    classnames = CORE_FILE_SAVERS.split(",");</div>
+<div>1130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = (Arrays.binarySearch(classnames, classname) >= 0);</div>
+<div>1131&emsp;&emsp;</div>
+<div>1132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>1133&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1134&emsp;&emsp;</div>
+<div>1135&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1136&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns a vector with the classnames of all the file savers.</div>
+<div>1137&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1138&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the classnames of the savers</div>
+<div>1139&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1140&emsp;&emsp;&nbsp;&nbsp;  public static Vector&#60;String> getFileSavers() {</div>
+<div>1141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getConverters(m_FileSavers);</div>
+<div>1142&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1143&emsp;&emsp;</div>
+<div>1144&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1145&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * tries to determine the saver to use for this kind of file, returns null if</div>
+<div>1146&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * none can be found.</div>
+<div>1147&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1148&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param filename the file to return a converter for</div>
+<div>1149&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the converter if one was found, null otherwise</div>
+<div>1150&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1151&emsp;&emsp;&nbsp;&nbsp;  public static AbstractFileSaver getSaverForFile(String filename) {</div>
+<div>1152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return (AbstractFileSaver) getConverterForFile(filename, m_FileSavers);</div>
+<div>1153&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1154&emsp;&emsp;</div>
+<div>1155&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1156&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * tries to determine the saver to use for this kind of file, returns null if</div>
+<div>1157&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * none can be found.</div>
+<div>1158&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1159&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param file the file to return a converter for</div>
+<div>1160&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the converter if one was found, null otherwise</div>
+<div>1161&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1162&emsp;&emsp;&nbsp;&nbsp;  public static AbstractFileSaver getSaverForFile(File file) {</div>
+<div>1163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getSaverForFile(file.getAbsolutePath());</div>
+<div>1164&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1165&emsp;&emsp;</div>
+<div>1166&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1167&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * tries to determine the saver to use for this kind of extension, returns</div>
+<div>1168&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * null if none can be found.</div>
+<div>1169&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1170&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param extension the file extension to return a converter for</div>
+<div>1171&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the converter if one was found, null otherwise</div>
+<div>1172&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1173&emsp;&emsp;&nbsp;&nbsp;  public static AbstractFileSaver getSaverForExtension(String extension) {</div>
+<div>1174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return (AbstractFileSaver) getConverterForExtension(extension, m_FileSavers);</div>
+<div>1175&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1176&emsp;&emsp;</div>
+<div>1177&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1178&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the revision string.</div>
+<div>1179&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1180&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the revision</div>
+<div>1181&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1182&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1183&emsp;&emsp;&nbsp;&nbsp;  public String getRevision() {</div>
+<div>1184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return RevisionUtils.extract("$Revision: 13477 $");</div>
+<div>1185&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1186&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

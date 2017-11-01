@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>UnivariateKernelEstimator.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *   This program is free software: you can redistribute it and/or modify</div>
+<div>3&emsp;&emsp;&nbsp; *   it under the terms of the GNU General Public License as published by</div>
+<div>4&emsp;&emsp;&nbsp; *   the Free Software Foundation, either version 3 of the License, or</div>
+<div>5&emsp;&emsp;&nbsp; *   (at your option) any later version.</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; *   This program is distributed in the hope that it will be useful,</div>
+<div>8&emsp;&emsp;&nbsp; *   but WITHOUT ANY WARRANTY; without even the implied warranty of</div>
+<div>9&emsp;&emsp;&nbsp; *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</div>
+<div>10&emsp;&emsp;&nbsp; *   GNU General Public License for more details.</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; *   You should have received a copy of the GNU General Public License</div>
+<div>13&emsp;&emsp;&nbsp; *   along with this program.  If not, see &#60;http://www.gnu.org/licenses/>.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/*</div>
+<div>17&emsp;&emsp;&nbsp; *    UnivariateKernelEstimator.java</div>
+<div>18&emsp;&emsp;&nbsp; *    Copyright (C) 2009-2012 University of Waikato, Hamilton, New Zealand</div>
+<div>19&emsp;&emsp;&nbsp; *</div>
+<div>20&emsp;&emsp;&nbsp; */</div>
+<div>21&emsp;&emsp;</div>
+<div>22&emsp;&emsp;package weka.estimators;</div>
+<div>23&emsp;&emsp;</div>
+<div>24&emsp;&emsp;import java.io.Serializable;</div>
+<div>25&emsp;&emsp;import java.util.ArrayList;</div>
+<div>26&emsp;&emsp;import java.util.Iterator;</div>
+<div>27&emsp;&emsp;import java.util.Map;</div>
+<div>28&emsp;&emsp;import java.util.Random;</div>
+<div>29&emsp;&emsp;import java.util.Set;</div>
+<div>30&emsp;&emsp;import java.util.TreeMap;</div>
+<div>31&emsp;&emsp;</div>
+<div>32&emsp;&emsp;import weka.core.RevisionUtils;</div>
+<div>33&emsp;&emsp;import weka.core.Statistics;</div>
+<div>34&emsp;&emsp;import weka.core.Utils;</div>
+<div>35&emsp;&emsp;</div>
+<div>36&emsp;&emsp;/**</div>
+<div>37&emsp;&emsp;&nbsp; * Simple weighted kernel density estimator.</div>
+<div>38&emsp;&emsp;&nbsp; * </div>
+<div>39&emsp;&emsp;&nbsp; * @author Eibe Frank (eibe@cs.waikato.ac.nz)</div>
+<div>40&emsp;&emsp;&nbsp; * @version $Revision: 11318 $</div>
+<div>41&emsp;&emsp;&nbsp; */</div>
+<div>42&emsp;&emsp;public class UnivariateKernelEstimator implements UnivariateDensityEstimator,</div>
+<div>43&emsp;&emsp;&nbsp;&nbsp;  UnivariateIntervalEstimator, UnivariateQuantileEstimator, Serializable {</div>
+<div>44&emsp;&emsp;</div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;  /** For serialization */</div>
+<div>46&emsp;&emsp;&nbsp;&nbsp;  private static final long serialVersionUID = -1163983347810498880L;</div>
+<div>47&emsp;&emsp;</div>
+<div>48&emsp;&emsp;&nbsp;&nbsp;  /** The collection used to store the weighted values. */</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;  protected TreeMap&#60;Double, Double> m_TM = new TreeMap&#60;Double, Double>();</div>
+<div>50&emsp;&emsp;</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;  /** The weighted sum of values */</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;  protected double m_WeightedSum = 0;</div>
+<div>53&emsp;&emsp;</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;  /** The weighted sum of squared values */</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;  protected double m_WeightedSumSquared = 0;</div>
+<div>56&emsp;&emsp;</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;  /** The weight of the values collected so far */</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;  protected double m_SumOfWeights = 0;</div>
+<div>59&emsp;&emsp;</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;  /** The current bandwidth (only computed when needed) */</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;  protected double m_Width = Double.MAX_VALUE;</div>
+<div>62&emsp;&emsp;</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;  /** The exponent to use in computation of bandwidth (default: -0.25) */</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;  protected double m_Exponent = -0.25;</div>
+<div>65&emsp;&emsp;</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;  /** The minimum allowed value of the kernel width (default: 1.0E-6) */</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;  protected double m_MinWidth = 1.0E-6;</div>
+<div>68&emsp;&emsp;</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;  /** Constant for Gaussian density. */</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;  public static final double CONST = -0.5 * Math.log(2 * Math.PI);</div>
+<div>71&emsp;&emsp;</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;  /** Threshold at which further kernels are no longer added to sum. */</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;  protected double m_Threshold = 1.0E-6;</div>
+<div>74&emsp;&emsp;</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;  /** The number of intervals used to approximate prediction interval. */</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;  protected int m_NumIntervals = 1000;</div>
+<div>77&emsp;&emsp;</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns a string describing the estimator.</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;  public String globalInfo() {</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return "Provides a univariate kernel estimator.";</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Adds a value to the density estimator.</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param value the value to add</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param weight the weight of the value</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;  public void addValue(double value, double weight) {</div>
+<div>92&emsp;&emsp;</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_WeightedSum += value * weight;</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_WeightedSumSquared += value * value * weight;</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_SumOfWeights += weight;</div>
+<div style="background-color:limegreen;">96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_TM.get(value) == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_TM.put(value, weight);</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_TM.put(value, m_TM.get(value) + weight);</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>102&emsp;&emsp;</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Updates bandwidth: the sample standard deviation is multiplied by the total</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * weight to the power of the given exponent.</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * If the total weight is not greater than zero, the width is set to</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Double.MAX_VALUE. If that is not the case, but the width becomes smaller</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * than m_MinWidth, the width is set to the value of m_MinWidth.</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;  public void updateWidth() {</div>
+<div>112&emsp;&emsp;</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // OK, need to do some work</div>
+<div style="background-color:limegreen;">114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_SumOfWeights > 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>115&emsp;&emsp;</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Compute variance for scaling</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double mean = m_WeightedSum / m_SumOfWeights;</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double variance = m_WeightedSumSquared / m_SumOfWeights - mean * mean;</div>
+<div style="background-color:limegreen;">119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (variance &#60; 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        variance = 0;</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>122&emsp;&emsp;</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Compute kernel bandwidth</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Width = Math.sqrt(variance) * Math.pow(m_SumOfWeights, m_Exponent);</div>
+<div>125&emsp;&emsp;</div>
+<div style="background-color:limegreen;">126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Width &#60;= m_MinWidth) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Width = m_MinWidth;</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Width = Double.MAX_VALUE;</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>133&emsp;&emsp;</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the interval for the given confidence value.</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param conf the confidence value in the interval [0, 1]</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the interval</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;  public double[][] predictIntervals(double conf) {</div>
+<div>142&emsp;&emsp;</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Update the bandwidth</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    updateWidth();</div>
+<div>145&emsp;&emsp;</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Compute minimum and maximum value, and delta</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double val = Statistics.normalInverse(1.0 - (1.0 - conf) / 2);</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double min = m_TM.firstKey() - val * m_Width;</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double max = m_TM.lastKey() + val * m_Width;</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double delta = (max - min) / m_NumIntervals;</div>
+<div>151&emsp;&emsp;</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Create array with estimated probabilities</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] probabilities = new double[m_NumIntervals];</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double leftVal = Math.exp(logDensity(min));</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; m_NumIntervals; i++) {</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double rightVal = Math.exp(logDensity(min + (i + 1) * delta));</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      probabilities[i] = 0.5 * (leftVal + rightVal) * delta;</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      leftVal = rightVal;</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>160&emsp;&emsp;</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Sort array based on area of bin estimates</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int[] sortedIndices = Utils.sort(probabilities);</div>
+<div>163&emsp;&emsp;</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Mark the intervals to use</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double sum = 0;</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean[] toUse = new boolean[probabilities.length];</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int k = 0;</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while ((sum &#60; conf) && (k &#60; toUse.length)) {</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      toUse[sortedIndices[toUse.length - (k + 1)]] = true;</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      sum += probabilities[sortedIndices[toUse.length - (k + 1)]];</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      k++;</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>173&emsp;&emsp;</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Don't need probabilities anymore</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    probabilities = null;</div>
+<div>176&emsp;&emsp;</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Create final list of intervals</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ArrayList&#60;double[]> intervals = new ArrayList&#60;double[]>();</div>
+<div>179&emsp;&emsp;</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // The current interval</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] interval = null;</div>
+<div>182&emsp;&emsp;</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Iterate through kernels</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean haveStartedInterval = false;</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; m_NumIntervals; i++) {</div>
+<div>186&emsp;&emsp;</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Should the current bin be used?</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (toUse[i]) {</div>
+<div>189&emsp;&emsp;</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Do we need to create a new interval?</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (haveStartedInterval == false) {</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          haveStartedInterval = true;</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          interval = new double[2];</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          interval[0] = min + i * delta;</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>196&emsp;&emsp;</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Regardless, we should update the upper boundary</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        interval[1] = min + (i + 1) * delta;</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>200&emsp;&emsp;</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // We need to finalize and store the last interval</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // if necessary.</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (haveStartedInterval) {</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          haveStartedInterval = false;</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          intervals.add(interval);</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>209&emsp;&emsp;</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Add last interval if there is one</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (haveStartedInterval) {</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      intervals.add(interval);</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>214&emsp;&emsp;</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return intervals.toArray(new double[0][0]);</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>217&emsp;&emsp;</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the quantile for the given percentage.</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param percentage the percentage</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the quantile</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;  public double predictQuantile(double percentage) {</div>
+<div>226&emsp;&emsp;</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Update the bandwidth</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    updateWidth();</div>
+<div>229&emsp;&emsp;</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Compute minimum and maximum value, and delta</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double val = Statistics.normalInverse(1.0 - (1.0 - 0.95) / 2);</div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double min = m_TM.firstKey() - val * m_Width;</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double max = m_TM.lastKey() + val * m_Width;</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double delta = (max - min) / m_NumIntervals;</div>
+<div>235&emsp;&emsp;</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double sum = 0;</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double leftVal = Math.exp(logDensity(min));</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; m_NumIntervals; i++) {</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (sum >= percentage) {</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return min + i * delta;</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double rightVal = Math.exp(logDensity(min + (i + 1) * delta));</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      sum += 0.5 * (leftVal + rightVal) * delta;</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      leftVal = rightVal;</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return max;</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>248&emsp;&emsp;</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Computes the logarithm of x and y given the logarithms of x and y.</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * This is based on Tobias P. Mann's description in "Numerically Stable Hidden</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Markov Implementation" (2006).</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;  protected double logOfSum(double logOfX, double logOfY) {</div>
+<div>256&emsp;&emsp;</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Check for cases where log of zero is present</div>
+<div style="background-color:limegreen;">258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (Double.isNaN(logOfX)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return logOfY;</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div style="background-color:limegreen;">261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (Double.isNaN(logOfY)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return logOfX;</div>
+<div>263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>264&emsp;&emsp;</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Otherwise return proper result, taken care of overflows</div>
+<div style="background-color:limegreen;">266&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (logOfX > logOfY) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return logOfX + Math.log(1 + Math.exp(logOfY - logOfX));</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return logOfY + Math.log(1 + Math.exp(logOfX - logOfY));</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>272&emsp;&emsp;</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Compute running sum of density values and weights.</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;  protected void runningSum(Set&#60;Map.Entry&#60;Double, Double>> c, double value,</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] sums) {</div>
+<div>278&emsp;&emsp;</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Auxiliary variables</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double offset = CONST - Math.log(m_Width);</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double logFactor = Math.log(m_Threshold) - Math.log(1 - m_Threshold);</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double logSumOfWeights = Math.log(m_SumOfWeights);</div>
+<div>283&emsp;&emsp;</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Iterate through values</div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Iterator&#60;Map.Entry&#60;Double, Double>> itr = c.iterator();</div>
+<div style="background-color:limegreen;">286&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    while (itr.hasNext()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Map.Entry&#60;Double, Double> entry = itr.next();</div>
+<div>288&emsp;&emsp;</div>
+<div>289&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Skip entry if weight is zero because it cannot contribute to sum</div>
+<div style="background-color:limegreen;">290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (entry.getValue() > 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double diff = (entry.getKey() - value) / m_Width;</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double logDensity = offset - 0.5 * diff * diff;</div>
+<div>293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double logWeight = Math.log(entry.getValue());</div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        sums[0] = logOfSum(sums[0], logWeight + logDensity);</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        sums[1] = logOfSum(sums[1], logWeight);</div>
+<div>296&emsp;&emsp;</div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Can we stop assuming worst case?</div>
+<div style="background-color:limegreen;">298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (logDensity + logSumOfWeights &#60; logOfSum(logFactor + sums[0],&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          logDensity + sums[1])) {</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>305&emsp;&emsp;</div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the natural logarithm of the density estimate at the given point.</div>
+<div>308&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param value the value at which to evaluate</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the natural logarithm of the density estimate at the given value</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;  public double logDensity(double value) {</div>
+<div>314&emsp;&emsp;</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Update the bandwidth</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    updateWidth();</div>
+<div>317&emsp;&emsp;</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Array used to keep running sums</div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] sums = new double[2];</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    sums[0] = Double.NaN;</div>
+<div>321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    sums[1] = Double.NaN;</div>
+<div>322&emsp;&emsp;</div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Examine right-hand size of value</div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    runningSum(m_TM.tailMap(value, true).entrySet(), value, sums);</div>
+<div>325&emsp;&emsp;</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Examine left-hand size of value</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    runningSum(m_TM.headMap(value, false).descendingMap().entrySet(), value,</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      sums);</div>
+<div>329&emsp;&emsp;</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Need to normalize</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return sums[0] - Math.log(m_SumOfWeights);</div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>333&emsp;&emsp;</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns textual description of this estimator.</div>
+<div>336&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>337&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;  public String toString() {</div>
+<div>339&emsp;&emsp;</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return "Kernel estimator with bandwidth " + m_Width + " and total weight "</div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      + m_SumOfWeights + " based on\n" + m_TM.toString();</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>343&emsp;&emsp;</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the revision string.</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the revision</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>349&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>350&emsp;&emsp;&nbsp;&nbsp;  public String getRevision() {</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return RevisionUtils.extract("$Revision: 11318 $");</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>353&emsp;&emsp;</div>
+<div>354&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Main method, used for testing this class.</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;  public static void main(String[] args) {</div>
+<div>358&emsp;&emsp;</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Get random number generator initialized by system</div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Random r = new Random();</div>
+<div>361&emsp;&emsp;</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Create density estimator</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    UnivariateKernelEstimator e = new UnivariateKernelEstimator();</div>
+<div>364&emsp;&emsp;</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Output the density estimator</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    System.out.println(e);</div>
+<div>367&emsp;&emsp;</div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Monte Carlo integration</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double sum = 0;</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; 1000; i++) {</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      sum += Math.exp(e.logDensity(r.nextDouble() * 10.0 - 5.0));</div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    System.out.println("Approximate integral: " + 10.0 * sum / 1000);</div>
+<div>374&emsp;&emsp;</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Add Gaussian values into it</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; 1000; i++) {</div>
+<div>377&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      e.addValue(0.1 * r.nextGaussian() - 3, 1);</div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      e.addValue(r.nextGaussian() * 0.25, 3);</div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>380&emsp;&emsp;</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Monte Carlo integration</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    sum = 0;</div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int points = 10000;</div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; points; i++) {</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double value = r.nextDouble() * 10.0 - 5.0;</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      sum += Math.exp(e.logDensity(value));</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    System.out.println("Approximate integral: " + 10.0 * sum / points);</div>
+<div>389&emsp;&emsp;</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Check interval estimates</div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[][] Intervals = e.predictIntervals(0.9);</div>
+<div>392&emsp;&emsp;</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    System.out.println("Printing kernel intervals ---------------------");</div>
+<div>394&emsp;&emsp;</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (double[] interval : Intervals) {</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("Left: " + interval[0] + "\t Right: " + interval[1]);</div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>398&emsp;&emsp;</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    System.out</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .println("Finished kernel printing intervals ---------------------");</div>
+<div>401&emsp;&emsp;</div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double Covered = 0;</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; 1000; i++) {</div>
+<div>404&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double val = -1;</div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (r.nextDouble() &#60; 0.25) {</div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        val = 0.1 * r.nextGaussian() - 3.0;</div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        val = r.nextGaussian() * 0.25;</div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>410&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (double[] interval : Intervals) {</div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (val >= interval[0] && val &#60;= interval[1]) {</div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Covered++;</div>
+<div>413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    System.out.println("Coverage at 0.9 level for kernel intervals: " + Covered</div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      / 1000);</div>
+<div>419&emsp;&emsp;</div>
+<div>420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Compare performance to normal estimator on normally distributed data</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    UnivariateKernelEstimator eKernel = new UnivariateKernelEstimator();</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    UnivariateNormalEstimator eNormal = new UnivariateNormalEstimator();</div>
+<div>423&emsp;&emsp;</div>
+<div>424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int j = 1; j &#60; 5; j++) {</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double numTrain = Math.pow(10, j);</div>
+<div>426&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("Number of training cases: " + numTrain);</div>
+<div>427&emsp;&emsp;</div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Add training cases</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; numTrain; i++) {</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double val = r.nextGaussian() * 1.5 + 0.5;</div>
+<div>431&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        eKernel.addValue(val, 1);</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        eNormal.addValue(val, 1);</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>434&emsp;&emsp;</div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Monte Carlo integration</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      sum = 0;</div>
+<div>437&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      points = 10000;</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; points; i++) {</div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double value = r.nextDouble() * 20.0 - 10.0;</div>
+<div>440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        sum += Math.exp(eKernel.logDensity(value));</div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("Approximate integral for kernel estimator: " + 20.0</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        * sum / points);</div>
+<div>444&emsp;&emsp;</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Evaluate estimators</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double loglikelihoodKernel = 0, loglikelihoodNormal = 0;</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; 1000; i++) {</div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double val = r.nextGaussian() * 1.5 + 0.5;</div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        loglikelihoodKernel += eKernel.logDensity(val);</div>
+<div>450&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        loglikelihoodNormal += eNormal.logDensity(val);</div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("Loglikelihood for kernel estimator: "</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + loglikelihoodKernel / 1000);</div>
+<div>454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("Loglikelihood for normal estimator: "</div>
+<div>455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + loglikelihoodNormal / 1000);</div>
+<div>456&emsp;&emsp;</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Check interval estimates</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[][] kernelIntervals = eKernel.predictIntervals(0.95);</div>
+<div>459&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[][] normalIntervals = eNormal.predictIntervals(0.95);</div>
+<div>460&emsp;&emsp;</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("Printing kernel intervals ---------------------");</div>
+<div>462&emsp;&emsp;</div>
+<div>463&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (double[] kernelInterval : kernelIntervals) {</div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println("Left: " + kernelInterval[0] + "\t Right: "</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + kernelInterval[1]);</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>467&emsp;&emsp;</div>
+<div>468&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out</div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        .println("Finished kernel printing intervals ---------------------");</div>
+<div>470&emsp;&emsp;</div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("Printing normal intervals ---------------------");</div>
+<div>472&emsp;&emsp;</div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (double[] normalInterval : normalIntervals) {</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println("Left: " + normalInterval[0] + "\t Right: "</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + normalInterval[1]);</div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>477&emsp;&emsp;</div>
+<div>478&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out</div>
+<div>479&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        .println("Finished normal printing intervals ---------------------");</div>
+<div>480&emsp;&emsp;</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double kernelCovered = 0;</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double normalCovered = 0;</div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; 1000; i++) {</div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double val = r.nextGaussian() * 1.5 + 0.5;</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (double[] kernelInterval : kernelIntervals) {</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (val >= kernelInterval[0] && val &#60;= kernelInterval[1]) {</div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            kernelCovered++;</div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>490&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (double[] normalInterval : normalIntervals) {</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (val >= normalInterval[0] && val &#60;= normalInterval[1]) {</div>
+<div>493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            normalCovered++;</div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("Coverage at 0.95 level for kernel intervals: "</div>
+<div>499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + kernelCovered / 1000);</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("Coverage at 0.95 level for normal intervals: "</div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + normalCovered / 1000);</div>
+<div>502&emsp;&emsp;</div>
+<div>503&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      kernelIntervals = eKernel.predictIntervals(0.8);</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      normalIntervals = eNormal.predictIntervals(0.8);</div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      kernelCovered = 0;</div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      normalCovered = 0;</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; 1000; i++) {</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double val = r.nextGaussian() * 1.5 + 0.5;</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (double[] kernelInterval : kernelIntervals) {</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (val >= kernelInterval[0] && val &#60;= kernelInterval[1]) {</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            kernelCovered++;</div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (double[] normalInterval : normalIntervals) {</div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (val >= normalInterval[0] && val &#60;= normalInterval[1]) {</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            normalCovered++;</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("Coverage at 0.8 level for kernel intervals: "</div>
+<div>523&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + kernelCovered / 1000);</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("Coverage at 0.8 level for normal intervals: "</div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + normalCovered / 1000);</div>
+<div>526&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>528&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

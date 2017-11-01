@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WekaPackageClassLoaderManager.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *   This program is free software: you can redistribute it and/or modify</div>
+<div>3&emsp;&emsp;&nbsp; *   it under the terms of the GNU General Public License as published by</div>
+<div>4&emsp;&emsp;&nbsp; *   the Free Software Foundation, either version 3 of the License, or</div>
+<div>5&emsp;&emsp;&nbsp; *   (at your option) any later version.</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; *   This program is distributed in the hope that it will be useful,</div>
+<div>8&emsp;&emsp;&nbsp; *   but WITHOUT ANY WARRANTY; without even the implied warranty of</div>
+<div>9&emsp;&emsp;&nbsp; *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</div>
+<div>10&emsp;&emsp;&nbsp; *   GNU General Public License for more details.</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; *   You should have received a copy of the GNU General Public License</div>
+<div>13&emsp;&emsp;&nbsp; *   along with this program.  If not, see &#60;http://www.gnu.org/licenses/>.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/*</div>
+<div>17&emsp;&emsp;&nbsp; *    WekaPackageClassLoaderManager.java</div>
+<div>18&emsp;&emsp;&nbsp; *    Copyright (C) 2016 University of Waikato, Hamilton, New Zealand</div>
+<div>19&emsp;&emsp;&nbsp; *</div>
+<div>20&emsp;&emsp;&nbsp; */</div>
+<div>21&emsp;&emsp;</div>
+<div>22&emsp;&emsp;package weka.core;</div>
+<div>23&emsp;&emsp;</div>
+<div>24&emsp;&emsp;import java.io.BufferedInputStream;</div>
+<div>25&emsp;&emsp;import java.io.ByteArrayOutputStream;</div>
+<div>26&emsp;&emsp;import java.io.File;</div>
+<div>27&emsp;&emsp;import java.io.FileInputStream;</div>
+<div>28&emsp;&emsp;import java.io.FileReader;</div>
+<div>29&emsp;&emsp;import java.io.IOException;</div>
+<div>30&emsp;&emsp;import java.io.InputStream;</div>
+<div>31&emsp;&emsp;import java.lang.reflect.Method;</div>
+<div>32&emsp;&emsp;import java.net.MalformedURLException;</div>
+<div>33&emsp;&emsp;import java.net.URI;</div>
+<div>34&emsp;&emsp;import java.net.URISyntaxException;</div>
+<div>35&emsp;&emsp;import java.net.URL;</div>
+<div>36&emsp;&emsp;import java.net.URLClassLoader;</div>
+<div>37&emsp;&emsp;import java.security.ProtectionDomain;</div>
+<div>38&emsp;&emsp;import java.util.ArrayList;</div>
+<div>39&emsp;&emsp;import java.util.Enumeration;</div>
+<div>40&emsp;&emsp;import java.util.HashMap;</div>
+<div>41&emsp;&emsp;import java.util.List;</div>
+<div>42&emsp;&emsp;import java.util.Map;</div>
+<div>43&emsp;&emsp;import java.util.Set;</div>
+<div>44&emsp;&emsp;import java.util.zip.ZipEntry;</div>
+<div>45&emsp;&emsp;import java.util.zip.ZipInputStream;</div>
+<div>46&emsp;&emsp;</div>
+<div>47&emsp;&emsp;/**</div>
+<div>48&emsp;&emsp;&nbsp; * Class that manages classloaders from individual Weka plugin packages.</div>
+<div>49&emsp;&emsp;&nbsp; * Maintains a collection of {@code WekaPackageLibIsolatingClassLoader}s - one</div>
+<div>50&emsp;&emsp;&nbsp; * for each package. {@code Utils.forName()} and {@code weka.Run} use this</div>
+<div>51&emsp;&emsp;&nbsp; * classloader to find/instantiate schemes exposed in top-level package jar</div>
+<div>52&emsp;&emsp;&nbsp; * files. Client code in a package should do the same, unless directly referring</div>
+<div>53&emsp;&emsp;&nbsp; * to classes in other packages, in which case the other packages should be</div>
+<div>54&emsp;&emsp;&nbsp; * explicit dependencies. This classloader will not find classes in third-party</div>
+<div>55&emsp;&emsp;&nbsp; * libraries inside a package's lib directory.&#60;br></div>
+<div>56&emsp;&emsp;&nbsp; * &#60;br></div>
+<div>57&emsp;&emsp;&nbsp; * Classes are searched for first in the parent classloader and then in the</div>
+<div>58&emsp;&emsp;&nbsp; * top-level package jar files.</div>
+<div>59&emsp;&emsp;&nbsp; * </div>
+<div>60&emsp;&emsp;&nbsp; * @author Mark Hall (mhall{[at]}pentaho{[dot]}com)</div>
+<div>61&emsp;&emsp;&nbsp; * @version $Revision: $</div>
+<div>62&emsp;&emsp;&nbsp; * @see WekaPackageLibIsolatingClassLoader</div>
+<div>63&emsp;&emsp;&nbsp; */</div>
+<div>64&emsp;&emsp;public class WekaPackageClassLoaderManager {</div>
+<div>65&emsp;&emsp;</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;  protected static final WekaPackageClassLoaderManager s_singletonLoader =</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    new WekaPackageClassLoaderManager();</div>
+<div>68&emsp;&emsp;</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;  /** Map of package classloaders keyed by package name */</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;  protected Map&#60;String, WekaPackageLibIsolatingClassLoader> m_packageJarClassLoaders =</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    new HashMap&#60;>();</div>
+<div>72&emsp;&emsp;</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Lookup for classloaders keyed by class names from top-level package jar</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * files</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;  protected Map&#60;String, WekaPackageLibIsolatingClassLoader> m_classBasedClassLoaderLookup =</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    new HashMap&#60;>();</div>
+<div>79&emsp;&emsp;</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;  /** Path to the weka.jar file on the classpath */</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;  protected File m_pathToWekaJarFile;</div>
+<div>82&emsp;&emsp;</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;  private WekaPackageClassLoaderManager() {</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>85&emsp;&emsp;</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Injects the MTJ core classes into the root classloader. This is so that</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * they are visible to the MTJ native library loader (if a MTJ native package</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * is installed).</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;  protected void injectMTJCoreClasses() {</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!WekaPackageClassLoaderManager</div>
+<div style="background-color:limegreen;">93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      .classExists("com.github.fommil.netlib.ARPACK")) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // inject core MTJ classes into the root classloader</div>
+<div>95&emsp;&emsp;</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String debugS =</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.getProperty("weka.core.classloader.debug", "false");</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      boolean debug = debugS.equalsIgnoreCase("true");</div>
+<div>99&emsp;&emsp;</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      InputStream mtjCoreInputStream =</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getClass().getClassLoader().getResourceAsStream("core.jar");</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      InputStream arpackAllInputStream =</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getClass().getClassLoader().getResourceAsStream(</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          "arpack_combined_all.jar");</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      InputStream mtjInputStream =</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getClass().getClassLoader().getResourceAsStream("mtj.jar");</div>
+<div style="background-color:limegreen;">107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (mtjCoreInputStream != null && arpackAllInputStream != null&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        && mtjInputStream != null) {</div>
+<div style="background-color:limegreen;">109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (debug) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          System.out.println("[WekaPackageClassLoaderManager] injecting "</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + "mtj-related core classes into root classloader");</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div style="background-color:limegreen;">114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (debug) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            System.out</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              .println("[WekaPackageClassLoaderManager] Injecting arpack");</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          injectAllClassesInFromStream(arpackAllInputStream);</div>
+<div style="background-color:limegreen;">119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (debug) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            System.out.println("[WekaPackageClassLoaderManager] Injecting mtj "</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              + "core");</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          injectAllClassesInFromStream(mtjCoreInputStream);</div>
+<div style="background-color:limegreen;">124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (debug) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            System.out.println("[WekaPackageClassLoaderManager] Injecting mtj");</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          injectAllClassesInFromStream(mtjInputStream);</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (Exception ex) {</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          ex.printStackTrace();</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println("WARNING: core mtj jar files are not available as "</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "resources to this classloader ("</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + WekaPackageClassLoaderManager.getWekaPackageClassLoaderManager()</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            .getClass().getClassLoader() + ")");</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>139&emsp;&emsp;</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Gets the singleton instance of the WekaPackageClassLoaderManager</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the singleton instance of hte WekaPackageClassLoaderManager</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;  public static WekaPackageClassLoaderManager</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    getWekaPackageClassLoaderManager() {</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return s_singletonLoader;</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>149&emsp;&emsp;</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Return an instantiated instance of the supplied class name. This method</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * will attempt to find a package that owns the named class first, before</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * falling back on the current and then parent class loader. Use this method</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * instead of Class.forName().newInstance().</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param className the name of the class to get an instance of</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return an instantiated object</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the class cannot be found, or a problem occurs during</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *           instantiation</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;  public static Object objectForName(String className) throws Exception {</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return forName(className).newInstance();</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>164&emsp;&emsp;</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Return the class object for the supplied class name. This method will</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * attempt to find a package that owns the named class first, before falling</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * back on the current, and then parent, class loader. Use this method instead</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * of Class.forName().</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param className the name of hte class to get an instance of</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a class object</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws ClassNotFoundException if the named class cannot be found.</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;  public static Class&#60;?> forName(String className)</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws ClassNotFoundException {</div>
+<div>177&emsp;&emsp;</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return forName(className, true);</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>180&emsp;&emsp;</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Return the class object for the supplied class name. This method will</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * attempt to find a package that owns the named class first, before falling</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * back on the current, and then parent, class loader. Use this method instead</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * of Class.forName().</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param className the name of hte class to get an instance of</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param initialize true if the class should be initialized</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a class object</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws ClassNotFoundException if the named class cannot be found.</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;  public static Class&#60;?> forName(String className, boolean initialize)</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws ClassNotFoundException {</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    WekaPackageClassLoaderManager cl =</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      WekaPackageClassLoaderManager.getWekaPackageClassLoaderManager();</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ClassLoader toUse = cl.getLoaderForClass(className);</div>
+<div>197&emsp;&emsp;</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return Class.forName(className, initialize, toUse);</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>200&emsp;&emsp;</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Return the path to the weka.jar file (if found) on the classpath.</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the path to the weka.jar file on the classpath, or null if no</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         weka.jar file was found.</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;  public File getPathToWekaJarFile() {</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_pathToWekaJarFile;</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>210&emsp;&emsp;</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get the entries in the Weka class loader (i.e. the class loader that loads</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the core weka classes) as an array of URLs. This is primarily used by</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Weka's dynamic class discovery mechanism, so that all Weka schemes on the</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * classpath can be discovered. If the Weka class loader is an instance of</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * URLClassLoader then the URLs encapsulated within are returned. Otherwise,</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * if the system class loader is the classloader that loads Weka then the</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * entries from java.class.path are returned. Failing that, we assume that</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Weka and any other supporting classes (not including packages) can be found</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * in the WEKA_CLASSPATH environment variable. This latter case can be used to</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * handle the situation where the weka.jar is loaded by a custom</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * (non-URLClassLoader) withn an app server (for example).</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return an array of URLs containing the entries available to the</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         classloader that loads the core weka classes</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;  public URL[] getWekaClassloaderClasspathEntries() {</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ClassLoader parent = getClass().getClassLoader();</div>
+<div>229&emsp;&emsp;</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // easy case</div>
+<div style="background-color:limegreen;">231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (parent instanceof URLClassLoader) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      URL[] result = ((URLClassLoader) parent).getURLs();</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // scan for weka.jar</div>
+<div style="background-color:limegreen;">234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (URL u : result) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (u.toString().endsWith("weka.jar")) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          try {</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_pathToWekaJarFile = new File(u.toURI());</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } catch (URISyntaxException e) {</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            e.printStackTrace();</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>245&emsp;&emsp;</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // otherwise, see if we've been loaded by the system classloader</div>
+<div style="background-color:limegreen;">247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (ClassLoader.getSystemClassLoader().equals(getClass().getClassLoader())) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // we can process the java.class.path property for weka core stuff</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return getSystemClasspathEntries();</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // have to have the WEKA_CLASSPATH property set</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return getWekaClasspathEntries();</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>255&emsp;&emsp;</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get a set of all classes contained in all top-level jar files from Weka</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * packages. These classes are globally visible across all packages.</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a set of all classes in all top-level package jar files</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;  public Set&#60;String> getPackageJarFileClasses() {</div>
+<div>263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_classBasedClassLoaderLookup.keySet();</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>265&emsp;&emsp;</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns a list of URLs made up from the entries available in the</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * java.class.path property. This will contain the weka.jar (or directory</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * containing weka classes) if Weka is launched as an application. It won't</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * contain Weka if weka is loaded by a child classloader (in an app server or</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * similar). In this case, if the child classloader is a URLClassLoader then</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the original class discovery mechanism will work; if not, then the</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * WEKA_CLASSPATH environment variable will need to be set to point to the</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * location of the weka.jar file on the file system.</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return an array of URLs containing the entries in the java.class.path</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         property</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;  private URL[] getSystemClasspathEntries() {</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String cp = System.getProperty("java.class.path", "");</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String sep = System.getProperty("path.separator", ":");</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getParts(cp, sep);</div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>284&emsp;&emsp;</div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>286&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns entries from the WEKA_CLASSPATH property (if set).</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>288&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return an array of URLs, one for each part of the WEKA_CLASSPATH</div>
+<div>289&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;  private URL[] getWekaClasspathEntries() {</div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String wekaCp =</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Environment.getSystemWide().getVariableValue("WEKA_CLASSPATH");</div>
+<div>293&emsp;&emsp;</div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // assume the system separator is being used</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String sep = System.getProperty("path.separator", ":");</div>
+<div style="background-color:limegreen;">296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (wekaCp != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return getParts(wekaCp, sep);</div>
+<div>298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>299&emsp;&emsp;</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return new URL[0];</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>302&emsp;&emsp;</div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Splits a supplied string classpath and returns an array of URLs</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * representing the entries.</div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param cp the classpath to process</div>
+<div>308&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param sep the path separator</div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return an array of URLs</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;  private URL[] getParts(String cp, String sep) {</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String[] cpParts = cp.split(sep);</div>
+<div>313&emsp;&emsp;</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;URL> uList = new ArrayList&#60;>();</div>
+<div style="background-color:limegreen;">315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (String part : cpParts) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        URL url;</div>
+<div style="background-color:limegreen;">318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (part.startsWith("file:")) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          part = part.replace(" ", "%20");</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          url = new URI(part).toURL();</div>
+<div>321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          url = new File(part).toURI().toURL();</div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          uList.add(url);</div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div style="background-color:limegreen;">325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (part.endsWith("weka.jar")) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_pathToWekaJarFile = new File(url.toURI());</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (MalformedURLException e) {</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        e.printStackTrace();</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (URISyntaxException e) {</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        e.printStackTrace();</div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return uList.toArray(new URL[uList.size()]);</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>336&emsp;&emsp;</div>
+<div>337&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Removes the named package classloader from those managed by this class.</div>
+<div>339&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Attempts to close the classloader and remove any file locks (under Windows)</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * that it might be holding</div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the package to remove the classloader for</div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;  public synchronized void removeClassLoaderForPackage(String packageName) {</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    WekaPackageLibIsolatingClassLoader loader =</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_packageJarClassLoaders.get(packageName);</div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (loader != null) {</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      loader.closeClassLoader();</div>
+<div>349&emsp;&emsp;</div>
+<div>350&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_packageJarClassLoaders.remove(packageName);</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>353&emsp;&emsp;</div>
+<div>354&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Create a class loader for the given package directory</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageDir the directory of a Weka package to create a class loader</div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          for</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @preturn the newly created class loader</div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;  public synchronized ClassLoader addPackageToClassLoader(File packageDir)</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>364&emsp;&emsp;</div>
+<div style="background-color:limegreen;">365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_packageJarClassLoaders.containsKey(packageDir.getName())) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_packageJarClassLoaders.get(packageDir.getName()).closeClassLoader();</div>
+<div>367&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>368&emsp;&emsp;</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    WekaPackageLibIsolatingClassLoader packageLoader =</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new WekaPackageLibIsolatingClassLoader(this, packageDir);</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_packageJarClassLoaders.put(packageDir.getName(), packageLoader);</div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Set&#60;String> classes = packageLoader.getPackageJarEntries();</div>
+<div style="background-color:limegreen;">373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (String c : classes) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_classBasedClassLoaderLookup.put(c, packageLoader);</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return packageLoader;</div>
+<div>377&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>378&emsp;&emsp;</div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Attempts to locate a classloader for the named class. Tries the Weka</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * classloader and globally visible package classes first. Note that this also</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * finds classes that are contained in a package's lib directory. General code</div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * should not be looking directly for such third-party classes. Instead, if</div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * they require third-party classes they should reference them directly (and</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * compile against the libraries in question), and then either include the</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * third party libraries in their own lib directory or declare a dependency on</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the package that contains them.</div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>389&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * This method is used by Weka's deserialization routines (in</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * SerializationHelper and SerializedObject) that need to locate classes</div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * (including third-party library ones) that might have been serialized when</div>
+<div>392&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * saving a learning scheme.</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param className the name of the class to locate a classloader for</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a classloader</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;  public ClassLoader getLoaderForClass(String className) {</div>
+<div>398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    className = className.replace("[L", "").replace("[", "").replace(";", "");</div>
+<div>399&emsp;&emsp;</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // try the Weka classloader and globally visible package classes first</div>
+<div>401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ClassLoader result = getClass().getClassLoader();</div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Class&#60;?> cl = findClass(className);</div>
+<div>404&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return cl.getClassLoader();</div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (Exception ex) {</div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>407&emsp;&emsp;</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = m_classBasedClassLoaderLookup.get(className);</div>
+<div style="background-color:limegreen;">409&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (result == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>410&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = getClass().getClassLoader();</div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>413&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>414&emsp;&emsp;</div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get the classloader for the named package</div>
+<div>417&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the package to get the classloader for</div>
+<div>419&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the package's classloader, or null if the package is not known (or</div>
+<div>420&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         perhaps was not loaded for some reason)</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;  public WekaPackageLibIsolatingClassLoader getPackageClassLoader(</div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String packageName) {</div>
+<div>424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_packageJarClassLoaders.get(packageName);</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>426&emsp;&emsp;</div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Attempts to find the named class. Tries the Weka classloader first (for</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * core Weka classes and general Java classes) and then tries package</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * classloaders (with respect to the globally visible classes contained in</div>
+<div>431&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * their top-level jar files). Note that this method will not find classes</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * contained in third-party libraries that reside in lib directories).</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the class to find</div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the class object</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws ClassNotFoundException if the named class cannot be found</div>
+<div>437&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;  protected Class&#60;?> findClass(String name) throws ClassNotFoundException {</div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Class&#60;?> result = null;</div>
+<div>440&emsp;&emsp;</div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // try the Weka classloader first (for general java stuff and core Weka</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // stuff)</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // result = super.findClass(name);</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = getClass().getClassLoader().loadClass(name);</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (ClassNotFoundException e) {</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // ignore</div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>449&emsp;&emsp;</div>
+<div style="background-color:limegreen;">450&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (result == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // now ask the package top-level classloaders</div>
+<div style="background-color:limegreen;">452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (Map.Entry&#60;String, WekaPackageLibIsolatingClassLoader> e : m_packageJarClassLoaders&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        .entrySet()) {</div>
+<div>454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result = e.getValue().findGloballyVisiblePackageClass(name);</div>
+<div style="background-color:limegreen;">455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (result != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>459&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>460&emsp;&emsp;</div>
+<div style="background-color:limegreen;">461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (result == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new ClassNotFoundException("Unable to find class '" + name + "'");</div>
+<div>463&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>464&emsp;&emsp;</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>467&emsp;&emsp;</div>
+<div>468&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Find a named resource. This searches the Weka classloader and all package</div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * classloaders. Note that it will only find resources contained in a</div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * package's top-level jar file(s).</div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the resource to find</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a URL to the resource, or null if the resource could not be located</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;  public URL findResource(String name) {</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URL result = null;</div>
+<div>478&emsp;&emsp;</div>
+<div>479&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // TODO might want to allow package resources to override parent classpath</div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // ones?</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // try the parent classloader first (for general java stuff and core Weka)</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // result = super.findResource(name);</div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = getClass().getClassLoader().getResource(name);</div>
+<div>484&emsp;&emsp;</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (result == null) {</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // now ask the package top-level classloaders</div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (Map.Entry&#60;String, WekaPackageLibIsolatingClassLoader> e : m_packageJarClassLoaders</div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        .entrySet()) {</div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result = e.getValue().findGloballyVisiblePackageResource(name);</div>
+<div>490&emsp;&emsp;</div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (result != null) {</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>496&emsp;&emsp;</div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>499&emsp;&emsp;</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get the classloader that covers the jar that contains the named resource.</div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Note that this considers the Weka classloader and package classloaders</div>
+<div>503&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * (with respect to resources contained in their top-level jar file(s))</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the resource to get the owning classloader for</div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the classloader that "owns" the resource</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;  public ClassLoader findClassloaderForResource(String name) {</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ClassLoader result = null;</div>
+<div>510&emsp;&emsp;</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (getClass().getClassLoader().getResource(name) != null) {</div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = getClass().getClassLoader();</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // now ask the package top-level classloaders</div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (Map.Entry&#60;String, WekaPackageLibIsolatingClassLoader> e : m_packageJarClassLoaders</div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        .entrySet()) {</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (e.getValue().findGloballyVisiblePackageResource(name) != null) {</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          result = e.getValue();</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>522&emsp;&emsp;</div>
+<div>523&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>525&emsp;&emsp;</div>
+<div>526&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Find a named resource. This searches the Weka classloader and all package</div>
+<div>528&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * classloaders. Note that it will only find resources contained in a</div>
+<div>529&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * package's top-level jar file(s).</div>
+<div>530&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>531&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the resource to find</div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return an enumeration of URLs to the resource, or null if the resource</div>
+<div>533&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         could not be located</div>
+<div>534&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>535&emsp;&emsp;&nbsp;&nbsp;  public Enumeration&#60;URL> findResources(String name) throws IOException {</div>
+<div>536&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Enumeration&#60;URL> result = null;</div>
+<div>537&emsp;&emsp;</div>
+<div>538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // TODO might want to allow package resources to override parent classpath</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // ones?</div>
+<div>540&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // result = super.findResources(name);</div>
+<div>542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = getClass().getClassLoader().getResources(name);</div>
+<div>543&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (IOException ex) {</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // just ignore</div>
+<div>545&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>546&emsp;&emsp;</div>
+<div>547&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (result == null) {</div>
+<div>548&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (Map.Entry&#60;String, WekaPackageLibIsolatingClassLoader> e : m_packageJarClassLoaders</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        .entrySet()) {</div>
+<div>550&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          result = e.getValue().findGloballyVisiblePackageResources(name);</div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (result != null) {</div>
+<div>553&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>554&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (IOException ex) {</div>
+<div>556&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // ignore</div>
+<div>557&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>558&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>560&emsp;&emsp;</div>
+<div>561&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>562&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>563&emsp;&emsp;</div>
+<div>564&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Try to find a class from the classloader for the named package. Note that</div>
+<div>566&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * this will traverse transitive package dependencies</div>
+<div>567&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the package to check for the class</div>
+<div>569&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param className the name of the class to search for</div>
+<div>570&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the named class or null if the class could not be found</div>
+<div>571&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;  protected Class&#60;?> findClass(String packageName, String className) {</div>
+<div>573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Class&#60;?> result = null;</div>
+<div>574&emsp;&emsp;</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    WekaPackageLibIsolatingClassLoader toTry =</div>
+<div>576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getPackageClassLoader(packageName);</div>
+<div>577&emsp;&emsp;</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (toTry != null) {</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // System.err.println("Looking for " + className + " in classloader: " +</div>
+<div>581&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // toTry.toString());</div>
+<div>582&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result = toTry.findClass(className);</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (ClassNotFoundException ex) {</div>
+<div>584&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // ignore here</div>
+<div>585&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>586&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>587&emsp;&emsp;</div>
+<div>588&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>590&emsp;&emsp;</div>
+<div>591&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>592&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Try to find a resource from the classloader for the named package. Note</div>
+<div>593&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * that this will traverse transitive package dependencies</div>
+<div>594&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>595&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the package to check for the resource</div>
+<div>596&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the resource to search for</div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a URL to the resource, or null if the resource could not be found</div>
+<div>598&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>599&emsp;&emsp;&nbsp;&nbsp;  protected URL findResource(String packageName, String name) {</div>
+<div>600&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    URL result = null;</div>
+<div>601&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    WekaPackageLibIsolatingClassLoader toTry =</div>
+<div>602&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getPackageClassLoader(packageName);</div>
+<div>603&emsp;&emsp;</div>
+<div>604&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (toTry != null) {</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = toTry.getResource(name);</div>
+<div>606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>607&emsp;&emsp;</div>
+<div>608&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>609&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>610&emsp;&emsp;</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>612&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Try to find a resource from the classloader for the named package. Note</div>
+<div>613&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * that this will traverse transitive package dependencies</div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>615&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the package to check for the resource</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the resource to search for</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return an enumeration of URLs to the resource, or null if the resource</div>
+<div>618&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         could not be found</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>620&emsp;&emsp;&nbsp;&nbsp;  protected Enumeration&#60;URL> findResources(String packageName, String name) {</div>
+<div>621&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Enumeration&#60;URL> result = null;</div>
+<div>622&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    WekaPackageLibIsolatingClassLoader toTry =</div>
+<div>623&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getPackageClassLoader(packageName);</div>
+<div>624&emsp;&emsp;</div>
+<div>625&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (toTry != null) {</div>
+<div>626&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result = toTry.getResources(name);</div>
+<div>628&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (IOException ex) {</div>
+<div>629&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // ignore here</div>
+<div>630&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>632&emsp;&emsp;</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>634&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>635&emsp;&emsp;</div>
+<div>636&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>637&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Check to see if the named class exists in this classloader</div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param className the name of the class to check for</div>
+<div>640&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if the class exists in this classloader</div>
+<div>641&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>642&emsp;&emsp;&nbsp;&nbsp;  protected static boolean classExists(String className) {</div>
+<div>643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean result = false;</div>
+<div>644&emsp;&emsp;</div>
+<div>645&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>646&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Class&#60;?> cls = Class.forName(className);</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = true;</div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (ClassNotFoundException e) {</div>
+<div>649&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // ignore - means class is not visible/available here</div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>651&emsp;&emsp;</div>
+<div>652&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>653&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>654&emsp;&emsp;</div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>656&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Inject all classes in the supplied jar file into the parent or root</div>
+<div>657&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * classloader</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>659&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param jarPath the path to the jar in question</div>
+<div>660&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param injectToRootClassLoader true to inject right up to the root</div>
+<div>661&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>662&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>663&emsp;&emsp;&nbsp;&nbsp;  protected static void injectAllClassesInJar(File jarPath,</div>
+<div>664&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean injectToRootClassLoader) throws Exception {</div>
+<div>665&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    injectClasses(jarPath, null, null, injectToRootClassLoader);</div>
+<div>666&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>667&emsp;&emsp;</div>
+<div>668&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>669&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Inject all classes in the supplied jar file into the root classloader</div>
+<div>670&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param jarPath the path to the jar in question</div>
+<div>672&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>673&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>674&emsp;&emsp;&nbsp;&nbsp;  protected static void injectAllClassesInJar(File jarPath) throws Exception {</div>
+<div>675&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    injectAllClassesInJar(jarPath, true);</div>
+<div>676&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>677&emsp;&emsp;</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>679&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Inject all classes from the supplied input stream into the root</div>
+<div>680&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * classloader. Assumes that the zip entries can be read from the input stream</div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * (i.e. a jar/zip file is the target)</div>
+<div>682&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>683&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param inStream the input stream to process</div>
+<div>684&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>685&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>686&emsp;&emsp;&nbsp;&nbsp;  protected static void injectAllClassesInFromStream(InputStream inStream)</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>688&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    injectClasses(new BufferedInputStream(inStream), null, null, true);</div>
+<div>689&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>690&emsp;&emsp;</div>
+<div>691&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>692&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Inject classes from the supplied jar file into the Weka or root</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * classloader.</div>
+<div>694&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>695&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param jarPath the path to the jar file to process</div>
+<div>696&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classJarPaths an optional list of paths to classes in the jar file</div>
+<div>697&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          to inject (if null then all classes in the jar file are injected)</div>
+<div>698&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classes an optional list of fully qualified class names. This should</div>
+<div>699&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          correspond to the paths in classJarPaths, but contain just the</div>
+<div>700&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          class name along with slashes replaced by "." and the .class</div>
+<div>701&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          extension removed.</div>
+<div>702&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param injectToRootClassLoader true if the classes are to be injected into</div>
+<div>703&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          the root classloader rather than the Weka classloader</div>
+<div>704&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>705&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>706&emsp;&emsp;&nbsp;&nbsp;  protected static void injectClasses(File jarPath, List&#60;String> classJarPaths,</div>
+<div>707&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;String> classes, boolean injectToRootClassLoader) throws Exception {</div>
+<div>708&emsp;&emsp;</div>
+<div>709&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!jarPath.exists()) {</div>
+<div>710&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.err.println("Path for jar file to inject '" + jarPath.toString()</div>
+<div>711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "' does not seem to exist - skipping");</div>
+<div>712&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return;</div>
+<div>713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>714&emsp;&emsp;</div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    InputStream inStream = new FileInputStream(jarPath);</div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    injectClasses(inStream, classJarPaths, classes, injectToRootClassLoader);</div>
+<div>717&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>718&emsp;&emsp;</div>
+<div>719&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>720&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Inject classes from the supplied stream into the Weka or root classloader.</div>
+<div>721&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>722&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param jarStream input stream to process. Is expected that jar/zip entries</div>
+<div>723&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          can be read from the stream</div>
+<div>724&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classJarPaths an optional list of paths to classes in the jar file</div>
+<div>725&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          to inject (if null then all classes in the jar file are injected)</div>
+<div>726&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classes an optional list of fully qualified class names. This should</div>
+<div>727&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          correspond to the paths in classJarPaths, but contain just the</div>
+<div>728&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          class name along with slashes replaced by "." and the .class</div>
+<div>729&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          extension removed.</div>
+<div>730&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param injectToRootClassLoader true if the classes are to be injected into</div>
+<div>731&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          the root classloader rather than the Weka classloader</div>
+<div>732&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>733&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>734&emsp;&emsp;&nbsp;&nbsp;  protected static void injectClasses(InputStream jarStream,</div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;String> classJarPaths, List&#60;String> classes,</div>
+<div>736&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean injectToRootClassLoader) throws Exception {</div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String debugS = System.getProperty("weka.core.classloader.debug", "false");</div>
+<div>738&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean debug = debugS.equalsIgnoreCase("true");</div>
+<div>739&emsp;&emsp;</div>
+<div>740&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean processAllClasses = classes == null || classJarPaths == null;</div>
+<div>741&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (processAllClasses) {</div>
+<div>742&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      classes = new ArrayList&#60;>();</div>
+<div>743&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      classJarPaths = new ArrayList&#60;>();</div>
+<div>744&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>745&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;byte[]> preloadClassByteCode = new ArrayList&#60;>();</div>
+<div>746&emsp;&emsp;</div>
+<div>747&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ZipInputStream zi = new ZipInputStream(jarStream);</div>
+<div>748&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ZipEntry zipEntry = null;</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while ((zipEntry = zi.getNextEntry()) != null) {</div>
+<div>750&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!zipEntry.isDirectory() && zipEntry.getName().endsWith(".class")) {</div>
+<div>751&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String zipPart = zipEntry.getName().replace("\\", "/");</div>
+<div>752&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (classJarPaths.contains(zipPart) || processAllClasses) {</div>
+<div>753&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preloadClassByteCode.add(getByteCode(zi, false));</div>
+<div>754&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          zi.closeEntry(); // move to next entry in zip</div>
+<div>755&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (processAllClasses) {</div>
+<div>756&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            classes.add(zipEntry.getName().replace(".class", "")</div>
+<div>757&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              .replace("\\", "/").replace("/", "."));</div>
+<div>758&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>760&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>761&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>762&emsp;&emsp;</div>
+<div>763&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    zi.close();</div>
+<div>764&emsp;&emsp;</div>
+<div>765&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;byte[]> okBytes = new ArrayList&#60;>();</div>
+<div>766&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;String> okClasses = new ArrayList&#60;>();</div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; classes.size(); i++) {</div>
+<div>768&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!classExists(classes.get(i))) {</div>
+<div>769&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        okClasses.add(classes.get(i));</div>
+<div>770&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        okBytes.add(preloadClassByteCode.get(i));</div>
+<div>771&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>772&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>773&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    preloadClassByteCode = okBytes;</div>
+<div>774&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    classes = okClasses;</div>
+<div>775&emsp;&emsp;</div>
+<div>776&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (preloadClassByteCode.size() > 0) {</div>
+<div>777&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ClassLoader rootClassloader =</div>
+<div>778&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        injectToRootClassLoader ? getRootClassLoader()</div>
+<div>779&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          : getWekaLevelClassloader();</div>
+<div>780&emsp;&emsp;</div>
+<div>781&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Class&#60;?> classLoader = Class.forName("java.lang.ClassLoader");</div>
+<div>782&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Method defineClass =</div>
+<div>783&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        classLoader.getDeclaredMethod("defineClass", String.class,</div>
+<div>784&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          byte[].class, int.class, int.class, ProtectionDomain.class);</div>
+<div>785&emsp;&emsp;</div>
+<div>786&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ProtectionDomain pd = System.class.getProtectionDomain();</div>
+<div>787&emsp;&emsp;</div>
+<div>788&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // ClassLoader.defineClass is a protected method, so we have to make it</div>
+<div>789&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // accessible</div>
+<div>790&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      defineClass.setAccessible(true);</div>
+<div>791&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      List&#60;byte[]> failedToInject = new ArrayList&#60;>();</div>
+<div>792&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      List&#60;String> classesF = new ArrayList&#60;>();</div>
+<div>793&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      boolean cont = true;</div>
+<div>794&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int numLeft = classes.size();</div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>796&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        do {</div>
+<div>797&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (debug) {</div>
+<div>798&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            System.out</div>
+<div>799&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              .println("[WekaPackageClassLoaderManager] Injecting classes "</div>
+<div>800&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                + "into the "</div>
+<div>801&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                + (injectToRootClassLoader ? "root classloader..."</div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  : "weka-level classloader..."));</div>
+<div>803&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>804&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          for (int i = 0; i &#60; classes.size(); i++) {</div>
+<div>805&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (debug) {</div>
+<div>806&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              System.out.println("** Injecting " + classes.get(i));</div>
+<div>807&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>808&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            byte[] b = preloadClassByteCode.get(i);</div>
+<div>809&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            try {</div>
+<div>810&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              defineClass.invoke(rootClassloader, classes.get(i), b, 0,</div>
+<div>811&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                b.length, pd);</div>
+<div>812&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } catch (Exception ex) {</div>
+<div>813&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              failedToInject.add(b);</div>
+<div>814&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              classesF.add(classes.get(i));</div>
+<div>815&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>816&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>817&emsp;&emsp;</div>
+<div>818&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          cont = failedToInject.size() &#60; numLeft;</div>
+<div>819&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preloadClassByteCode = failedToInject;</div>
+<div>820&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          classes = classesF;</div>
+<div>821&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          numLeft = failedToInject.size();</div>
+<div>822&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          failedToInject = new ArrayList&#60;>();</div>
+<div>823&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          classesF = new ArrayList&#60;>();</div>
+<div>824&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } while (classes.size() > 0 && cont);</div>
+<div>825&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } finally {</div>
+<div>826&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        defineClass.setAccessible(false);</div>
+<div>827&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>828&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>830&emsp;&emsp;</div>
+<div>831&emsp;&emsp;&nbsp;&nbsp;  private static byte[] getByteCode(InputStream in) throws IOException {</div>
+<div>832&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getByteCode(in, true);</div>
+<div>833&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>834&emsp;&emsp;</div>
+<div>835&emsp;&emsp;&nbsp;&nbsp;  private static byte[] getByteCode(InputStream in, boolean closeInput)</div>
+<div>836&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws IOException {</div>
+<div>837&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    byte[] buf = new byte[1024];</div>
+<div>838&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ByteArrayOutputStream byteCodeBuf = new ByteArrayOutputStream();</div>
+<div>839&emsp;&emsp;</div>
+<div>840&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int readLength; (readLength = in.read(buf)) != -1;) {</div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      byteCodeBuf.write(buf, 0, readLength);</div>
+<div>842&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>843&emsp;&emsp;</div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (closeInput) {</div>
+<div>845&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      in.close();</div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>847&emsp;&emsp;</div>
+<div>848&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return byteCodeBuf.toByteArray();</div>
+<div>849&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>850&emsp;&emsp;</div>
+<div>851&emsp;&emsp;&nbsp;&nbsp;  private static ClassLoader getRootClassLoader() {</div>
+<div>852&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ClassLoader cl = Thread.currentThread().getContextClassLoader();</div>
+<div>853&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while (cl.getParent() != null) {</div>
+<div>854&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // System.err.println("Getting parent classloader....");</div>
+<div>855&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      cl = cl.getParent();</div>
+<div>856&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return cl;</div>
+<div>858&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>859&emsp;&emsp;</div>
+<div>860&emsp;&emsp;&nbsp;&nbsp;  private static ClassLoader getWekaLevelClassloader() {</div>
+<div>861&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return weka.core.Version.class.getClassLoader();</div>
+<div>862&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>863&emsp;&emsp;</div>
+<div>864&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>865&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Checks each classloader to make sure that their dependencies are available</div>
+<div>866&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * (i.e. a classloader for each dependency is present). This method is called</div>
+<div>867&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * by WekaPackageManager after loading all packages, but before dynamic class</div>
+<div>868&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * discovery is invoked. This takes care of any issues that might arise from</div>
+<div>869&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the user toggling the load status of a package, or perhaps manually</div>
+<div>870&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * installing packages that preclude one another, which might make one or more</div>
+<div>871&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * dependencies unavailable</div>
+<div>872&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>873&emsp;&emsp;&nbsp;&nbsp;  protected void performIntegrityCheck() {</div>
+<div>874&emsp;&emsp;</div>
+<div>875&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;String> problems = new ArrayList&#60;>();</div>
+<div style="background-color:limegreen;">876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (Map.Entry&#60;String, WekaPackageLibIsolatingClassLoader> e : m_packageJarClassLoaders&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>877&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .entrySet()) {</div>
+<div>878&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String packageName = e.getKey();</div>
+<div>879&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      WekaPackageLibIsolatingClassLoader child = e.getValue();</div>
+<div>880&emsp;&emsp;</div>
+<div>881&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div style="background-color:limegreen;">882&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!child.integrityCheck()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>883&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          problems.add(packageName);</div>
+<div>884&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>885&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (Exception ex) {</div>
+<div>886&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        problems.add(packageName);</div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>888&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>889&emsp;&emsp;</div>
+<div>890&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    List&#60;String> classKeys = new ArrayList&#60;>();</div>
+<div style="background-color:limegreen;">891&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (String p : problems) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>892&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.err.println("[Weka] Integrity: removing classloader for: " + p);</div>
+<div>893&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // remove from lookups</div>
+<div>894&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_packageJarClassLoaders.remove(p);</div>
+<div>895&emsp;&emsp;</div>
+<div style="background-color:limegreen;">896&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (Map.Entry&#60;String, WekaPackageLibIsolatingClassLoader> e : m_classBasedClassLoaderLookup&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>897&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        .entrySet()) {</div>
+<div style="background-color:limegreen;">898&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (e.getValue().getPackageName().equals(p)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>899&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          classKeys.add(e.getKey());</div>
+<div>900&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>901&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div style="background-color:limegreen;">902&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (String k : classKeys) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_classBasedClassLoaderLookup.remove(k);</div>
+<div>904&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>905&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>906&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>907&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

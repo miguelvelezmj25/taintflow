@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ThresholdCurve.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *   This program is free software: you can redistribute it and/or modify</div>
+<div>3&emsp;&emsp;&nbsp; *   it under the terms of the GNU General Public License as published by</div>
+<div>4&emsp;&emsp;&nbsp; *   the Free Software Foundation, either version 3 of the License, or</div>
+<div>5&emsp;&emsp;&nbsp; *   (at your option) any later version.</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; *   This program is distributed in the hope that it will be useful,</div>
+<div>8&emsp;&emsp;&nbsp; *   but WITHOUT ANY WARRANTY; without even the implied warranty of</div>
+<div>9&emsp;&emsp;&nbsp; *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</div>
+<div>10&emsp;&emsp;&nbsp; *   GNU General Public License for more details.</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; *   You should have received a copy of the GNU General Public License</div>
+<div>13&emsp;&emsp;&nbsp; *   along with this program.  If not, see &#60;http://www.gnu.org/licenses/>.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/*</div>
+<div>17&emsp;&emsp;&nbsp; *    ThresholdCurve.java</div>
+<div>18&emsp;&emsp;&nbsp; *    Copyright (C) 2002-2012 University of Waikato, Hamilton, New Zealand</div>
+<div>19&emsp;&emsp;&nbsp; *</div>
+<div>20&emsp;&emsp;&nbsp; */</div>
+<div>21&emsp;&emsp;</div>
+<div>22&emsp;&emsp;package weka.classifiers.evaluation;</div>
+<div>23&emsp;&emsp;</div>
+<div>24&emsp;&emsp;import java.util.ArrayList;</div>
+<div>25&emsp;&emsp;</div>
+<div>26&emsp;&emsp;import weka.classifiers.Classifier;</div>
+<div>27&emsp;&emsp;import weka.core.Attribute;</div>
+<div>28&emsp;&emsp;import weka.core.DenseInstance;</div>
+<div>29&emsp;&emsp;import weka.core.Instance;</div>
+<div>30&emsp;&emsp;import weka.core.Instances;</div>
+<div>31&emsp;&emsp;import weka.core.RevisionHandler;</div>
+<div>32&emsp;&emsp;import weka.core.RevisionUtils;</div>
+<div>33&emsp;&emsp;import weka.core.Utils;</div>
+<div>34&emsp;&emsp;</div>
+<div>35&emsp;&emsp;/**</div>
+<div>36&emsp;&emsp;&nbsp; * Generates points illustrating prediction tradeoffs that can be obtained by</div>
+<div>37&emsp;&emsp;&nbsp; * varying the threshold value between classes. For example, the typical</div>
+<div>38&emsp;&emsp;&nbsp; * threshold value of 0.5 means the predicted probability of "positive" must be</div>
+<div>39&emsp;&emsp;&nbsp; * higher than 0.5 for the instance to be predicted as "positive". The resulting</div>
+<div>40&emsp;&emsp;&nbsp; * dataset can be used to visualize precision/recall tradeoff, or for ROC curve</div>
+<div>41&emsp;&emsp;&nbsp; * analysis (true positive rate vs false positive rate). Weka just varies the</div>
+<div>42&emsp;&emsp;&nbsp; * threshold on the class probability estimates in each case. The Mann Whitney</div>
+<div>43&emsp;&emsp;&nbsp; * statistic is used to calculate the AUC.</div>
+<div>44&emsp;&emsp;&nbsp; * </div>
+<div>45&emsp;&emsp;&nbsp; * @author Len Trigg (len@reeltwo.com)</div>
+<div>46&emsp;&emsp;&nbsp; * @version $Revision: 10153 $</div>
+<div>47&emsp;&emsp;&nbsp; */</div>
+<div>48&emsp;&emsp;public class ThresholdCurve implements RevisionHandler {</div>
+<div>49&emsp;&emsp;</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;  /** The name of the relation used in threshold curve datasets */</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;  public static final String RELATION_NAME = "ThresholdCurve";</div>
+<div>52&emsp;&emsp;</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;  /** attribute name: True Positives */</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;  public static final String TRUE_POS_NAME = "True Positives";</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;  /** attribute name: False Negatives */</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;  public static final String FALSE_NEG_NAME = "False Negatives";</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;  /** attribute name: False Positives */</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;  public static final String FALSE_POS_NAME = "False Positives";</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;  /** attribute name: True Negatives */</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;  public static final String TRUE_NEG_NAME = "True Negatives";</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;  /** attribute name: False Positive Rate" */</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;  public static final String FP_RATE_NAME = "False Positive Rate";</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;  /** attribute name: True Positive Rate */</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;  public static final String TP_RATE_NAME = "True Positive Rate";</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;  /** attribute name: Precision */</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;  public static final String PRECISION_NAME = "Precision";</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;  /** attribute name: Recall */</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;  public static final String RECALL_NAME = "Recall";</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;  /** attribute name: Fallout */</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;  public static final String FALLOUT_NAME = "Fallout";</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;  /** attribute name: FMeasure */</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;  public static final String FMEASURE_NAME = "FMeasure";</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;  /** attribute name: Sample Size */</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;  public static final String SAMPLE_SIZE_NAME = "Sample Size";</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;  /** attribute name: Lift */</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;  public static final String LIFT_NAME = "Lift";</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;  /** attribute name: Threshold */</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;  public static final String THRESHOLD_NAME = "Threshold";</div>
+<div>79&emsp;&emsp;</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Calculates the performance stats for the default class and return results</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * as a set of Instances. The structure of these Instances is as follows:</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;p></div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;ul></div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;li>&#60;b>True Positives &#60;/b></div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;li>&#60;b>False Negatives&#60;/b></div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;li>&#60;b>False Positives&#60;/b></div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;li>&#60;b>True Negatives&#60;/b></div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;li>&#60;b>False Positive Rate&#60;/b></div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;li>&#60;b>True Positive Rate&#60;/b></div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;li>&#60;b>Precision&#60;/b></div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;li>&#60;b>Recall&#60;/b></div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;li>&#60;b>Fallout&#60;/b></div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;li>&#60;b>Threshold&#60;/b> contains the probability threshold that gives rise to</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the previous performance values.</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;/ul></div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;p></div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * For the definitions of these measures, see TwoClassStats</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;p></div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see TwoClassStats</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param predictions the predictions to base the curve on</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return datapoints as a set of instances, null if no predictions have been</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         made.</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;  public Instances getCurve(ArrayList&#60;Prediction> predictions) {</div>
+<div>107&emsp;&emsp;</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (predictions.size() == 0) {</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return null;</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return getCurve(predictions,</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ((NominalPrediction) predictions.get(0)).distribution().length - 1);</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>114&emsp;&emsp;</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Calculates the performance stats for the desired class and return results</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * as a set of Instances.</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param predictions the predictions to base the curve on</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classIndex index of the class of interest.</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return datapoints as a set of instances.</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;  public Instances getCurve(ArrayList&#60;Prediction> predictions, int classIndex) {</div>
+<div>124&emsp;&emsp;</div>
+<div style="background-color:limegreen;">125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if ((predictions.size() == 0)&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      || (((NominalPrediction) predictions.get(0)).distribution().length &#60;= classIndex)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return null;</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>129&emsp;&emsp;</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double totPos = 0, totNeg = 0;</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] probs = getProbabilities(predictions, classIndex);</div>
+<div>132&emsp;&emsp;</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Get distribution of positive/negatives</div>
+<div style="background-color:limegreen;">134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; probs.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NominalPrediction pred = (NominalPrediction) predictions.get(i);</div>
+<div style="background-color:limegreen;">136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (pred.actual() == Prediction.MISSING_VALUE) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println(getClass().getName()</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + " Skipping prediction with missing class value");</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        continue;</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div style="background-color:limegreen;">141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (pred.weight() &#60; 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println(getClass().getName()</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + " Skipping prediction with negative weight");</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        continue;</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div style="background-color:limegreen;">146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (pred.actual() == classIndex) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        totPos += pred.weight();</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        totNeg += pred.weight();</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>152&emsp;&emsp;</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances insts = makeHeader();</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int[] sorted = Utils.sort(probs);</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    TwoClassStats tc = new TwoClassStats(totPos, totNeg, 0, 0);</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double threshold = 0;</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double cumulativePos = 0;</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double cumulativeNeg = 0;</div>
+<div>159&emsp;&emsp;</div>
+<div style="background-color:limegreen;">160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; sorted.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>161&emsp;&emsp;</div>
+<div style="background-color:limegreen;">162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if ((i == 0) || (probs[sorted[i]] > threshold)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        tc.setTruePositive(tc.getTruePositive() - cumulativePos);</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        tc.setFalseNegative(tc.getFalseNegative() + cumulativePos);</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        tc.setFalsePositive(tc.getFalsePositive() - cumulativeNeg);</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        tc.setTrueNegative(tc.getTrueNegative() + cumulativeNeg);</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        threshold = probs[sorted[i]];</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        insts.add(makeInstance(tc, threshold));</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        cumulativePos = 0;</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        cumulativeNeg = 0;</div>
+<div style="background-color:limegreen;">171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (i == sorted.length - 1) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>175&emsp;&emsp;</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NominalPrediction pred = (NominalPrediction) predictions.get(sorted[i]);</div>
+<div>177&emsp;&emsp;</div>
+<div style="background-color:limegreen;">178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (pred.actual() == Prediction.MISSING_VALUE) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println(getClass().getName()</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + " Skipping prediction with missing class value");</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        continue;</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div style="background-color:limegreen;">183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (pred.weight() &#60; 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println(getClass().getName()</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + " Skipping prediction with negative weight");</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        continue;</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div style="background-color:limegreen;">188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (pred.actual() == classIndex) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        cumulativePos += pred.weight();</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        cumulativeNeg += pred.weight();</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>193&emsp;&emsp;</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      /*</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;       * System.out.println(tc + " " + probs[sorted[i]] + " " + (pred.actual()</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;       * == classIndex));</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;       */</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      /*</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;       * if ((i != (sorted.length - 1)) && ((i == 0) || (probs[sorted[i]] !=</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;       * probs[sorted[i - 1]]))) { insts.add(makeInstance(tc,</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;       * probs[sorted[i]])); }</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;       */</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>204&emsp;&emsp;</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // make sure a zero point gets into the curve</div>
+<div style="background-color:limegreen;">206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (tc.getFalseNegative() != totPos || tc.getTrueNegative() != totNeg) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      tc = new TwoClassStats(0, 0, totNeg, totPos);</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      threshold = probs[sorted[sorted.length - 1]] + 10e-6;</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      insts.add(makeInstance(tc, threshold));</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>211&emsp;&emsp;</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return insts;</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>214&emsp;&emsp;</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Calculates the n point precision result, which is the precision averaged</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * over n evenly spaced (w.r.t recall) samples of the curve.</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param tcurve a previously extracted threshold curve Instances.</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param n the number of points to average over.</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the n-point precision.</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;  public static double getNPointPrecision(Instances tcurve, int n) {</div>
+<div>224&emsp;&emsp;</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!RELATION_NAME.equals(tcurve.relationName())</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      || (tcurve.numInstances() == 0)) {</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return Double.NaN;</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int recallInd = tcurve.attribute(RECALL_NAME).index();</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int precisInd = tcurve.attribute(PRECISION_NAME).index();</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] recallVals = tcurve.attributeToDoubleArray(recallInd);</div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int[] sorted = Utils.sort(recallVals);</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double isize = 1.0 / (n - 1);</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double psum = 0;</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; n; i++) {</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int pos = binarySearch(sorted, recallVals, i * isize);</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double recall = recallVals[sorted[pos]];</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double precis = tcurve.instance(sorted[pos]).value(precisInd);</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      /*</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;       * System.err.println("Point " + (i + 1) + ": i=" + pos + " r=" + (i *</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;       * isize) + " p'=" + precis + " r'=" + recall);</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;       */</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // interpolate figures for non-endpoints</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      while ((pos != 0) && (pos &#60; sorted.length - 1)) {</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        pos++;</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double recall2 = recallVals[sorted[pos]];</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (recall2 != recall) {</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          double precis2 = tcurve.instance(sorted[pos]).value(precisInd);</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          double slope = (precis2 - precis) / (recall2 - recall);</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          double offset = precis - recall * slope;</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          precis = isize * i * slope + offset;</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          /*</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;           * System.err.println("Point2 " + (i + 1) + ": i=" + pos + " r=" + (i</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;           * * isize) + " p'=" + precis2 + " r'=" + recall2 + " p''=" + precis);</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;           */</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      psum += precis;</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return psum / n;</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>263&emsp;&emsp;</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Calculates the area under the precision-recall curve (AUPRC).</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param tcurve a previously extracted threshold curve Instances.</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the PRC area, or Double.NaN if you don't pass in a ThresholdCurve</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         generated Instances.</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;  public static double getPRCArea(Instances tcurve) {</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final int n = tcurve.numInstances();</div>
+<div style="background-color:limegreen;">273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!RELATION_NAME.equals(tcurve.relationName()) || (n == 0)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return Double.NaN;</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>276&emsp;&emsp;</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final int pInd = tcurve.attribute(PRECISION_NAME).index();</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final int rInd = tcurve.attribute(RECALL_NAME).index();</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final double[] pVals = tcurve.attributeToDoubleArray(pInd);</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final double[] rVals = tcurve.attributeToDoubleArray(rInd);</div>
+<div>281&emsp;&emsp;</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double area = 0;</div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double xlast = rVals[n - 1];</div>
+<div>284&emsp;&emsp;</div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // start from the first real p/r pair (not the artificial zero point)</div>
+<div style="background-color:limegreen;">286&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = n - 2; i >= 0; i--) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double recallDelta = rVals[i] - xlast;</div>
+<div>288&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      area += (pVals[i] * recallDelta);</div>
+<div>289&emsp;&emsp;</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      xlast = rVals[i];</div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>292&emsp;&emsp;</div>
+<div style="background-color:limegreen;">293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (area == 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return Utils.missingValue();</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return area;</div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>298&emsp;&emsp;</div>
+<div>299&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Calculates the area under the ROC curve as the Wilcoxon-Mann-Whitney</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * statistic.</div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param tcurve a previously extracted threshold curve Instances.</div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the ROC area, or Double.NaN if you don't pass in a ThresholdCurve</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         generated Instances.</div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;  public static double getROCArea(Instances tcurve) {</div>
+<div>308&emsp;&emsp;</div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final int n = tcurve.numInstances();</div>
+<div style="background-color:limegreen;">310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!RELATION_NAME.equals(tcurve.relationName()) || (n == 0)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return Double.NaN;</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final int tpInd = tcurve.attribute(TRUE_POS_NAME).index();</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final int fpInd = tcurve.attribute(FALSE_POS_NAME).index();</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final double[] tpVals = tcurve.attributeToDoubleArray(tpInd);</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final double[] fpVals = tcurve.attributeToDoubleArray(fpInd);</div>
+<div>317&emsp;&emsp;</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double area = 0.0, cumNeg = 0.0;</div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final double totalPos = tpVals[0];</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    final double totalNeg = fpVals[0];</div>
+<div style="background-color:limegreen;">321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; n; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double cip, cin;</div>
+<div style="background-color:limegreen;">323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (i &#60; n - 1) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        cip = tpVals[i] - tpVals[i + 1];</div>
+<div>325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        cin = fpVals[i] - fpVals[i + 1];</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        cip = tpVals[n - 1];</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        cin = fpVals[n - 1];</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      area += cip * (cumNeg + (0.5 * cin));</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      cumNeg += cin;</div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    area /= (totalNeg * totalPos);</div>
+<div>334&emsp;&emsp;</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return area;</div>
+<div>336&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>337&emsp;&emsp;</div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>339&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Gets the index of the instance with the closest threshold value to the</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * desired target</div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param tcurve a set of instances that have been generated by this class</div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param threshold the target threshold</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the index of the instance that has threshold closest to the target,</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         or -1 if this could not be found (i.e. no data, or bad threshold</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         target)</div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;  public static int getThresholdInstance(Instances tcurve, double threshold) {</div>
+<div>349&emsp;&emsp;</div>
+<div>350&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!RELATION_NAME.equals(tcurve.relationName())</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      || (tcurve.numInstances() == 0) || (threshold &#60; 0) || (threshold > 1.0)) {</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return -1;</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (tcurve.numInstances() == 1) {</div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return 0;</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] tvals = tcurve.attributeToDoubleArray(tcurve.numAttributes() - 1);</div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int[] sorted = Utils.sort(tvals);</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return binarySearch(sorted, tvals, threshold);</div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>361&emsp;&emsp;</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * performs a binary search</div>
+<div>364&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param index the indices</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param vals the values</div>
+<div>367&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param target the target to look for</div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the index of the target</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;  private static int binarySearch(int[] index, double[] vals, double target) {</div>
+<div>371&emsp;&emsp;</div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int lo = 0, hi = index.length - 1;</div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    while (hi - lo > 1) {</div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int mid = lo + (hi - lo) / 2;</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double midval = vals[index[mid]];</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (target > midval) {</div>
+<div>377&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        lo = mid;</div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else if (target &#60; midval) {</div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        hi = mid;</div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        while ((mid > 0) && (vals[index[mid - 1]] == target)) {</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          mid--;</div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return mid;</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return lo;</div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>389&emsp;&emsp;</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>392&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param predictions the predictions to use</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classIndex the class index</div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the probabilities</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;  private double[] getProbabilities(ArrayList&#60;Prediction> predictions,</div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int classIndex) {</div>
+<div>398&emsp;&emsp;</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // sort by predicted probability of the desired class.</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] probs = new double[predictions.size()];</div>
+<div style="background-color:limegreen;">401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; probs.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NominalPrediction pred = (NominalPrediction) predictions.get(i);</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      probs[i] = pred.distribution()[classIndex];</div>
+<div>404&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return probs;</div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>407&emsp;&emsp;</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * generates the header</div>
+<div>410&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the header</div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>413&emsp;&emsp;&nbsp;&nbsp;  private Instances makeHeader() {</div>
+<div>414&emsp;&emsp;</div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ArrayList&#60;Attribute> fv = new ArrayList&#60;Attribute>();</div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    fv.add(new Attribute(TRUE_POS_NAME));</div>
+<div>417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    fv.add(new Attribute(FALSE_NEG_NAME));</div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    fv.add(new Attribute(FALSE_POS_NAME));</div>
+<div>419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    fv.add(new Attribute(TRUE_NEG_NAME));</div>
+<div>420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    fv.add(new Attribute(FP_RATE_NAME));</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    fv.add(new Attribute(TP_RATE_NAME));</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    fv.add(new Attribute(PRECISION_NAME));</div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    fv.add(new Attribute(RECALL_NAME));</div>
+<div>424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    fv.add(new Attribute(FALLOUT_NAME));</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    fv.add(new Attribute(FMEASURE_NAME));</div>
+<div>426&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    fv.add(new Attribute(SAMPLE_SIZE_NAME));</div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    fv.add(new Attribute(LIFT_NAME));</div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    fv.add(new Attribute(THRESHOLD_NAME));</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return new Instances(RELATION_NAME, fv, 100);</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>431&emsp;&emsp;</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * generates an instance out of the given data</div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param tc the statistics</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param prob the probability</div>
+<div>437&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the generated instance</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;  private Instance makeInstance(TwoClassStats tc, double prob) {</div>
+<div>440&emsp;&emsp;</div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int count = 0;</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] vals = new double[13];</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    vals[count++] = tc.getTruePositive();</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    vals[count++] = tc.getFalseNegative();</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    vals[count++] = tc.getFalsePositive();</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    vals[count++] = tc.getTrueNegative();</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    vals[count++] = tc.getFalsePositiveRate();</div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    vals[count++] = tc.getTruePositiveRate();</div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    vals[count++] = tc.getPrecision();</div>
+<div>450&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    vals[count++] = tc.getRecall();</div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    vals[count++] = tc.getFallout();</div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    vals[count++] = tc.getFMeasure();</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double ss = (tc.getTruePositive() + tc.getFalsePositive())</div>
+<div>454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      / (tc.getTruePositive() + tc.getFalsePositive() + tc.getTrueNegative() + tc</div>
+<div>455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        .getFalseNegative());</div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    vals[count++] = ss;</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double expectedByChance = (ss * (tc.getTruePositive() + tc</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .getFalseNegative()));</div>
+<div style="background-color:limegreen;">459&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (expectedByChance &#60; 1) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      vals[count++] = Utils.missingValue();</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      vals[count++] = tc.getTruePositive() / expectedByChance;</div>
+<div>463&emsp;&emsp;</div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    vals[count++] = prob;</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return new DenseInstance(1.0, vals);</div>
+<div>467&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>468&emsp;&emsp;</div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the revision string.</div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the revision</div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;  public String getRevision() {</div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return RevisionUtils.extract("$Revision: 10153 $");</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>478&emsp;&emsp;</div>
+<div>479&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Tests the ThresholdCurve generation from the command line. The classifier</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * is currently hardcoded. Pipe in an arff file.</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param args currently ignored</div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;  public static void main(String[] args) {</div>
+<div>486&emsp;&emsp;</div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>488&emsp;&emsp;</div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances inst = new Instances(new java.io.InputStreamReader(System.in));</div>
+<div>490&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (0 != Math.log(1)) { // false</div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println(ThresholdCurve.getNPointPrecision(inst, 11));</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else if (3 != 1 + 1) { // true</div>
+<div>493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        inst.setClassIndex(inst.numAttributes() - 1);</div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ThresholdCurve tc = new ThresholdCurve();</div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        EvaluationUtils eu = new EvaluationUtils();</div>
+<div>496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Classifier classifier = new weka.classifiers.functions.Logistic();</div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ArrayList&#60;Prediction> predictions = new ArrayList&#60;Prediction>();</div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (int i = 0; i &#60; 2; i++) { // Do two runs.</div>
+<div>499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          eu.setSeed(i);</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          predictions.addAll(eu.getCVPredictions(classifier, inst, 10));</div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // System.out.println("\n\n\n");</div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>503&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Instances result = tc.getCurve(predictions);</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println(result);</div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (Exception ex) {</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ex.printStackTrace();</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>510&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

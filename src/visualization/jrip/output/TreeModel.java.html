@@ -1,0 +1,1757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TreeModel.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *   This program is free software: you can redistribute it and/or modify</div>
+<div>3&emsp;&emsp;&nbsp; *   it under the terms of the GNU General Public License as published by</div>
+<div>4&emsp;&emsp;&nbsp; *   the Free Software Foundation, either version 3 of the License, or</div>
+<div>5&emsp;&emsp;&nbsp; *   (at your option) any later version.</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; *   This program is distributed in the hope that it will be useful,</div>
+<div>8&emsp;&emsp;&nbsp; *   but WITHOUT ANY WARRANTY; without even the implied warranty of</div>
+<div>9&emsp;&emsp;&nbsp; *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</div>
+<div>10&emsp;&emsp;&nbsp; *   GNU General Public License for more details.</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; *   You should have received a copy of the GNU General Public License</div>
+<div>13&emsp;&emsp;&nbsp; *   along with this program.  If not, see &#60;http://www.gnu.org/licenses/>.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/*</div>
+<div>17&emsp;&emsp;&nbsp; *    TreeModel.java</div>
+<div>18&emsp;&emsp;&nbsp; *    Copyright (C) 2009-2012 University of Waikato, Hamilton, New Zealand</div>
+<div>19&emsp;&emsp;&nbsp; *</div>
+<div>20&emsp;&emsp;&nbsp; */</div>
+<div>21&emsp;&emsp;</div>
+<div>22&emsp;&emsp;package weka.classifiers.pmml.consumer;</div>
+<div>23&emsp;&emsp;</div>
+<div>24&emsp;&emsp;import java.io.Serializable;</div>
+<div>25&emsp;&emsp;import java.util.ArrayList;</div>
+<div>26&emsp;&emsp;</div>
+<div>27&emsp;&emsp;import org.w3c.dom.Element;</div>
+<div>28&emsp;&emsp;import org.w3c.dom.Node;</div>
+<div>29&emsp;&emsp;import org.w3c.dom.NodeList;</div>
+<div>30&emsp;&emsp;</div>
+<div>31&emsp;&emsp;import weka.core.Attribute;</div>
+<div>32&emsp;&emsp;import weka.core.Drawable;</div>
+<div>33&emsp;&emsp;import weka.core.Instance;</div>
+<div>34&emsp;&emsp;import weka.core.Instances;</div>
+<div>35&emsp;&emsp;import weka.core.RevisionUtils;</div>
+<div>36&emsp;&emsp;import weka.core.Utils;</div>
+<div>37&emsp;&emsp;import weka.core.pmml.Array;</div>
+<div>38&emsp;&emsp;import weka.core.pmml.MiningSchema;</div>
+<div>39&emsp;&emsp;</div>
+<div>40&emsp;&emsp;/**</div>
+<div>41&emsp;&emsp;&nbsp; * Class implementing import of PMML TreeModel. Can be used as a Weka classifier</div>
+<div>42&emsp;&emsp;&nbsp; * for prediction (buildClassifier() raises and Exception).</div>
+<div>43&emsp;&emsp;&nbsp; * </div>
+<div>44&emsp;&emsp;&nbsp; * @author Mark Hall (mhall{[at]}pentaho{[dot]}com)</div>
+<div>45&emsp;&emsp;&nbsp; * @version $Revision: 10153 $;</div>
+<div>46&emsp;&emsp;&nbsp; */</div>
+<div>47&emsp;&emsp;public class TreeModel extends PMMLClassifier implements Drawable {</div>
+<div>48&emsp;&emsp;</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * For serialization</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;  private static final long serialVersionUID = -2065158088298753129L;</div>
+<div>53&emsp;&emsp;</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Inner class representing the ScoreDistribution element</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;  static class ScoreDistribution implements Serializable {</div>
+<div>58&emsp;&emsp;</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For serialization</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -123506262094299933L;</div>
+<div>63&emsp;&emsp;</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The class label for this distribution element */</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final String m_classLabel;</div>
+<div>66&emsp;&emsp;</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The index of the class label */</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private int m_classLabelIndex = -1;</div>
+<div>69&emsp;&emsp;</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The count for this label */</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final double m_recordCount;</div>
+<div>72&emsp;&emsp;</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The optional confidence value */</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private double m_confidence = Utils.missingValue();</div>
+<div>75&emsp;&emsp;</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Construct a ScoreDistribution entry</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param scoreE the node containing the distribution</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param miningSchema the mining schema</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param baseCount the number of records at the node that owns this</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          distribution entry</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected ScoreDistribution(Element scoreE, MiningSchema miningSchema,</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double baseCount) throws Exception {</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the label</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_classLabel = scoreE.getAttribute("value");</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute classAtt = miningSchema.getFieldsAsInstances().classAttribute();</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (classAtt == null || classAtt.indexOfValue(m_classLabel) &#60; 0) {</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception(</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          "[ScoreDistribution] class attribute not set or class value "</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + m_classLabel + " not found!");</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>95&emsp;&emsp;</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_classLabelIndex = classAtt.indexOfValue(m_classLabel);</div>
+<div>97&emsp;&emsp;</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the frequency</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String recordC = scoreE.getAttribute("recordCount");</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_recordCount = Double.parseDouble(recordC);</div>
+<div>101&emsp;&emsp;</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the optional confidence</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String confidence = scoreE.getAttribute("confidence");</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (confidence != null && confidence.length() > 0) {</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_confidence = Double.parseDouble(confidence);</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else if (!Utils.isMissingValue(baseCount) && baseCount > 0) {</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_confidence = m_recordCount / baseCount;</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>110&emsp;&emsp;</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Backfit confidence value (does nothing if the confidence value is already</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * set).</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param baseCount the total number of records (supplied either explicitly</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          from the node that owns this distribution entry or most likely</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          computed from summing the recordCounts of all the distribution</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          entries in the distribution that owns this entry).</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    void deriveConfidenceValue(double baseCount) {</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (Utils.isMissingValue(m_confidence)</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        && !Utils.isMissingValue(baseCount) && baseCount > 0) {</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_confidence = m_recordCount / baseCount;</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>126&emsp;&emsp;</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String getClassLabel() {</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_classLabel;</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>130&emsp;&emsp;</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int getClassLabelIndex() {</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_classLabelIndex;</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>134&emsp;&emsp;</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double getRecordCount() {</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_recordCount;</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>138&emsp;&emsp;</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double getConfidence() {</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_confidence;</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>142&emsp;&emsp;</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_classLabel + ": " + m_recordCount + " ("</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + Utils.doubleToString(m_confidence, 2) + ") ";</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>149&emsp;&emsp;</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Base class for Predicates</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;  static abstract class Predicate implements Serializable {</div>
+<div>154&emsp;&emsp;</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For serialization</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = 1035344165452733887L;</div>
+<div>159&emsp;&emsp;</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    enum Eval {</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      TRUE, FALSE, UNKNOWN;</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>163&emsp;&emsp;</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Evaluate this predicate.</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param input the input vector of attribute and derived field values.</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the evaluation status of this predicate.</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    abstract Eval evaluate(double[] input);</div>
+<div>172&emsp;&emsp;</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String toString(int level, boolean cr) {</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return toString(level);</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>176&emsp;&emsp;</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String toString(int level) {</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      StringBuffer text = new StringBuffer();</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int j = 0; j &#60; level; j++) {</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        text.append("|   ");</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>182&emsp;&emsp;</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return text.append(toString()).toString();</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>185&emsp;&emsp;</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static Eval booleanToEval(boolean missing, boolean result) {</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (missing) {</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Eval.UNKNOWN;</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else if (result) {</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Eval.TRUE;</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Eval.FALSE;</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>195&emsp;&emsp;</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Factory method to return the appropriate predicate for a given node in</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the tree.</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param nodeE the XML node encapsulating the tree node.</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param miningSchema the mining schema in use</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return a Predicate</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception of something goes wrong.</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    static Predicate getPredicate(Element nodeE, MiningSchema miningSchema)</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div>207&emsp;&emsp;</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Predicate result = null;</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NodeList children = nodeE.getChildNodes();</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; children.getLength(); i++) {</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Node child = children.item(i);</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (child.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String tagName = ((Element) child).getTagName();</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (tagName.equals("True")) {</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            result = new True();</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else if (tagName.equals("False")) {</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            result = new False();</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else if (tagName.equals("SimplePredicate")) {</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            result = new SimplePredicate((Element) child, miningSchema);</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else if (tagName.equals("CompoundPredicate")) {</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            result = new CompoundPredicate((Element) child, miningSchema);</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else if (tagName.equals("SimpleSetPredicate")) {</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            result = new SimpleSetPredicate((Element) child, miningSchema);</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>232&emsp;&emsp;</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (result == null) {</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception(</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          "[Predicate] unknown or missing predicate type in node");</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>237&emsp;&emsp;</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>241&emsp;&emsp;</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Simple True Predicate</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;  static class True extends Predicate {</div>
+<div>246&emsp;&emsp;</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For serialization</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = 1817942234610531627L;</div>
+<div>251&emsp;&emsp;</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Predicate.Eval evaluate(double[] input) {</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return Predicate.Eval.TRUE;</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>256&emsp;&emsp;</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return "True: ";</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>262&emsp;&emsp;</div>
+<div>263&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Simple False Predicate</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;  static class False extends Predicate {</div>
+<div>267&emsp;&emsp;</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For serialization</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -3647261386442860365L;</div>
+<div>272&emsp;&emsp;</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Predicate.Eval evaluate(double[] input) {</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return Predicate.Eval.FALSE;</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>277&emsp;&emsp;</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return "False: ";</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>283&emsp;&emsp;</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Class representing the SimplePredicate</div>
+<div>286&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;  static class SimplePredicate extends Predicate {</div>
+<div>288&emsp;&emsp;</div>
+<div>289&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For serialization</div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -6156684285069327400L;</div>
+<div>293&emsp;&emsp;</div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    enum Operator {</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      EQUAL("equal") {</div>
+<div>296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predicate.Eval evaluate(double[] input, double value, int fieldIndex) {</div>
+<div>298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return Predicate.booleanToEval(</div>
+<div>299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Utils.isMissingValue(input[fieldIndex]),</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            weka.core.Utils.eq(input[fieldIndex], value));</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>302&emsp;&emsp;</div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String shortName() {</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return "==";</div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      },</div>
+<div>308&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NOTEQUAL("notEqual") {</div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predicate.Eval evaluate(double[] input, double value, int fieldIndex) {</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return Predicate.booleanToEval(</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Utils.isMissingValue(input[fieldIndex]),</div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (input[fieldIndex] != value));</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>315&emsp;&emsp;</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String shortName() {</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return "!=";</div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      },</div>
+<div>321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      LESSTHAN("lessThan") {</div>
+<div>322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predicate.Eval evaluate(double[] input, double value, int fieldIndex) {</div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return Predicate.booleanToEval(</div>
+<div>325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Utils.isMissingValue(input[fieldIndex]),</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (input[fieldIndex] &#60; value));</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>328&emsp;&emsp;</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String shortName() {</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return "&#60;";</div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      },</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      LESSOREQUAL("lessOrEqual") {</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>336&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predicate.Eval evaluate(double[] input, double value, int fieldIndex) {</div>
+<div>337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return Predicate.booleanToEval(</div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Utils.isMissingValue(input[fieldIndex]),</div>
+<div>339&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (input[fieldIndex] &#60;= value));</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>341&emsp;&emsp;</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String shortName() {</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return "&#60;=";</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      },</div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      GREATERTHAN("greaterThan") {</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predicate.Eval evaluate(double[] input, double value, int fieldIndex) {</div>
+<div>350&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return Predicate.booleanToEval(</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Utils.isMissingValue(input[fieldIndex]),</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (input[fieldIndex] > value));</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>354&emsp;&emsp;</div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String shortName() {</div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return ">";</div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      },</div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      GREATEROREQUAL("greaterOrEqual") {</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predicate.Eval evaluate(double[] input, double value, int fieldIndex) {</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return Predicate.booleanToEval(</div>
+<div>364&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Utils.isMissingValue(input[fieldIndex]),</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            (input[fieldIndex] >= value));</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>367&emsp;&emsp;</div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String shortName() {</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return ">=";</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      },</div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ISMISSING("isMissing") {</div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predicate.Eval evaluate(double[] input, double value, int fieldIndex) {</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return Predicate.booleanToEval(false,</div>
+<div>377&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Utils.isMissingValue(input[fieldIndex]));</div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>379&emsp;&emsp;</div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String shortName() {</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return toString();</div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      },</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ISNOTMISSING("isNotMissing") {</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predicate.Eval evaluate(double[] input, double value, int fieldIndex) {</div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return Predicate.booleanToEval(false,</div>
+<div>389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            !Utils.isMissingValue(input[fieldIndex]));</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>391&emsp;&emsp;</div>
+<div>392&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String shortName() {</div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return toString();</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      };</div>
+<div>397&emsp;&emsp;</div>
+<div>398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      abstract Predicate.Eval evaluate(double[] input, double value,</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int fieldIndex);</div>
+<div>400&emsp;&emsp;</div>
+<div>401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      abstract String shortName();</div>
+<div>402&emsp;&emsp;</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      private final String m_stringVal;</div>
+<div>404&emsp;&emsp;</div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Operator(String name) {</div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_stringVal = name;</div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>408&emsp;&emsp;</div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      @Override</div>
+<div>410&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      public String toString() {</div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return m_stringVal;</div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>414&emsp;&emsp;</div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the field that we are comparing against */</div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int m_fieldIndex = -1;</div>
+<div>417&emsp;&emsp;</div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the name of the field */</div>
+<div>419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String m_fieldName;</div>
+<div>420&emsp;&emsp;</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** true if the field is nominal */</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean m_isNominal;</div>
+<div>423&emsp;&emsp;</div>
+<div>424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the value as a string (if nominal) */</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String m_nominalValue;</div>
+<div>426&emsp;&emsp;</div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the value to compare against (if nominal it holds the index of the value)</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double m_value;</div>
+<div>431&emsp;&emsp;</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the operator to use */</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Operator m_operator;</div>
+<div>434&emsp;&emsp;</div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public SimplePredicate(Element simpleP, MiningSchema miningSchema) throws Exception {</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances totalStructure = miningSchema.getFieldsAsInstances();</div>
+<div>437&emsp;&emsp;</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the field name and set up the index</div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String fieldS = simpleP.getAttribute("field");</div>
+<div>440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute att = totalStructure.attribute(fieldS);</div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (att == null) {</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[SimplePredicate] unable to find field " + fieldS</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + " in the incoming instance structure!");</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>445&emsp;&emsp;</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // find the index</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int index = -1;</div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; totalStructure.numAttributes(); i++) {</div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (totalStructure.attribute(i).name().equals(fieldS)) {</div>
+<div>450&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          index = i;</div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_fieldName = totalStructure.attribute(i).name();</div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_fieldIndex = index;</div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (att.isNominal()) {</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_isNominal = true;</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>459&emsp;&emsp;</div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the operator</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String oppS = simpleP.getAttribute("operator");</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (Operator o : Operator.values()) {</div>
+<div>463&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (o.toString().equals(oppS)) {</div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_operator = o;</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>467&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>468&emsp;&emsp;</div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (m_operator != Operator.ISMISSING</div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        && m_operator != Operator.ISNOTMISSING) {</div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String valueS = simpleP.getAttribute("value");</div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (att.isNumeric()) {</div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_value = Double.parseDouble(valueS);</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_nominalValue = valueS;</div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_value = att.indexOfValue(valueS);</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (m_value &#60; 0) {</div>
+<div>478&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new Exception("[SimplePredicate] can't find value " + valueS</div>
+<div>479&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              + " in nominal " + "attribute " + att.name());</div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>484&emsp;&emsp;</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Predicate.Eval evaluate(double[] input) {</div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_operator.evaluate(input, m_value, m_fieldIndex);</div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>489&emsp;&emsp;</div>
+<div>490&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      StringBuffer temp = new StringBuffer();</div>
+<div>493&emsp;&emsp;</div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append(m_fieldName + " " + m_operator.shortName());</div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (m_operator != Operator.ISMISSING</div>
+<div>496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        && m_operator != Operator.ISNOTMISSING) {</div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append(" " + ((m_isNominal) ? m_nominalValue : "" + m_value));</div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>499&emsp;&emsp;</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return temp.toString();</div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>503&emsp;&emsp;</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Class representing the CompoundPredicate</div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;  static class CompoundPredicate extends Predicate {</div>
+<div>508&emsp;&emsp;</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For serialization</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -3332091529764559077L;</div>
+<div>513&emsp;&emsp;</div>
+<div>514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    enum BooleanOperator {</div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      OR("or") {</div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predicate.Eval evaluate(ArrayList&#60;Predicate> constituents,</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          double[] input) {</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Predicate.Eval currentStatus = Predicate.Eval.FALSE;</div>
+<div>520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          for (Predicate p : constituents) {</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Predicate.Eval temp = p.evaluate(input);</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (temp == Predicate.Eval.TRUE) {</div>
+<div>523&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              currentStatus = temp;</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              break;</div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } else if (temp == Predicate.Eval.UNKNOWN) {</div>
+<div>526&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              currentStatus = temp;</div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>528&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>529&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return currentStatus;</div>
+<div>530&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>531&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      },</div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      AND("and") {</div>
+<div>533&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>534&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predicate.Eval evaluate(ArrayList&#60;Predicate> constituents,</div>
+<div>535&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          double[] input) {</div>
+<div>536&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Predicate.Eval currentStatus = Predicate.Eval.TRUE;</div>
+<div>537&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          for (Predicate p : constituents) {</div>
+<div>538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Predicate.Eval temp = p.evaluate(input);</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (temp == Predicate.Eval.FALSE) {</div>
+<div>540&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              currentStatus = temp;</div>
+<div>541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              break;</div>
+<div>542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } else if (temp == Predicate.Eval.UNKNOWN) {</div>
+<div>543&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              currentStatus = temp;</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>545&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>546&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return currentStatus;</div>
+<div>547&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>548&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      },</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      XOR("xor") {</div>
+<div>550&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predicate.Eval evaluate(ArrayList&#60;Predicate> constituents,</div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          double[] input) {</div>
+<div>553&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Predicate.Eval currentStatus = constituents.get(0).evaluate(input);</div>
+<div>554&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (currentStatus != Predicate.Eval.UNKNOWN) {</div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            for (int i = 1; i &#60; constituents.size(); i++) {</div>
+<div>556&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              Predicate.Eval temp = constituents.get(i).evaluate(input);</div>
+<div>557&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              if (temp == Predicate.Eval.UNKNOWN) {</div>
+<div>558&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                currentStatus = temp;</div>
+<div>559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                break;</div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              } else {</div>
+<div>561&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if (currentStatus != temp) {</div>
+<div>562&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  currentStatus = Predicate.Eval.TRUE;</div>
+<div>563&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                } else {</div>
+<div>564&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  currentStatus = Predicate.Eval.FALSE;</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>566&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              }</div>
+<div>567&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>569&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return currentStatus;</div>
+<div>570&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>571&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      },</div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      SURROGATE("surrogate") {</div>
+<div>573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>574&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predicate.Eval evaluate(ArrayList&#60;Predicate> constituents,</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          double[] input) {</div>
+<div>576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Predicate.Eval currentStatus = constituents.get(0).evaluate(input);</div>
+<div>577&emsp;&emsp;</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          int i = 1;</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          while (currentStatus == Predicate.Eval.UNKNOWN) {</div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            currentStatus = constituents.get(i).evaluate(input);</div>
+<div>581&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>582&emsp;&emsp;</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // return false if all our surrogates evaluate to unknown.</div>
+<div>584&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (currentStatus == Predicate.Eval.UNKNOWN) {</div>
+<div>585&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            currentStatus = Predicate.Eval.FALSE;</div>
+<div>586&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>587&emsp;&emsp;</div>
+<div>588&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return currentStatus;</div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>590&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      };</div>
+<div>591&emsp;&emsp;</div>
+<div>592&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      abstract Predicate.Eval evaluate(ArrayList&#60;Predicate> constituents,</div>
+<div>593&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double[] input);</div>
+<div>594&emsp;&emsp;</div>
+<div>595&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      private final String m_stringVal;</div>
+<div>596&emsp;&emsp;</div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      BooleanOperator(String name) {</div>
+<div>598&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_stringVal = name;</div>
+<div>599&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>600&emsp;&emsp;</div>
+<div>601&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      @Override</div>
+<div>602&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      public String toString() {</div>
+<div>603&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return m_stringVal;</div>
+<div>604&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>606&emsp;&emsp;</div>
+<div>607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the constituent Predicates */</div>
+<div>608&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ArrayList&#60;Predicate> m_components = new ArrayList&#60;Predicate>();</div>
+<div>609&emsp;&emsp;</div>
+<div>610&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the boolean operator */</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    BooleanOperator m_booleanOperator;</div>
+<div>612&emsp;&emsp;</div>
+<div>613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public CompoundPredicate(Element compoundP, MiningSchema miningSchema) throws Exception {</div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Instances totalStructure = miningSchema.getFieldsAsInstances();</div>
+<div>615&emsp;&emsp;</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String booleanOpp = compoundP.getAttribute("booleanOperator");</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (BooleanOperator b : BooleanOperator.values()) {</div>
+<div>618&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (b.toString().equals(booleanOpp)) {</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_booleanOperator = b;</div>
+<div>620&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>621&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>622&emsp;&emsp;</div>
+<div>623&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // now get all the encapsulated operators</div>
+<div>624&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NodeList children = compoundP.getChildNodes();</div>
+<div>625&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; children.getLength(); i++) {</div>
+<div>626&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Node child = children.item(i);</div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (child.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>628&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String tagName = ((Element) child).getTagName();</div>
+<div>629&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (tagName.equals("True")) {</div>
+<div>630&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_components.add(new True());</div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else if (tagName.equals("False")) {</div>
+<div>632&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_components.add(new False());</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else if (tagName.equals("SimplePredicate")) {</div>
+<div>634&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_components</div>
+<div>635&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              .add(new SimplePredicate((Element) child, miningSchema));</div>
+<div>636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else if (tagName.equals("CompoundPredicate")) {</div>
+<div>637&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_components.add(new CompoundPredicate((Element) child,</div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              miningSchema));</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>640&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_components.add(new SimpleSetPredicate((Element) child,</div>
+<div>641&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              miningSchema));</div>
+<div>642&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>644&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>645&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>646&emsp;&emsp;</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Predicate.Eval evaluate(double[] input) {</div>
+<div>649&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_booleanOperator.evaluate(m_components, input);</div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>651&emsp;&emsp;</div>
+<div>652&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>653&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>654&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return toString(0, false);</div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>656&emsp;&emsp;</div>
+<div>657&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString(int level, boolean cr) {</div>
+<div>659&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      StringBuffer text = new StringBuffer();</div>
+<div>660&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int j = 0; j &#60; level; j++) {</div>
+<div>661&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        text.append("|   ");</div>
+<div>662&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>663&emsp;&emsp;</div>
+<div>664&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      text.append("Compound [" + m_booleanOperator.toString() + "]");</div>
+<div>665&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (cr) {</div>
+<div>666&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        text.append("\\n");</div>
+<div>667&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>668&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        text.append("\n");</div>
+<div>669&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>670&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; m_components.size(); i++) {</div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        text.append(m_components.get(i).toString(level, cr).replace(":", ""));</div>
+<div>672&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (i != m_components.size() - 1) {</div>
+<div>673&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (cr) {</div>
+<div>674&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            text.append("\\n");</div>
+<div>675&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>676&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            text.append("\n");</div>
+<div>677&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>679&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>680&emsp;&emsp;</div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return text.toString();</div>
+<div>682&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>683&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>684&emsp;&emsp;</div>
+<div>685&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>686&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Class representing the SimpleSetPredicate</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>688&emsp;&emsp;&nbsp;&nbsp;  static class SimpleSetPredicate extends Predicate {</div>
+<div>689&emsp;&emsp;</div>
+<div>690&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>691&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For serialization</div>
+<div>692&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -2711995401345708486L;</div>
+<div>694&emsp;&emsp;</div>
+<div>695&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    enum BooleanOperator {</div>
+<div>696&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      IS_IN("isIn") {</div>
+<div>697&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>698&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predicate.Eval evaluate(double[] input, int fieldIndex, Array set,</div>
+<div>699&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Attribute nominalLookup) {</div>
+<div>700&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (set.getType() == Array.ArrayType.STRING) {</div>
+<div>701&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            String value = "";</div>
+<div>702&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (!Utils.isMissingValue(input[fieldIndex])) {</div>
+<div>703&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              value = nominalLookup.value((int) input[fieldIndex]);</div>
+<div>704&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>705&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return Predicate.booleanToEval(</div>
+<div>706&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              Utils.isMissingValue(input[fieldIndex]), set.contains(value));</div>
+<div>707&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else if (set.getType() == Array.ArrayType.NUM</div>
+<div>708&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            || set.getType() == Array.ArrayType.REAL) {</div>
+<div>709&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return Predicate.booleanToEval(</div>
+<div>710&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              Utils.isMissingValue(input[fieldIndex]),</div>
+<div>711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              set.contains(input[fieldIndex]));</div>
+<div>712&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return Predicate.booleanToEval(</div>
+<div>714&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Utils.isMissingValue(input[fieldIndex]),</div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            set.contains((int) input[fieldIndex]));</div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>717&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      },</div>
+<div>718&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      IS_NOT_IN("isNotIn") {</div>
+<div>719&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        @Override</div>
+<div>720&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predicate.Eval evaluate(double[] input, int fieldIndex, Array set,</div>
+<div>721&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Attribute nominalLookup) {</div>
+<div>722&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Predicate.Eval result = IS_IN.evaluate(input, fieldIndex, set,</div>
+<div>723&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            nominalLookup);</div>
+<div>724&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (result == Predicate.Eval.FALSE) {</div>
+<div>725&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            result = Predicate.Eval.TRUE;</div>
+<div>726&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else if (result == Predicate.Eval.TRUE) {</div>
+<div>727&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            result = Predicate.Eval.FALSE;</div>
+<div>728&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>729&emsp;&emsp;</div>
+<div>730&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return result;</div>
+<div>731&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>732&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      };</div>
+<div>733&emsp;&emsp;</div>
+<div>734&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      abstract Predicate.Eval evaluate(double[] input, int fieldIndex,</div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Array set, Attribute nominalLookup);</div>
+<div>736&emsp;&emsp;</div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      private final String m_stringVal;</div>
+<div>738&emsp;&emsp;</div>
+<div>739&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      BooleanOperator(String name) {</div>
+<div>740&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_stringVal = name;</div>
+<div>741&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>742&emsp;&emsp;</div>
+<div>743&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      @Override</div>
+<div>744&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      public String toString() {</div>
+<div>745&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return m_stringVal;</div>
+<div>746&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>747&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>748&emsp;&emsp;</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the field to reference */</div>
+<div>750&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int m_fieldIndex = -1;</div>
+<div>751&emsp;&emsp;</div>
+<div>752&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the name of the field */</div>
+<div>753&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String m_fieldName;</div>
+<div>754&emsp;&emsp;</div>
+<div>755&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** is the referenced field nominal? */</div>
+<div>756&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean m_isNominal = false;</div>
+<div>757&emsp;&emsp;</div>
+<div>758&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the attribute to lookup nominal values from */</div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Attribute m_nominalLookup;</div>
+<div>760&emsp;&emsp;</div>
+<div>761&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the boolean operator */</div>
+<div>762&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    BooleanOperator m_operator = BooleanOperator.IS_IN;</div>
+<div>763&emsp;&emsp;</div>
+<div>764&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the array holding the set of values */</div>
+<div>765&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Array m_set;</div>
+<div>766&emsp;&emsp;</div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public SimpleSetPredicate(Element setP, MiningSchema miningSchema) throws Exception {</div>
+<div>768&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances totalStructure = miningSchema.getFieldsAsInstances();</div>
+<div>769&emsp;&emsp;</div>
+<div>770&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the field name and set up the index</div>
+<div>771&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String fieldS = setP.getAttribute("field");</div>
+<div>772&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute att = totalStructure.attribute(fieldS);</div>
+<div>773&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (att == null) {</div>
+<div>774&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[SimplePredicate] unable to find field " + fieldS</div>
+<div>775&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + " in the incoming instance structure!");</div>
+<div>776&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>777&emsp;&emsp;</div>
+<div>778&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // find the index</div>
+<div>779&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int index = -1;</div>
+<div>780&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; totalStructure.numAttributes(); i++) {</div>
+<div>781&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (totalStructure.attribute(i).name().equals(fieldS)) {</div>
+<div>782&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          index = i;</div>
+<div>783&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_fieldName = totalStructure.attribute(i).name();</div>
+<div>784&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>785&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>786&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>787&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_fieldIndex = index;</div>
+<div>788&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (att.isNominal()) {</div>
+<div>789&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_isNominal = true;</div>
+<div>790&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_nominalLookup = att;</div>
+<div>791&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>792&emsp;&emsp;</div>
+<div>793&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // need to scan the children looking for an array type</div>
+<div>794&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NodeList children = setP.getChildNodes();</div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; children.getLength(); i++) {</div>
+<div>796&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Node child = children.item(i);</div>
+<div>797&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (child.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>798&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (Array.isArray((Element) child)) {</div>
+<div>799&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // found the array</div>
+<div>800&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_set = Array.create((Element) child);</div>
+<div>801&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>803&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>804&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>805&emsp;&emsp;</div>
+<div>806&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (m_set == null) {</div>
+<div>807&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[SimpleSetPredictate] couldn't find an "</div>
+<div>808&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "array containing the set values!");</div>
+<div>809&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>810&emsp;&emsp;</div>
+<div>811&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // check array type against field type</div>
+<div>812&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (m_set.getType() == Array.ArrayType.STRING && !m_isNominal) {</div>
+<div>813&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[SimpleSetPredicate] referenced field "</div>
+<div>814&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + totalStructure.attribute(m_fieldIndex).name()</div>
+<div>815&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + " is numeric but array type is string!");</div>
+<div>816&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else if (m_set.getType() != Array.ArrayType.STRING && m_isNominal) {</div>
+<div>817&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[SimpleSetPredicate] referenced field "</div>
+<div>818&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + totalStructure.attribute(m_fieldIndex).name()</div>
+<div>819&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + " is nominal but array type is numeric!");</div>
+<div>820&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>821&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>822&emsp;&emsp;</div>
+<div>823&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>824&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Predicate.Eval evaluate(double[] input) {</div>
+<div>825&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_operator.evaluate(input, m_fieldIndex, m_set, m_nominalLookup);</div>
+<div>826&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>827&emsp;&emsp;</div>
+<div>828&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>830&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      StringBuffer temp = new StringBuffer();</div>
+<div>831&emsp;&emsp;</div>
+<div>832&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append(m_fieldName + " " + m_operator.toString() + " ");</div>
+<div>833&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append(m_set.toString());</div>
+<div>834&emsp;&emsp;</div>
+<div>835&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return temp.toString();</div>
+<div>836&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>837&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>838&emsp;&emsp;</div>
+<div>839&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>840&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Class for handling a Node in the tree</div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>842&emsp;&emsp;&nbsp;&nbsp;  class TreeNode implements Serializable {</div>
+<div>843&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // TODO: perhaps implement a class called Statistics that contains</div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Partitions?</div>
+<div>845&emsp;&emsp;</div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>847&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For serialization</div>
+<div>848&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>849&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = 3011062274167063699L;</div>
+<div>850&emsp;&emsp;</div>
+<div>851&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** ID for this node */</div>
+<div>852&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private String m_ID = "" + this.hashCode();</div>
+<div>853&emsp;&emsp;</div>
+<div>854&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The score as a string */</div>
+<div>855&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private String m_scoreString;</div>
+<div>856&emsp;&emsp;</div>
+<div>857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The index of this predicted value (if class is nominal) */</div>
+<div>858&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private int m_scoreIndex = -1;</div>
+<div>859&emsp;&emsp;</div>
+<div>860&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The score as a number (if target is numeric) */</div>
+<div>861&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private double m_scoreNumeric = Utils.missingValue();</div>
+<div>862&emsp;&emsp;</div>
+<div>863&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The record count at this node (if defined) */</div>
+<div>864&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private double m_recordCount = Utils.missingValue();</div>
+<div>865&emsp;&emsp;</div>
+<div>866&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The ID of the default child (if applicable) */</div>
+<div>867&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private String m_defaultChildID;</div>
+<div>868&emsp;&emsp;</div>
+<div>869&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** Holds the node of the default child (if defined) */</div>
+<div>870&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private TreeNode m_defaultChild;</div>
+<div>871&emsp;&emsp;</div>
+<div>872&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The distribution for labels (classification) */</div>
+<div>873&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final ArrayList&#60;ScoreDistribution> m_scoreDistributions = new ArrayList&#60;ScoreDistribution>();</div>
+<div>874&emsp;&emsp;</div>
+<div>875&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The predicate for this node */</div>
+<div>876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final Predicate m_predicate;</div>
+<div>877&emsp;&emsp;</div>
+<div>878&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The children of this node */</div>
+<div>879&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final ArrayList&#60;TreeNode> m_childNodes = new ArrayList&#60;TreeNode>();</div>
+<div>880&emsp;&emsp;</div>
+<div>881&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected TreeNode(Element nodeE, MiningSchema miningSchema) throws Exception {</div>
+<div>882&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute classAtt = miningSchema.getFieldsAsInstances().classAttribute();</div>
+<div>883&emsp;&emsp;</div>
+<div>884&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the ID</div>
+<div>885&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String id = nodeE.getAttribute("id");</div>
+<div>886&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (id != null && id.length() > 0) {</div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_ID = id;</div>
+<div>888&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>889&emsp;&emsp;</div>
+<div>890&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the score for this node</div>
+<div>891&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String scoreS = nodeE.getAttribute("score");</div>
+<div>892&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (scoreS != null && scoreS.length() > 0) {</div>
+<div>893&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_scoreString = scoreS;</div>
+<div>894&emsp;&emsp;</div>
+<div>895&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // try to parse as a number in case we</div>
+<div>896&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // are part of a regression tree</div>
+<div>897&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (classAtt.isNumeric()) {</div>
+<div>898&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          try {</div>
+<div>899&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_scoreNumeric = Double.parseDouble(scoreS);</div>
+<div>900&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } catch (NumberFormatException ex) {</div>
+<div>901&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new Exception(</div>
+<div>902&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              "[TreeNode] class is numeric but unable to parse score "</div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                + m_scoreString + " as a number!");</div>
+<div>904&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>905&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>906&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // store the index of this class value</div>
+<div>907&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_scoreIndex = classAtt.indexOfValue(m_scoreString);</div>
+<div>908&emsp;&emsp;</div>
+<div>909&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (m_scoreIndex &#60; 0) {</div>
+<div>910&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new Exception(</div>
+<div>911&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              "[TreeNode] can't find match for predicted value "</div>
+<div>912&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                + m_scoreString + " in class attribute!");</div>
+<div>913&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>914&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>915&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>916&emsp;&emsp;</div>
+<div>917&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the record count if defined</div>
+<div>918&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String recordC = nodeE.getAttribute("recordCount");</div>
+<div>919&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (recordC != null && recordC.length() > 0) {</div>
+<div>920&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_recordCount = Double.parseDouble(recordC);</div>
+<div>921&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>922&emsp;&emsp;</div>
+<div>923&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the default child (if applicable)</div>
+<div>924&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String defaultC = nodeE.getAttribute("defaultChild");</div>
+<div>925&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (defaultC != null && defaultC.length() > 0) {</div>
+<div>926&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_defaultChildID = defaultC;</div>
+<div>927&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>928&emsp;&emsp;</div>
+<div>929&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // TODO: Embedded model (once we support model composition)</div>
+<div>930&emsp;&emsp;</div>
+<div>931&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Now get the ScoreDistributions (if any and mining function</div>
+<div>932&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // is classification) at this level</div>
+<div>933&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (m_functionType == MiningFunction.CLASSIFICATION) {</div>
+<div>934&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getScoreDistributions(nodeE, miningSchema);</div>
+<div>935&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>936&emsp;&emsp;</div>
+<div>937&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Now get the Predicate</div>
+<div>938&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_predicate = Predicate.getPredicate(nodeE, miningSchema);</div>
+<div>939&emsp;&emsp;</div>
+<div>940&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Now get the child Node(s)</div>
+<div>941&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getChildNodes(nodeE, miningSchema);</div>
+<div>942&emsp;&emsp;</div>
+<div>943&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // If we have a default child specified, find it now</div>
+<div>944&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (m_defaultChildID != null) {</div>
+<div>945&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (TreeNode t : m_childNodes) {</div>
+<div>946&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (t.getID().equals(m_defaultChildID)) {</div>
+<div>947&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_defaultChild = t;</div>
+<div>948&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>949&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>950&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>951&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>952&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>953&emsp;&emsp;</div>
+<div>954&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void getChildNodes(Element nodeE, MiningSchema miningSchema)</div>
+<div>955&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div>956&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NodeList children = nodeE.getChildNodes();</div>
+<div>957&emsp;&emsp;</div>
+<div>958&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; children.getLength(); i++) {</div>
+<div>959&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Node child = children.item(i);</div>
+<div>960&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (child.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>961&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String tagName = ((Element) child).getTagName();</div>
+<div>962&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (tagName.equals("Node")) {</div>
+<div>963&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            TreeNode tempN = new TreeNode((Element) child, miningSchema);</div>
+<div>964&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_childNodes.add(tempN);</div>
+<div>965&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>966&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>967&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>968&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>969&emsp;&emsp;</div>
+<div>970&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void getScoreDistributions(Element nodeE, MiningSchema miningSchema)</div>
+<div>971&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div>972&emsp;&emsp;</div>
+<div>973&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NodeList scoreChildren = nodeE.getChildNodes();</div>
+<div>974&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; scoreChildren.getLength(); i++) {</div>
+<div>975&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Node child = scoreChildren.item(i);</div>
+<div>976&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (child.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>977&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String tagName = ((Element) child).getTagName();</div>
+<div>978&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (tagName.equals("ScoreDistribution")) {</div>
+<div>979&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ScoreDistribution newDist = new ScoreDistribution((Element) child,</div>
+<div>980&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              miningSchema, m_recordCount);</div>
+<div>981&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_scoreDistributions.add(newDist);</div>
+<div>982&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>983&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>984&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>985&emsp;&emsp;</div>
+<div>986&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // backfit the confidence values</div>
+<div>987&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (Utils.isMissingValue(m_recordCount)) {</div>
+<div>988&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double baseCount = 0;</div>
+<div>989&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (ScoreDistribution s : m_scoreDistributions) {</div>
+<div>990&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          baseCount += s.getRecordCount();</div>
+<div>991&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>992&emsp;&emsp;</div>
+<div>993&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (ScoreDistribution s : m_scoreDistributions) {</div>
+<div>994&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          s.deriveConfidenceValue(baseCount);</div>
+<div>995&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>996&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>997&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>998&emsp;&emsp;</div>
+<div>999&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1000&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get the score value as a string.</div>
+<div>1001&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1002&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the score value as a String.</div>
+<div>1003&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1004&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String getScore() {</div>
+<div>1005&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_scoreString;</div>
+<div>1006&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1007&emsp;&emsp;</div>
+<div>1008&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1009&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get the score value as a number (regression trees only).</div>
+<div>1010&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1011&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the score as a number</div>
+<div>1012&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1013&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double getScoreNumeric() {</div>
+<div>1014&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_scoreNumeric;</div>
+<div>1015&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1016&emsp;&emsp;</div>
+<div>1017&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1018&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get the ID of this node.</div>
+<div>1019&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1020&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the ID of this node.</div>
+<div>1021&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1022&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String getID() {</div>
+<div>1023&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_ID;</div>
+<div>1024&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1025&emsp;&emsp;</div>
+<div>1026&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1027&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get the Predicate at this node.</div>
+<div>1028&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1029&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the predicate at this node.</div>
+<div>1030&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1031&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Predicate getPredicate() {</div>
+<div>1032&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_predicate;</div>
+<div>1033&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1034&emsp;&emsp;</div>
+<div>1035&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1036&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get the record count at this node.</div>
+<div>1037&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1038&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the record count at this node.</div>
+<div>1039&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1040&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double getRecordCount() {</div>
+<div>1041&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_recordCount;</div>
+<div>1042&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1043&emsp;&emsp;</div>
+<div>1044&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void dumpGraph(StringBuffer text) throws Exception {</div>
+<div>1045&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      text.append("N" + m_ID + " ");</div>
+<div style="background-color:limegreen;">1046&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_scoreString != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1047&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        text.append("[label=\"score=" + m_scoreString);</div>
+<div>1048&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1049&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1050&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_scoreDistributions.size() > 0 && m_childNodes.size() == 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES] & [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1051&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        text.append("\\n");</div>
+<div style="background-color:limegreen;">1052&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for (ScoreDistribution s : m_scoreDistributions) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1053&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          text.append(s + "\\n");</div>
+<div>1054&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1055&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1056&emsp;&emsp;</div>
+<div>1057&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      text.append("\"");</div>
+<div>1058&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1059&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_childNodes.size() == 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1060&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        text.append(" shape=box style=filled");</div>
+<div>1061&emsp;&emsp;</div>
+<div>1062&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1063&emsp;&emsp;</div>
+<div>1064&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      text.append("]\n");</div>
+<div>1065&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1066&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (TreeNode c : m_childNodes) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1067&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        text.append("N" + m_ID + "->" + "N" + c.getID());</div>
+<div>1068&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        text.append(" [label=\"" + c.getPredicate().toString(0, true));</div>
+<div>1069&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        text.append("\"]\n");</div>
+<div>1070&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        c.dumpGraph(text);</div>
+<div>1071&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1072&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1073&emsp;&emsp;</div>
+<div>1074&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>1075&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>1076&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      StringBuffer text = new StringBuffer();</div>
+<div>1077&emsp;&emsp;</div>
+<div>1078&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // print out the root</div>
+<div>1079&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      dumpTree(0, text);</div>
+<div>1080&emsp;&emsp;</div>
+<div>1081&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return text.toString();</div>
+<div>1082&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1083&emsp;&emsp;</div>
+<div>1084&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void dumpTree(int level, StringBuffer text) {</div>
+<div style="background-color:limegreen;">1085&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_childNodes.size() > 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1086&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1087&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for (int i = 0; i &#60; m_childNodes.size(); i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1088&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          text.append("\n");</div>
+<div>1089&emsp;&emsp;</div>
+<div>1090&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          /*</div>
+<div>1091&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;           * for (int j = 0; j &#60; level; j++) { text.append("|   "); }</div>
+<div>1092&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;           */</div>
+<div>1093&emsp;&emsp;</div>
+<div>1094&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // output the predicate for this child node</div>
+<div>1095&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          TreeNode child = m_childNodes.get(i);</div>
+<div>1096&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          text.append(child.getPredicate().toString(level, false));</div>
+<div>1097&emsp;&emsp;</div>
+<div>1098&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // process recursively</div>
+<div>1099&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          child.dumpTree(level + 1, text);</div>
+<div>1100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // leaf</div>
+<div>1103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        text.append(": ");</div>
+<div style="background-color:limegreen;">1104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!Utils.isMissingValue(m_scoreNumeric)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          text.append(m_scoreNumeric);</div>
+<div>1106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          text.append(m_scoreString + " ");</div>
+<div style="background-color:limegreen;">1108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (m_scoreDistributions.size() > 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            text.append("[");</div>
+<div style="background-color:limegreen;">1110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            for (ScoreDistribution s : m_scoreDistributions) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              text.append(s);</div>
+<div>1112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            text.append("]");</div>
+<div>1114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>1115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            text.append(m_scoreString);</div>
+<div>1116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1120&emsp;&emsp;</div>
+<div>1121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Score an incoming instance. Invokes a missing value handling strategy.</div>
+<div>1123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param instance a vector of incoming attribute and derived field values.</div>
+<div>1125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param classAtt the class attribute</div>
+<div>1126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return a predicted probability distribution.</div>
+<div>1127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong.</div>
+<div>1128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double[] score(double[] instance, Attribute classAtt)</div>
+<div>1130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div>1131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] preds = null;</div>
+<div>1132&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (classAtt.isNumeric()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        preds = new double[1];</div>
+<div>1135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        preds = new double[classAtt.numValues()];</div>
+<div>1137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1138&emsp;&emsp;</div>
+<div>1139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // leaf?</div>
+<div style="background-color:limegreen;">1140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_childNodes.size() == 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        doLeaf(classAtt, preds);</div>
+<div>1142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // process the children</div>
+<div style="background-color:limegreen;">1144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        switch (TreeModel.this.m_missingValueStrategy) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        case NONE:</div>
+<div>1146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds = missingValueStrategyNone(instance, classAtt);</div>
+<div>1147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>1148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        case LASTPREDICTION:</div>
+<div>1149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds = missingValueStrategyLastPrediction(instance, classAtt);</div>
+<div>1150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>1151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        case DEFAULTCHILD:</div>
+<div>1152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds = missingValueStrategyDefaultChild(instance, classAtt);</div>
+<div>1153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>1154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        default:</div>
+<div>1155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw new Exception("[TreeModel] not implemented!");</div>
+<div>1156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1158&emsp;&emsp;</div>
+<div>1159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return preds;</div>
+<div>1160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1161&emsp;&emsp;</div>
+<div>1162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute the predictions for a leaf.</div>
+<div>1164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param classAtt the class attribute</div>
+<div>1166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param preds an array to hold the predicted probabilities.</div>
+<div>1167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong.</div>
+<div>1168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void doLeaf(Attribute classAtt, double[] preds) throws Exception {</div>
+<div style="background-color:limegreen;">1170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (classAtt.isNumeric()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        preds[0] = m_scoreNumeric;</div>
+<div>1172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div style="background-color:limegreen;">1173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_scoreDistributions.size() == 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds[m_scoreIndex] = 1.0;</div>
+<div>1175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // collect confidences from the score distributions</div>
+<div style="background-color:limegreen;">1177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          for (ScoreDistribution s : m_scoreDistributions) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            preds[s.getClassLabelIndex()] = s.getConfidence();</div>
+<div>1179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1183&emsp;&emsp;</div>
+<div>1184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Evaluate on the basis of the no true child strategy.</div>
+<div>1186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param classAtt the class attribute.</div>
+<div>1188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param preds an array to hold the predicted probabilities.</div>
+<div>1189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong.</div>
+<div>1190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void doNoTrueChild(Attribute classAtt, double[] preds)</div>
+<div>1192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div style="background-color:limegreen;">1193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (TreeModel.this.m_noTrueChildStrategy == NoTrueChildStrategy.RETURNNULLPREDICTION) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for (int i = 0; i &#60; classAtt.numValues(); i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds[i] = Utils.missingValue();</div>
+<div>1196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // return the predictions at this node</div>
+<div>1199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        doLeaf(classAtt, preds);</div>
+<div>1200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1202&emsp;&emsp;</div>
+<div>1203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute predictions and optionally invoke the weighted confidence missing</div>
+<div>1205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * value handling strategy.</div>
+<div>1206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param instance the incoming vector of attribute and derived field</div>
+<div>1208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          values.</div>
+<div>1209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param classAtt the class attribute.</div>
+<div>1210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the predicted probability distribution.</div>
+<div>1211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong.</div>
+<div>1212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double[] missingValueStrategyWeightedConfidence(</div>
+<div>1214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] instance, Attribute classAtt) throws Exception {</div>
+<div>1215&emsp;&emsp;</div>
+<div>1216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (classAtt.isNumeric()) {</div>
+<div>1217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception(</div>
+<div>1218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          "[TreeNode] missing value strategy weighted confidence, "</div>
+<div>1219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + "but class is numeric!");</div>
+<div>1220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1221&emsp;&emsp;</div>
+<div>1222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] preds = null;</div>
+<div>1223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      TreeNode trueNode = null;</div>
+<div>1224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      boolean strategyInvoked = false;</div>
+<div>1225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int nodeCount = 0;</div>
+<div>1226&emsp;&emsp;</div>
+<div>1227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // look at the evaluation of the child predicates</div>
+<div>1228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (TreeNode c : m_childNodes) {</div>
+<div>1229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (c.getPredicate().evaluate(instance) == Predicate.Eval.TRUE) {</div>
+<div>1230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // note the first child to evaluate to true</div>
+<div>1231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (trueNode == null) {</div>
+<div>1232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            trueNode = c;</div>
+<div>1233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          nodeCount++;</div>
+<div>1235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else if (c.getPredicate().evaluate(instance) == Predicate.Eval.UNKNOWN) {</div>
+<div>1236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          strategyInvoked = true;</div>
+<div>1237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          nodeCount++;</div>
+<div>1238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1240&emsp;&emsp;</div>
+<div>1241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (strategyInvoked) {</div>
+<div>1242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // we expect to combine nodeCount distributions</div>
+<div>1243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double[][] dists = new double[nodeCount][];</div>
+<div>1244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double[] weights = new double[nodeCount];</div>
+<div>1245&emsp;&emsp;</div>
+<div>1246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // collect the distributions and weights</div>
+<div>1247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int count = 0;</div>
+<div>1248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (TreeNode c : m_childNodes) {</div>
+<div>1249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (c.getPredicate().evaluate(instance) == Predicate.Eval.TRUE</div>
+<div>1250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            || c.getPredicate().evaluate(instance) == Predicate.Eval.UNKNOWN) {</div>
+<div>1251&emsp;&emsp;</div>
+<div>1252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            weights[count] = c.getRecordCount();</div>
+<div>1253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (Utils.isMissingValue(weights[count])) {</div>
+<div>1254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              throw new Exception(</div>
+<div>1255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                "[TreeNode] weighted confidence missing value "</div>
+<div>1256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  + "strategy invoked, but no record count defined for node "</div>
+<div>1257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  + c.getID());</div>
+<div>1258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            dists[count++] = c.score(instance, classAtt);</div>
+<div>1260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1262&emsp;&emsp;</div>
+<div>1263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // do the combination</div>
+<div>1264&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        preds = new double[classAtt.numValues()];</div>
+<div>1265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (int i = 0; i &#60; classAtt.numValues(); i++) {</div>
+<div>1266&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          for (int j = 0; j &#60; nodeCount; j++) {</div>
+<div>1267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            preds[i] += ((weights[j] / m_recordCount) * dists[j][i]);</div>
+<div>1268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (trueNode != null) {</div>
+<div>1272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds = trueNode.score(instance, classAtt);</div>
+<div>1273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          doNoTrueChild(classAtt, preds);</div>
+<div>1275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1277&emsp;&emsp;</div>
+<div>1278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return preds;</div>
+<div>1279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1280&emsp;&emsp;</div>
+<div>1281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double[] freqCountsForAggNodesStrategy(double[] instance,</div>
+<div>1282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute classAtt) throws Exception {</div>
+<div>1283&emsp;&emsp;</div>
+<div>1284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] counts = new double[classAtt.numValues()];</div>
+<div>1285&emsp;&emsp;</div>
+<div>1286&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (m_childNodes.size() > 0) {</div>
+<div>1287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // collect the counts</div>
+<div>1288&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (TreeNode c : m_childNodes) {</div>
+<div>1289&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (c.getPredicate().evaluate(instance) == Predicate.Eval.TRUE</div>
+<div>1290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            || c.getPredicate().evaluate(instance) == Predicate.Eval.UNKNOWN) {</div>
+<div>1291&emsp;&emsp;</div>
+<div>1292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            double[] temp = c.freqCountsForAggNodesStrategy(instance, classAtt);</div>
+<div>1293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            for (int i = 0; i &#60; classAtt.numValues(); i++) {</div>
+<div>1294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              counts[i] += temp[i];</div>
+<div>1295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // process the score distributions</div>
+<div>1300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (m_scoreDistributions.size() == 0) {</div>
+<div>1301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw new Exception(</div>
+<div>1302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            "[TreeModel] missing value strategy aggregate nodes:"</div>
+<div>1303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              + " no score distributions at leaf " + m_ID);</div>
+<div>1304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (ScoreDistribution s : m_scoreDistributions) {</div>
+<div>1306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          counts[s.getClassLabelIndex()] = s.getRecordCount();</div>
+<div>1307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1308&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1309&emsp;&emsp;</div>
+<div>1310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return counts;</div>
+<div>1311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1312&emsp;&emsp;</div>
+<div>1313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute predictions and optionally invoke the aggregate nodes missing</div>
+<div>1315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * value handling strategy.</div>
+<div>1316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param instance the incoming vector of attribute and derived field</div>
+<div>1318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          values.</div>
+<div>1319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param classAtt the class attribute.</div>
+<div>1320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the predicted probability distribution.</div>
+<div>1321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong.</div>
+<div>1322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double[] missingValueStrategyAggregateNodes(double[] instance,</div>
+<div>1324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute classAtt) throws Exception {</div>
+<div>1325&emsp;&emsp;</div>
+<div>1326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (classAtt.isNumeric()) {</div>
+<div>1327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception(</div>
+<div>1328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          "[TreeNode] missing value strategy aggregate nodes, "</div>
+<div>1329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + "but class is numeric!");</div>
+<div>1330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1331&emsp;&emsp;</div>
+<div>1332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] preds = null;</div>
+<div>1333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      TreeNode trueNode = null;</div>
+<div>1334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      boolean strategyInvoked = false;</div>
+<div>1335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // look at the evaluation of the child predicates</div>
+<div>1336&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (TreeNode c : m_childNodes) {</div>
+<div>1337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (c.getPredicate().evaluate(instance) == Predicate.Eval.TRUE) {</div>
+<div>1338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // note the first child to evaluate to true</div>
+<div>1339&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (trueNode == null) {</div>
+<div>1340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            trueNode = c;</div>
+<div>1341&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else if (c.getPredicate().evaluate(instance) == Predicate.Eval.UNKNOWN) {</div>
+<div>1343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          strategyInvoked = true;</div>
+<div>1344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1346&emsp;&emsp;</div>
+<div>1347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (strategyInvoked) {</div>
+<div>1348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double[] aggregatedCounts = freqCountsForAggNodesStrategy(instance,</div>
+<div>1349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          classAtt);</div>
+<div>1350&emsp;&emsp;</div>
+<div>1351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // normalize</div>
+<div>1352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Utils.normalize(aggregatedCounts);</div>
+<div>1353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        preds = aggregatedCounts;</div>
+<div>1354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1355&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (trueNode != null) {</div>
+<div>1356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds = trueNode.score(instance, classAtt);</div>
+<div>1357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          doNoTrueChild(classAtt, preds);</div>
+<div>1359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1361&emsp;&emsp;</div>
+<div>1362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return preds;</div>
+<div>1363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1364&emsp;&emsp;</div>
+<div>1365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute predictions and optionally invoke the default child missing value</div>
+<div>1367&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * handling strategy.</div>
+<div>1368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param instance the incoming vector of attribute and derived field</div>
+<div>1370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          values.</div>
+<div>1371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param classAtt the class attribute.</div>
+<div>1372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the predicted probability distribution.</div>
+<div>1373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong.</div>
+<div>1374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double[] missingValueStrategyDefaultChild(double[] instance,</div>
+<div>1376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute classAtt) throws Exception {</div>
+<div>1377&emsp;&emsp;</div>
+<div>1378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] preds = null;</div>
+<div>1379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      boolean strategyInvoked = false;</div>
+<div>1380&emsp;&emsp;</div>
+<div>1381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // look for a child whose predicate evaluates to TRUE</div>
+<div style="background-color:limegreen;">1382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (TreeNode c : m_childNodes) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (c.getPredicate().evaluate(instance) == Predicate.Eval.TRUE) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds = c.score(instance, classAtt);</div>
+<div>1385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div style="background-color:limegreen;">1386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        } else if (c.getPredicate().evaluate(instance) == Predicate.Eval.UNKNOWN) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          strategyInvoked = true;</div>
+<div>1388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1390&emsp;&emsp;</div>
+<div>1391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // no true child found</div>
+<div style="background-color:limegreen;">1392&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (preds == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!strategyInvoked) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          doNoTrueChild(classAtt, preds);</div>
+<div>1395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // do the strategy</div>
+<div>1397&emsp;&emsp;</div>
+<div>1398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // NOTE: we don't actually implement the missing value penalty since</div>
+<div>1399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // we always return a full probability distribution.</div>
+<div style="background-color:limegreen;">1400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (m_defaultChild != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            preds = m_defaultChild.score(instance, classAtt);</div>
+<div>1402&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>1403&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new Exception(</div>
+<div>1404&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              "[TreeNode] missing value strategy is defaultChild, but "</div>
+<div>1405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                + "no default child has been specified in node " + m_ID);</div>
+<div>1406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1408&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1409&emsp;&emsp;</div>
+<div>1410&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return preds;</div>
+<div>1411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1412&emsp;&emsp;</div>
+<div>1413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute predictions and optionally invoke the last prediction missing</div>
+<div>1415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * value handling strategy.</div>
+<div>1416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param instance the incoming vector of attribute and derived field</div>
+<div>1418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          values.</div>
+<div>1419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param classAtt the class attribute.</div>
+<div>1420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the predicted probability distribution.</div>
+<div>1421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong.</div>
+<div>1422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double[] missingValueStrategyLastPrediction(double[] instance,</div>
+<div>1424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute classAtt) throws Exception {</div>
+<div>1425&emsp;&emsp;</div>
+<div>1426&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] preds = null;</div>
+<div>1427&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      boolean strategyInvoked = false;</div>
+<div>1428&emsp;&emsp;</div>
+<div>1429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // look for a child whose predicate evaluates to TRUE</div>
+<div style="background-color:limegreen;">1430&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (TreeNode c : m_childNodes) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1431&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (c.getPredicate().evaluate(instance) == Predicate.Eval.TRUE) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1432&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds = c.score(instance, classAtt);</div>
+<div>1433&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div style="background-color:limegreen;">1434&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        } else if (c.getPredicate().evaluate(instance) == Predicate.Eval.UNKNOWN) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1435&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          strategyInvoked = true;</div>
+<div>1436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1437&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1438&emsp;&emsp;</div>
+<div>1439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // no true child found</div>
+<div style="background-color:limegreen;">1440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (preds == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        preds = new double[classAtt.numValues()];</div>
+<div style="background-color:limegreen;">1442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!strategyInvoked) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // no true child</div>
+<div>1444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          doNoTrueChild(classAtt, preds);</div>
+<div>1445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // do the strategy</div>
+<div>1447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          doLeaf(classAtt, preds);</div>
+<div>1448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1450&emsp;&emsp;</div>
+<div>1451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return preds;</div>
+<div>1452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1453&emsp;&emsp;</div>
+<div>1454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute predictions and optionally invoke the null prediction missing</div>
+<div>1456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * value handling strategy.</div>
+<div>1457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param instance the incoming vector of attribute and derived field</div>
+<div>1459&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          values.</div>
+<div>1460&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param classAtt the class attribute.</div>
+<div>1461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the predicted probability distribution.</div>
+<div>1462&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong.</div>
+<div>1463&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double[] missingValueStrategyNullPrediction(double[] instance,</div>
+<div>1465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute classAtt) throws Exception {</div>
+<div>1466&emsp;&emsp;</div>
+<div>1467&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] preds = null;</div>
+<div>1468&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      boolean strategyInvoked = false;</div>
+<div>1469&emsp;&emsp;</div>
+<div>1470&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // look for a child whose predicate evaluates to TRUE</div>
+<div>1471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (TreeNode c : m_childNodes) {</div>
+<div>1472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (c.getPredicate().evaluate(instance) == Predicate.Eval.TRUE) {</div>
+<div>1473&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds = c.score(instance, classAtt);</div>
+<div>1474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>1475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else if (c.getPredicate().evaluate(instance) == Predicate.Eval.UNKNOWN) {</div>
+<div>1476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          strategyInvoked = true;</div>
+<div>1477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1478&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1479&emsp;&emsp;</div>
+<div>1480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // no true child found</div>
+<div>1481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (preds == null) {</div>
+<div>1482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        preds = new double[classAtt.numValues()];</div>
+<div>1483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (!strategyInvoked) {</div>
+<div>1484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          doNoTrueChild(classAtt, preds);</div>
+<div>1485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // do the strategy</div>
+<div>1487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          for (int i = 0; i &#60; classAtt.numValues(); i++) {</div>
+<div>1488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            preds[i] = Utils.missingValue();</div>
+<div>1489&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1490&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1492&emsp;&emsp;</div>
+<div>1493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return preds;</div>
+<div>1494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1495&emsp;&emsp;</div>
+<div>1496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute predictions and optionally invoke the "none" missing value</div>
+<div>1498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * handling strategy (invokes no true child).</div>
+<div>1499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param instance the incoming vector of attribute and derived field</div>
+<div>1501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          values.</div>
+<div>1502&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param classAtt the class attribute.</div>
+<div>1503&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the predicted probability distribution.</div>
+<div>1504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong.</div>
+<div>1505&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1506&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double[] missingValueStrategyNone(double[] instance,</div>
+<div>1507&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute classAtt) throws Exception {</div>
+<div>1508&emsp;&emsp;</div>
+<div>1509&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] preds = null;</div>
+<div>1510&emsp;&emsp;</div>
+<div>1511&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // look for a child whose predicate evaluates to TRUE</div>
+<div style="background-color:limegreen;">1512&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (TreeNode c : m_childNodes) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1513&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (c.getPredicate().evaluate(instance) == Predicate.Eval.TRUE) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds = c.score(instance, classAtt);</div>
+<div>1515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>1516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1518&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (preds == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        preds = new double[classAtt.numValues()];</div>
+<div>1521&emsp;&emsp;</div>
+<div>1522&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // no true child strategy</div>
+<div>1523&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        doNoTrueChild(classAtt, preds);</div>
+<div>1524&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1525&emsp;&emsp;</div>
+<div>1526&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return preds;</div>
+<div>1527&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1528&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1529&emsp;&emsp;</div>
+<div>1530&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1531&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Enumerated type for the mining function</div>
+<div>1532&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1533&emsp;&emsp;&nbsp;&nbsp;  enum MiningFunction {</div>
+<div>1534&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    CLASSIFICATION, REGRESSION;</div>
+<div>1535&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1536&emsp;&emsp;</div>
+<div>1537&emsp;&emsp;&nbsp;&nbsp;  enum MissingValueStrategy {</div>
+<div>1538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    LASTPREDICTION("lastPrediction"), NULLPREDICTION("nullPrediction"), DEFAULTCHILD(</div>
+<div>1539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "defaultChild"), WEIGHTEDCONFIDENCE("weightedConfidence"), AGGREGATENODES(</div>
+<div>1540&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "aggregateNodes"), NONE("none");</div>
+<div>1541&emsp;&emsp;</div>
+<div>1542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final String m_stringVal;</div>
+<div>1543&emsp;&emsp;</div>
+<div>1544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    MissingValueStrategy(String name) {</div>
+<div>1545&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_stringVal = name;</div>
+<div>1546&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1547&emsp;&emsp;</div>
+<div>1548&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>1549&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>1550&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_stringVal;</div>
+<div>1551&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1552&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1553&emsp;&emsp;</div>
+<div>1554&emsp;&emsp;&nbsp;&nbsp;  enum NoTrueChildStrategy {</div>
+<div>1555&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    RETURNNULLPREDICTION("returnNullPrediction"), RETURNLASTPREDICTION(</div>
+<div>1556&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      "returnLastPrediction");</div>
+<div>1557&emsp;&emsp;</div>
+<div>1558&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final String m_stringVal;</div>
+<div>1559&emsp;&emsp;</div>
+<div>1560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NoTrueChildStrategy(String name) {</div>
+<div>1561&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_stringVal = name;</div>
+<div>1562&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1563&emsp;&emsp;</div>
+<div>1564&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>1565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>1566&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_stringVal;</div>
+<div>1567&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1568&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1569&emsp;&emsp;</div>
+<div>1570&emsp;&emsp;&nbsp;&nbsp;  enum SplitCharacteristic {</div>
+<div>1571&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    BINARYSPLIT("binarySplit"), MULTISPLIT("multiSplit");</div>
+<div>1572&emsp;&emsp;</div>
+<div>1573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final String m_stringVal;</div>
+<div>1574&emsp;&emsp;</div>
+<div>1575&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    SplitCharacteristic(String name) {</div>
+<div>1576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_stringVal = name;</div>
+<div>1577&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1578&emsp;&emsp;</div>
+<div>1579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>1580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>1581&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_stringVal;</div>
+<div>1582&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1583&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1584&emsp;&emsp;</div>
+<div>1585&emsp;&emsp;&nbsp;&nbsp;  /** The mining function */</div>
+<div>1586&emsp;&emsp;&nbsp;&nbsp;  protected MiningFunction m_functionType = MiningFunction.CLASSIFICATION;</div>
+<div>1587&emsp;&emsp;</div>
+<div>1588&emsp;&emsp;&nbsp;&nbsp;  /** The missing value strategy */</div>
+<div>1589&emsp;&emsp;&nbsp;&nbsp;  protected MissingValueStrategy m_missingValueStrategy = MissingValueStrategy.NONE;</div>
+<div>1590&emsp;&emsp;</div>
+<div>1591&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1592&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * The missing value penalty (if defined). We don't actually make use of this</div>
+<div>1593&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * since we always return full probability distributions.</div>
+<div>1594&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1595&emsp;&emsp;&nbsp;&nbsp;  protected double m_missingValuePenalty = Utils.missingValue();</div>
+<div>1596&emsp;&emsp;</div>
+<div>1597&emsp;&emsp;&nbsp;&nbsp;  /** The no true child strategy to use */</div>
+<div>1598&emsp;&emsp;&nbsp;&nbsp;  protected NoTrueChildStrategy m_noTrueChildStrategy = NoTrueChildStrategy.RETURNNULLPREDICTION;</div>
+<div>1599&emsp;&emsp;</div>
+<div>1600&emsp;&emsp;&nbsp;&nbsp;  /** The splitting type */</div>
+<div>1601&emsp;&emsp;&nbsp;&nbsp;  protected SplitCharacteristic m_splitCharacteristic = SplitCharacteristic.MULTISPLIT;</div>
+<div>1602&emsp;&emsp;</div>
+<div>1603&emsp;&emsp;&nbsp;&nbsp;  /** The root of the tree */</div>
+<div>1604&emsp;&emsp;&nbsp;&nbsp;  protected TreeNode m_root;</div>
+<div>1605&emsp;&emsp;</div>
+<div>1606&emsp;&emsp;&nbsp;&nbsp;  public TreeModel(Element model, Instances dataDictionary,</div>
+<div>1607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    MiningSchema miningSchema) throws Exception {</div>
+<div>1608&emsp;&emsp;</div>
+<div>1609&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    super(dataDictionary, miningSchema);</div>
+<div>1610&emsp;&emsp;</div>
+<div>1611&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!getPMMLVersion().equals("3.2")) {</div>
+<div>1612&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // TODO: might have to throw an exception and only support 3.2</div>
+<div>1613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1614&emsp;&emsp;</div>
+<div>1615&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String fn = model.getAttribute("functionName");</div>
+<div>1616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (fn.equals("regression")) {</div>
+<div>1617&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_functionType = MiningFunction.REGRESSION;</div>
+<div>1618&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1619&emsp;&emsp;</div>
+<div>1620&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the missing value strategy (if any)</div>
+<div>1621&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String missingVS = model.getAttribute("missingValueStrategy");</div>
+<div>1622&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (missingVS != null && missingVS.length() > 0) {</div>
+<div>1623&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (MissingValueStrategy m : MissingValueStrategy.values()) {</div>
+<div>1624&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (m.toString().equals(missingVS)) {</div>
+<div>1625&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_missingValueStrategy = m;</div>
+<div>1626&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>1627&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1628&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1629&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1630&emsp;&emsp;</div>
+<div>1631&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the missing value penalty (if any)</div>
+<div>1632&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String missingP = model.getAttribute("missingValuePenalty");</div>
+<div>1633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (missingP != null && missingP.length() > 0) {</div>
+<div>1634&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // try to parse as a number</div>
+<div>1635&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>1636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_missingValuePenalty = Double.parseDouble(missingP);</div>
+<div>1637&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (NumberFormatException ex) {</div>
+<div>1638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println("[TreeModel] WARNING: "</div>
+<div>1639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "couldn't parse supplied missingValuePenalty as a number");</div>
+<div>1640&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1641&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1642&emsp;&emsp;</div>
+<div>1643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String splitC = model.getAttribute("splitCharacteristic");</div>
+<div>1644&emsp;&emsp;</div>
+<div>1645&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (splitC != null && splitC.length() > 0) {</div>
+<div>1646&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (SplitCharacteristic s : SplitCharacteristic.values()) {</div>
+<div>1647&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (s.toString().equals(splitC)) {</div>
+<div>1648&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_splitCharacteristic = s;</div>
+<div>1649&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>1650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1651&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1652&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1653&emsp;&emsp;</div>
+<div>1654&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // find the root node of the tree</div>
+<div>1655&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NodeList children = model.getChildNodes();</div>
+<div>1656&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; children.getLength(); i++) {</div>
+<div>1657&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Node child = children.item(i);</div>
+<div>1658&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (child.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>1659&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String tagName = ((Element) child).getTagName();</div>
+<div>1660&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (tagName.equals("Node")) {</div>
+<div>1661&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_root = new TreeNode((Element) child, miningSchema);</div>
+<div>1662&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>1663&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1664&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1665&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1666&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1667&emsp;&emsp;</div>
+<div>1668&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1669&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Classifies the given test instance. The instance has to belong to a dataset</div>
+<div>1670&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * when it's being classified.</div>
+<div>1671&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1672&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param inst the instance to be classified</div>
+<div>1673&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the predicted most likely class for the instance or</div>
+<div>1674&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         Utils.missingValue() if no prediction is made</div>
+<div>1675&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @exception Exception if an error occurred during the prediction</div>
+<div>1676&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1677&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1678&emsp;&emsp;&nbsp;&nbsp;  public double[] distributionForInstance(Instance inst) throws Exception {</div>
+<div style="background-color:limegreen;">1679&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!m_initialized) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1680&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      mapToMiningSchema(inst.dataset());</div>
+<div>1681&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1682&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] preds = null;</div>
+<div>1683&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1684&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_miningSchema.getFieldsAsInstances().classAttribute().isNumeric()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1685&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      preds = new double[1];</div>
+<div>1686&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>1687&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      preds = new double[m_miningSchema.getFieldsAsInstances().classAttribute()</div>
+<div>1688&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        .numValues()];</div>
+<div>1689&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1690&emsp;&emsp;</div>
+<div>1691&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] incoming = m_fieldsMap.instanceToSchema(inst, m_miningSchema);</div>
+<div>1692&emsp;&emsp;</div>
+<div>1693&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    preds = m_root.score(incoming, m_miningSchema.getFieldsAsInstances()</div>
+<div>1694&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .classAttribute());</div>
+<div>1695&emsp;&emsp;</div>
+<div>1696&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return preds;</div>
+<div>1697&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1698&emsp;&emsp;</div>
+<div>1699&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1700&emsp;&emsp;&nbsp;&nbsp;  public String toString() {</div>
+<div>1701&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    StringBuffer temp = new StringBuffer();</div>
+<div>1702&emsp;&emsp;</div>
+<div>1703&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("PMML version " + getPMMLVersion());</div>
+<div style="background-color:limegreen;">1704&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!getCreatorApplication().equals("?")) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1705&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("\nApplication: " + getCreatorApplication());</div>
+<div>1706&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1707&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("\nPMML Model: TreeModel");</div>
+<div>1708&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("\n\n");</div>
+<div>1709&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append(m_miningSchema);</div>
+<div>1710&emsp;&emsp;</div>
+<div>1711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("Split-type: " + m_splitCharacteristic + "\n");</div>
+<div>1712&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("No true child strategy: " + m_noTrueChildStrategy + "\n");</div>
+<div>1713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("Missing value strategy: " + m_missingValueStrategy + "\n");</div>
+<div>1714&emsp;&emsp;</div>
+<div>1715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append(m_root.toString());</div>
+<div>1716&emsp;&emsp;</div>
+<div>1717&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return temp.toString();</div>
+<div>1718&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1719&emsp;&emsp;</div>
+<div>1720&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1721&emsp;&emsp;&nbsp;&nbsp;  public String graph() throws Exception {</div>
+<div>1722&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    StringBuffer text = new StringBuffer();</div>
+<div>1723&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    text.append("digraph PMMTree {\n");</div>
+<div>1724&emsp;&emsp;</div>
+<div>1725&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_root.dumpGraph(text);</div>
+<div>1726&emsp;&emsp;</div>
+<div>1727&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    text.append("}\n");</div>
+<div>1728&emsp;&emsp;</div>
+<div>1729&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return text.toString();</div>
+<div>1730&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1731&emsp;&emsp;</div>
+<div>1732&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1733&emsp;&emsp;&nbsp;&nbsp;  public String getRevision() {</div>
+<div>1734&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return RevisionUtils.extract("$Revision: 10153 $");</div>
+<div>1735&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1736&emsp;&emsp;</div>
+<div>1737&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1738&emsp;&emsp;&nbsp;&nbsp;  public int graphType() {</div>
+<div>1739&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return Drawable.TREE;</div>
+<div>1740&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1741&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

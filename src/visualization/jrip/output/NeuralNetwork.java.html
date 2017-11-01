@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>NeuralNetwork.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *   This program is free software: you can redistribute it and/or modify</div>
+<div>3&emsp;&emsp;&nbsp; *   it under the terms of the GNU General Public License as published by</div>
+<div>4&emsp;&emsp;&nbsp; *   the Free Software Foundation, either version 3 of the License, or</div>
+<div>5&emsp;&emsp;&nbsp; *   (at your option) any later version.</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; *   This program is distributed in the hope that it will be useful,</div>
+<div>8&emsp;&emsp;&nbsp; *   but WITHOUT ANY WARRANTY; without even the implied warranty of</div>
+<div>9&emsp;&emsp;&nbsp; *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</div>
+<div>10&emsp;&emsp;&nbsp; *   GNU General Public License for more details.</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; *   You should have received a copy of the GNU General Public License</div>
+<div>13&emsp;&emsp;&nbsp; *   along with this program.  If not, see &#60;http://www.gnu.org/licenses/>.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/*</div>
+<div>17&emsp;&emsp;&nbsp; *    NeuralNetwork.java</div>
+<div>18&emsp;&emsp;&nbsp; *    Copyright (C) 2008-2012 University of Waikato, Hamilton, New Zealand</div>
+<div>19&emsp;&emsp;&nbsp; *</div>
+<div>20&emsp;&emsp;&nbsp; */</div>
+<div>21&emsp;&emsp;</div>
+<div>22&emsp;&emsp;package weka.classifiers.pmml.consumer;</div>
+<div>23&emsp;&emsp;</div>
+<div>24&emsp;&emsp;import java.io.Serializable;</div>
+<div>25&emsp;&emsp;import java.util.ArrayList;</div>
+<div>26&emsp;&emsp;import java.util.HashMap;</div>
+<div>27&emsp;&emsp;</div>
+<div>28&emsp;&emsp;import org.w3c.dom.Element;</div>
+<div>29&emsp;&emsp;import org.w3c.dom.Node;</div>
+<div>30&emsp;&emsp;import org.w3c.dom.NodeList;</div>
+<div>31&emsp;&emsp;</div>
+<div>32&emsp;&emsp;import weka.core.Attribute;</div>
+<div>33&emsp;&emsp;import weka.core.Instance;</div>
+<div>34&emsp;&emsp;import weka.core.Instances;</div>
+<div>35&emsp;&emsp;import weka.core.RevisionUtils;</div>
+<div>36&emsp;&emsp;import weka.core.Utils;</div>
+<div>37&emsp;&emsp;import weka.core.pmml.DerivedFieldMetaInfo;</div>
+<div>38&emsp;&emsp;import weka.core.pmml.FieldMetaInfo;</div>
+<div>39&emsp;&emsp;import weka.core.pmml.MiningSchema;</div>
+<div>40&emsp;&emsp;import weka.core.pmml.NormContinuous;</div>
+<div>41&emsp;&emsp;import weka.core.pmml.TargetMetaInfo;</div>
+<div>42&emsp;&emsp;</div>
+<div>43&emsp;&emsp;/**</div>
+<div>44&emsp;&emsp;&nbsp; * Class implementing import of PMML Neural Network model. Can be used as a Weka</div>
+<div>45&emsp;&emsp;&nbsp; * classifier for prediction (buildClassifier() raises an Exception).</div>
+<div>46&emsp;&emsp;&nbsp; * </div>
+<div>47&emsp;&emsp;&nbsp; * @author Mark Hall (mhall{[at]}pentaho{[dot]}com)</div>
+<div>48&emsp;&emsp;&nbsp; * @version $Revision 1.0 $</div>
+<div>49&emsp;&emsp;&nbsp; */</div>
+<div>50&emsp;&emsp;public class NeuralNetwork extends PMMLClassifier {</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * For serialization</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;  private static final long serialVersionUID = -4545904813133921249L;</div>
+<div>56&emsp;&emsp;</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Small inner class for a NeuralInput (essentially just</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * wraps a DerivedField and adds an ID)</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;  static class NeuralInput implements Serializable {</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For serialization</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -1902233762824835563L;</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** Field that this input refers to */</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private DerivedFieldMetaInfo m_field;</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** ID string */</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private String m_ID = null;</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private String getID() {</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_ID;</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected NeuralInput(Element input, MiningSchema miningSchema) throws Exception {</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_ID = input.getAttribute("id");</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NodeList fL = input.getElementsByTagName("DerivedField");</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (fL.getLength() != 1) {</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[NeuralInput] expecting just one derived field!");</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Element dF = (Element)fL.item(0);</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instances allFields = miningSchema.getFieldsAsInstances();</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ArrayList&#60;Attribute> fieldDefs = new ArrayList&#60;Attribute>();</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; allFields.numAttributes(); i++) {</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        fieldDefs.add(allFields.attribute(i));</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_field = new DerivedFieldMetaInfo(dF, fieldDefs, miningSchema.getTransformationDictionary());</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double getValue(double[] incoming) throws Exception {</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_field.getDerivedValue(incoming);</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      StringBuffer temp = new StringBuffer();</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("Nueral input (" + getID() + ")\n");</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append(m_field);</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return temp.toString();</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Inner class representing a layer in the network.</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;  class NeuralLayer implements Serializable {</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For serialization</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -8386042001675763922L;</div>
+<div>118&emsp;&emsp;</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The number of neurons in this layer */</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private int m_numNeurons = 0;</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** Activation function (if defined, overrides one in NeuralNetwork) */</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private ActivationFunction m_layerActivationFunction = null;</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** Threshold (if defined overrides one in NeuralNetwork) */</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private double m_layerThreshold = Double.NaN; </div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** Width (if defined overrides one in NeuralNetwork) */</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private double m_layerWidth = Double.NaN;</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** Altitude (if defined overrides one in NeuralNetwork) */</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private double m_layerAltitude = Double.NaN;</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** Normalization (if defined overrides one in NeuralNetwork) */</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private Normalization m_layerNormalization = null;</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The neurons at this hidden layer */</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private Neuron[] m_layerNeurons = null;</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** Stores the output of this layer (for given inputs) */</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private HashMap&#60;String, Double> m_layerOutput = new HashMap&#60;String, Double>();</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected NeuralLayer(Element layerE) {</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String activationFunction = layerE.getAttribute("activationFunction");</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (activationFunction != null && activationFunction.length() > 0) {</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (ActivationFunction a : ActivationFunction.values()) {</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (a.toString().equals(activationFunction)) {</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_layerActivationFunction = a;</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // use the network-level activation function</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_layerActivationFunction = m_activationFunction;</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String threshold = layerE.getAttribute("threshold");</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (threshold != null && threshold.length() > 0) {</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_layerThreshold = Double.parseDouble(threshold);</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // use network-level threshold</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_layerThreshold = m_threshold;</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String width = layerE.getAttribute("width");</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (width != null && width.length() > 0) {</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_layerWidth = Double.parseDouble(width);</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // use network-level width</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_layerWidth = m_width;</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String altitude = layerE.getAttribute("altitude");</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (altitude != null && altitude.length() > 0) {</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_layerAltitude = Double.parseDouble(altitude);</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // use network-level altitude</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_layerAltitude = m_altitude;</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String normMethod = layerE.getAttribute("normalizationMethod");</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (normMethod != null && normMethod.length() > 0) {</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (Normalization n : Normalization.values()) {</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (n.toString().equals(normMethod)) {</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_layerNormalization = n;</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // use network-level normalization method</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_layerNormalization = m_normalizationMethod;</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NodeList neuronL = layerE.getElementsByTagName("Neuron");</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_numNeurons = neuronL.getLength();</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_layerNeurons = new Neuron[m_numNeurons];</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; neuronL.getLength(); i++) {</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Node neuronN = neuronL.item(i);</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (neuronN.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_layerNeurons[i] = new Neuron((Element)neuronN, this);</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected ActivationFunction getActivationFunction() {</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_layerActivationFunction;</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double getThreshold() {</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_layerThreshold;</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double getWidth() {</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_layerWidth;</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double getAltitude() {</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_layerAltitude;</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Normalization getNormalization() {</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_layerNormalization;</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute the output values for this layer.</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param incoming the incoming values</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the output values for this layer</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if there is a problem computing the outputs</div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected HashMap&#60;String, Double> computeOutput(HashMap&#60;String, Double> incoming) </div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_layerOutput.clear();</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double normSum = 0;</div>
+<div style="background-color:limegreen;">239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int i = 0; i &#60; m_layerNeurons.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double neuronOut = m_layerNeurons[i].getValue(incoming);</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String neuronID = m_layerNeurons[i].getID();</div>
+<div>242&emsp;&emsp;</div>
+<div style="background-color:limegreen;">243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_layerNormalization == Normalization.SOFTMAX) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          normSum += Math.exp(neuronOut);</div>
+<div style="background-color:limegreen;">245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        } else if (m_layerNormalization == Normalization.SIMPLEMAX) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          normSum += neuronOut;</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        //System.err.println("Inserting ID " + neuronID + " " + neuronOut);</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_layerOutput.put(neuronID, neuronOut);</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // apply the normalization (if necessary)</div>
+<div style="background-color:limegreen;">253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_layerNormalization != Normalization.NONE) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for (int i = 0; i &#60; m_layerNeurons.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          double val = m_layerOutput.get(m_layerNeurons[i].getID());</div>
+<div>256&emsp;&emsp;//          System.err.println("Normalizing ID " + m_layerNeurons[i].getID() + " " + val);</div>
+<div style="background-color:limegreen;">257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (m_layerNormalization == Normalization.SOFTMAX) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            val = Math.exp(val) / normSum;</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            val = (val / normSum);</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_layerOutput.put(m_layerNeurons[i].getID(), val);</div>
+<div>263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_layerOutput;</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      StringBuffer temp = new StringBuffer();</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("activation: " + getActivationFunction() + "\n");</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!Double.isNaN(getThreshold())) {</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("threshold: " + getThreshold() + "\n");</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!Double.isNaN(getWidth())) {</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("width: " + getWidth() + "\n");</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!Double.isNaN(getAltitude())) {</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("altitude: " + getAltitude() + "\n");</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("normalization: " + m_layerNormalization + "\n");</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; m_numNeurons; i++) {</div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append(m_layerNeurons[i] + "\n");</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>285&emsp;&emsp;</div>
+<div>286&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return temp.toString();</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>288&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>289&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Inner class encapsulating a Neuron</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>293&emsp;&emsp;&nbsp;&nbsp;  static class Neuron implements Serializable {</div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For serialization</div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -3817434025682603443L;</div>
+<div>299&emsp;&emsp;</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** ID string */</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private String m_ID = null;</div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The layer we belong to (for accessing activation function, threshold etc.) */</div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private NeuralLayer m_layer;</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The bias */</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private double m_bias = 0.0;</div>
+<div>308&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The width (if defined overrides the one in NeuralLayer or NeuralNetwork) */</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private double m_neuronWidth = Double.NaN;</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The altitude (if defined overrides the one in NeuralLayer or NeuralNetwork) */</div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private double m_neuronAltitude = Double.NaN;</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The IDs of the neurons/neural inputs that we are connected to */</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private String[] m_connectionIDs = null;</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The weights corresponding to the connections */</div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private double[] m_weights = null;</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Neuron(Element neuronE, NeuralLayer layer) {</div>
+<div>322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_layer = layer;</div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_ID = neuronE.getAttribute("id");</div>
+<div>325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String bias = neuronE.getAttribute("bias");</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (bias != null && bias.length() > 0) {</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_bias = Double.parseDouble(bias);</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String width = neuronE.getAttribute("width");</div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (width != null && width.length() > 0) {</div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_neuronWidth = Double.parseDouble(width);</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>336&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String altitude = neuronE.getAttribute("altitude");</div>
+<div>337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (altitude != null && altitude.length() > 0) {</div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_neuronAltitude = Double.parseDouble(altitude);</div>
+<div>339&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the connection details</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NodeList conL = neuronE.getElementsByTagName("Con");</div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_connectionIDs = new String[conL.getLength()];</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_weights = new double[conL.getLength()];</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; conL.getLength(); i++) {</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Node conN = conL.item(i);</div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (conN.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Element conE = (Element)conN;</div>
+<div>349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_connectionIDs[i] = conE.getAttribute("from");</div>
+<div>350&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String weight = conE.getAttribute("weight");</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_weights[i] = Double.parseDouble(weight);</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String getID() {</div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_ID;</div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }    </div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute the output of this Neuron.</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param incoming a Map of input values. The keys are the IDs</div>
+<div>364&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * of incoming connections (either neural inputs or neurons) and</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the values are the output values of the neural input/neuron in</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * question.</div>
+<div>367&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the output of this neuron</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if any of our incoming connection IDs cannot be</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * located in the Map</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double getValue(HashMap&#60;String, Double> incoming) throws Exception {</div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double z = 0;</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double result = Double.NaN;</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div style="background-color:limegreen;">377&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      double width = (Double.isNaN(m_neuronWidth))&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ? m_layer.getWidth()</div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        : m_neuronWidth;</div>
+<div>380&emsp;&emsp;</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      z = m_bias;</div>
+<div style="background-color:limegreen;">382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int i = 0; i &#60; m_connectionIDs.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Double inVal = incoming.get(m_connectionIDs[i]);</div>
+<div style="background-color:limegreen;">384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (inVal == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw new Exception("[Neuron] unable to find connection " </div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              + m_connectionIDs[i] + " in input Map!");</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>388&emsp;&emsp;</div>
+<div style="background-color:limegreen;">389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_layer.getActivationFunction() != ActivationFunction.RADIALBASIS) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // multiply with weight</div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          double inV = inVal.doubleValue() * m_weights[i];</div>
+<div>392&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          z += inV;</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // Euclidean distance to the center (stored in m_weights)</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          double inV = Math.pow((inVal.doubleValue() - m_weights[i]), 2.0);</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          z += inV;</div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // apply the width if necessary</div>
+<div style="background-color:limegreen;">401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_layer.getActivationFunction() == ActivationFunction.RADIALBASIS) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        z /= (2.0 * (width * width));</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>404&emsp;&emsp;</div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double threshold = m_layer.getThreshold();</div>
+<div style="background-color:limegreen;">406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      double altitude = (Double.isNaN(m_neuronAltitude))&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ? m_layer.getAltitude()</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        : m_neuronAltitude;</div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        </div>
+<div>410&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double fanIn = m_connectionIDs.length;        </div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = m_layer.getActivationFunction().eval(z, threshold, altitude, fanIn);</div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      StringBuffer temp = new StringBuffer();</div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("Nueron (" + m_ID + ") [bias:" + m_bias);</div>
+<div>419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!Double.isNaN(m_neuronWidth)) {</div>
+<div>420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append(" width:" + m_neuronWidth);</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!Double.isNaN(m_neuronAltitude)) {</div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append(" altitude:" + m_neuronAltitude);</div>
+<div>424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("]\n");</div>
+<div>426&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("  con. (ID:weight): ");</div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; m_connectionIDs.length; i++) {</div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append(m_connectionIDs[i] + ":" + Utils.doubleToString(m_weights[i], 2));</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if ((i + 1) % 10 == 0 || i == m_connectionIDs.length - 1) {</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          temp.append("\n                    ");</div>
+<div>431&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          temp.append(", ");</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return temp.toString();</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>437&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;  static class NeuralOutputs implements Serializable {</div>
+<div>440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For serialization</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -233611113950482952L;</div>
+<div>445&emsp;&emsp;</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The neurons we are mapping */</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private String[] m_outputNeurons = null;</div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>450&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *  In the case of a nominal class, the index of the value</div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * being predicted by each output neuron</div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private int[] m_categoricalIndexes = null;</div>
+<div>454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The class attribute we are mapping to */</div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private Attribute m_classAttribute = null;</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** Used when the class is numeric */</div>
+<div>459&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private NormContinuous m_regressionMapping = null;</div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        </div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected NeuralOutputs(Element outputs, MiningSchema miningSchema) throws Exception {</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_classAttribute = miningSchema.getMiningSchemaAsInstances().classAttribute();</div>
+<div>463&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int vals = (m_classAttribute.isNumeric())</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ? 1</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        : m_classAttribute.numValues();</div>
+<div>467&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>468&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_outputNeurons = new String[vals];</div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_categoricalIndexes = new int[vals];</div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NodeList outputL = outputs.getElementsByTagName("NeuralOutput");</div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (outputL.getLength() != m_outputNeurons.length) {</div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[NeuralOutputs] the number of neural outputs does not match "</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + "the number expected!");</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; outputL.getLength(); i++) {</div>
+<div>478&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Node outputN = outputL.item(i);</div>
+<div>479&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (outputN.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Element outputE = (Element)outputN;</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // get the ID for this output neuron</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_outputNeurons[i] = outputE.getAttribute("outputNeuron");</div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          </div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (m_classAttribute.isNumeric()) {</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // get the single norm continuous</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeList contL = outputE.getElementsByTagName("NormContinuous");</div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (contL.getLength() != 1) {</div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              throw new Exception("[NeuralOutputs] Should be exactly one norm continuous element "</div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  + "for numeric class!");</div>
+<div>490&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Node normContNode = contL.item(0);</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            String attName = ((Element)normContNode).getAttribute("field");</div>
+<div>493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Attribute dummyTargetDef = new Attribute(attName);</div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ArrayList&#60;Attribute> dummyFieldDefs = new ArrayList&#60;Attribute>();</div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            dummyFieldDefs.add(dummyTargetDef);</div>
+<div>496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            </div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_regressionMapping = new NormContinuous((Element)normContNode, </div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                FieldMetaInfo.Optype.CONTINUOUS, dummyFieldDefs);</div>
+<div>499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // we just need to grab the categorical value (out of the NormDiscrete element)</div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // that this output neuron is associated with</div>
+<div>503&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            NodeList discL = outputE.getElementsByTagName("NormDiscrete");</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (discL.getLength() != 1) {</div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              throw new Exception("[NeuralOutputs] Should be only one norm discrete element "</div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  + "per derived field/neural output for a nominal class!");</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Node normDiscNode = discL.item(0);</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            String attValue = ((Element)normDiscNode).getAttribute("value");</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int index = m_classAttribute.indexOfValue(attValue);</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (index &#60; 0) {</div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              throw new Exception("[NeuralOutputs] Can't find specified target value "</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  + attValue + " in class attribute " + m_classAttribute.name());</div>
+<div>514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_categoricalIndexes[i] = index;</div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute the output. Either a probability distribution or a single</div>
+<div>523&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * value (regression).</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param incoming the values from the last hidden layer</div>
+<div>526&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param preds the array to fill with predicted values</div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if there is a problem computing the output</div>
+<div>528&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>529&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void getOuput(HashMap&#60;String, Double> incoming, double[] preds) throws Exception {</div>
+<div>530&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div style="background-color:limegreen;">531&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (preds.length != m_outputNeurons.length) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[NeuralOutputs] Incorrect number of predictions requested: "</div>
+<div>533&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + preds.length + "requested, " + m_outputNeurons.length + " expected");</div>
+<div>534&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div style="background-color:limegreen;">535&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int i = 0; i &#60; m_outputNeurons.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>536&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Double neuronOut = incoming.get(m_outputNeurons[i]);</div>
+<div style="background-color:limegreen;">537&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (neuronOut == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw new Exception("[NeuralOutputs] Unable to find output neuron "</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              + m_outputNeurons[i] + " in the incoming HashMap!!");</div>
+<div>540&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div style="background-color:limegreen;">541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_classAttribute.isNumeric()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // will be only one output neuron anyway</div>
+<div>543&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds[0] = neuronOut.doubleValue();</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          </div>
+<div>545&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds[0] = m_regressionMapping.getResultInverse(preds);</div>
+<div>546&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>547&emsp;&emsp;</div>
+<div>548&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // clip at zero</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // preds[m_categoricalIndexes[i]] = (neuronOut &#60; 0) ? 0.0 : neuronOut;</div>
+<div>550&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds[m_categoricalIndexes[i]] = neuronOut;</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>553&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div style="background-color:limegreen;">554&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_classAttribute.isNominal()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // check for negative values and adjust</div>
+<div>556&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double min = preds[Utils.minIndex(preds)];</div>
+<div style="background-color:limegreen;">557&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (min &#60; 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">558&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          for (int i = 0; i &#60; preds.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            preds[i] -= min;</div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>561&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>562&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // do a simplemax normalization</div>
+<div>563&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Utils.normalize(preds);</div>
+<div>564&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>566&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>567&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      StringBuffer temp = new StringBuffer();</div>
+<div>569&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div style="background-color:limegreen;">570&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int i = 0; i &#60; m_outputNeurons.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>571&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("Output neuron (" + m_outputNeurons[i] + ")\n");</div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("mapping:\n");</div>
+<div style="background-color:limegreen;">573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_classAttribute.isNumeric()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>574&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          temp.append(m_regressionMapping +"\n");</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          temp.append(m_classAttribute.name() + " = " </div>
+<div>577&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              + m_classAttribute.value(m_categoricalIndexes[i]) + "\n");</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>581&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return temp.toString();</div>
+<div>582&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>584&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>585&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>586&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Enumerated type for the mining function</div>
+<div>587&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>588&emsp;&emsp;&nbsp;&nbsp;  enum MiningFunction {</div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    CLASSIFICATION,</div>
+<div>590&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    REGRESSION;</div>
+<div>591&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>592&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>593&emsp;&emsp;&nbsp;&nbsp;  /** The mining function */</div>
+<div>594&emsp;&emsp;&nbsp;&nbsp;  protected MiningFunction m_functionType = MiningFunction.CLASSIFICATION;</div>
+<div>595&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>596&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Enumerated type for the activation function.</div>
+<div>598&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>599&emsp;&emsp;&nbsp;&nbsp;  enum ActivationFunction {</div>
+<div>600&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    THRESHOLD("threshold") {</div>
+<div>601&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double z, double threshold, double altitude, double fanIn) {</div>
+<div style="background-color:limegreen;">602&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (z > threshold) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>603&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return 1.0;</div>
+<div>604&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return 0.0;</div>
+<div>606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>608&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    LOGISTIC("logistic") {</div>
+<div>609&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double z, double threshold, double altitude, double fanIn) {</div>
+<div>610&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return 1.0 / (1.0 + Math.exp(-z));</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>612&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    TANH("tanh") {</div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double z, double threshold, double altitude, double fanIn) {</div>
+<div>615&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double a = Math.exp( z );</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double b = Math.exp( -z );</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ((a-b)/(a+b));</div>
+<div>618&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        //return (1.0 - Math.exp(-2.0 * z)) / (1.0 + Math.exp(-2.0 * z));</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>620&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>621&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    IDENTITY("identity") {</div>
+<div>622&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double z, double threshold, double altitude, double fanIn) {</div>
+<div>623&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return z;</div>
+<div>624&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>625&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>626&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    EXPONENTIAL("exponential") {</div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double z, double threshold, double altitude, double fanIn) {</div>
+<div>628&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Math.exp(z);</div>
+<div>629&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>630&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    RECIPROCAL("reciprocal") {</div>
+<div>632&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double z, double threshold, double altitude, double fanIn) {</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return 1.0 / z;</div>
+<div>634&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>635&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    SQUARE("square") {</div>
+<div>637&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double z, double threshold, double altitude, double fanIn) {</div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return  z * z;</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>640&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>641&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    GAUSS("gauss") {</div>
+<div>642&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double z, double threshold, double altitude, double fanIn) {</div>
+<div>643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Math.exp(-(z * z));</div>
+<div>644&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>645&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>646&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    SINE("sine") {</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double z, double threshold, double altitude, double fanIn) {</div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Math.sin(z);</div>
+<div>649&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>651&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    COSINE("cosine") {</div>
+<div>652&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double z, double threshold, double altitude, double fanIn) {</div>
+<div>653&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Math.cos(z);</div>
+<div>654&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>656&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ELLICOT("ellicot") {</div>
+<div>657&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double z, double threshold, double altitude, double fanIn) {</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return z / (1.0 + Math.abs(z));</div>
+<div>659&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>660&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>661&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ARCTAN("arctan") {</div>
+<div>662&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double z, double threshold, double altitude, double fanIn) {</div>
+<div>663&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return 2.0 * Math.atan(z) / Math.PI;</div>
+<div>664&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>665&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>666&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    RADIALBASIS("radialBasis") {</div>
+<div>667&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double z, double threshold, double altitude, double fanIn) {</div>
+<div>668&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Math.exp(fanIn * Math.log(altitude) - z);</div>
+<div>669&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>670&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    };</div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>672&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    abstract double eval(double z, double threshold, double altitude, double fanIn);</div>
+<div>673&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>674&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final String m_stringVal;</div>
+<div>675&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>676&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ActivationFunction(String name) {</div>
+<div>677&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_stringVal = name;</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>679&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>680&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_stringVal;</div>
+<div>682&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>683&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>684&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>685&emsp;&emsp;&nbsp;&nbsp;  /** The activation function to use */</div>
+<div>686&emsp;&emsp;&nbsp;&nbsp;  protected ActivationFunction m_activationFunction = ActivationFunction.ARCTAN;</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>688&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>689&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Enumerated type for the normalization method</div>
+<div>690&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>691&emsp;&emsp;&nbsp;&nbsp;  enum Normalization {</div>
+<div>692&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NONE ("none"),</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    SIMPLEMAX ("simplemax"),</div>
+<div>694&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    SOFTMAX ("softmax");</div>
+<div>695&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>696&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final String m_stringVal;</div>
+<div>697&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>698&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Normalization(String name) {</div>
+<div>699&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_stringVal = name;</div>
+<div>700&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>701&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>702&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>703&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_stringVal;</div>
+<div>704&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>705&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>706&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>707&emsp;&emsp;&nbsp;&nbsp;  /** The normalization method */</div>
+<div>708&emsp;&emsp;&nbsp;&nbsp;  protected Normalization m_normalizationMethod = Normalization.NONE;</div>
+<div>709&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>710&emsp;&emsp;&nbsp;&nbsp;  /** Threshold activation */</div>
+<div>711&emsp;&emsp;&nbsp;&nbsp;  protected double m_threshold = 0.0; // default = 0</div>
+<div>712&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>713&emsp;&emsp;&nbsp;&nbsp;  /** Width for radial basis */</div>
+<div>714&emsp;&emsp;&nbsp;&nbsp;  protected double m_width = Double.NaN; // no default</div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;  /** Altitude for radial basis */</div>
+<div>717&emsp;&emsp;&nbsp;&nbsp;  protected double m_altitude = 1.0; // default = 1</div>
+<div>718&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>719&emsp;&emsp;&nbsp;&nbsp;  /** The number of inputs to the network */</div>
+<div>720&emsp;&emsp;&nbsp;&nbsp;  protected int m_numberOfInputs = 0;</div>
+<div>721&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>722&emsp;&emsp;&nbsp;&nbsp;  /** Number of hidden layers in the network */</div>
+<div>723&emsp;&emsp;&nbsp;&nbsp;  protected int m_numberOfLayers = 0;</div>
+<div>724&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>725&emsp;&emsp;&nbsp;&nbsp;  /** The inputs to the network */</div>
+<div>726&emsp;&emsp;&nbsp;&nbsp;  protected NeuralInput[] m_inputs = null;</div>
+<div>727&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>728&emsp;&emsp;&nbsp;&nbsp;  /** A map for storing network input values (computed from an incoming instance) */</div>
+<div>729&emsp;&emsp;&nbsp;&nbsp;  protected HashMap&#60;String, Double> m_inputMap = new HashMap&#60;String, Double>();</div>
+<div>730&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>731&emsp;&emsp;&nbsp;&nbsp;  /** The hidden layers in the network */</div>
+<div>732&emsp;&emsp;&nbsp;&nbsp;  protected NeuralLayer[] m_layers = null;</div>
+<div>733&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>734&emsp;&emsp;&nbsp;&nbsp;  /** The outputs of the network */</div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;  protected NeuralOutputs m_outputs = null;</div>
+<div>736&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;  public NeuralNetwork(Element model, Instances dataDictionary,</div>
+<div>738&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                       MiningSchema miningSchema) throws Exception {</div>
+<div>739&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>740&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    super(dataDictionary, miningSchema);</div>
+<div>741&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>742&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String fn = model.getAttribute("functionName");</div>
+<div>743&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (fn.equals("regression")) {</div>
+<div>744&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_functionType = MiningFunction.REGRESSION;</div>
+<div>745&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>746&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>747&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String act = model.getAttribute("activationFunction");</div>
+<div>748&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (act == null || act.length() == 0) {</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[NeuralNetwork] no activation functon defined");</div>
+<div>750&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>751&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>752&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the activation function</div>
+<div>753&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (ActivationFunction a : ActivationFunction.values()) {</div>
+<div>754&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (a.toString().equals(act)) {</div>
+<div>755&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_activationFunction = a;</div>
+<div>756&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        break;</div>
+<div>757&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>758&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>760&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the normalization method (if specified)</div>
+<div>761&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String norm = model.getAttribute("normalizationMethod");</div>
+<div>762&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (norm != null && norm.length() > 0) {</div>
+<div>763&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (Normalization n : Normalization.values()) {</div>
+<div>764&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (n.toString().equals(norm)) {</div>
+<div>765&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_normalizationMethod = n;</div>
+<div>766&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>768&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>769&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>770&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>771&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String thresh = model.getAttribute("threshold");</div>
+<div>772&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (thresh != null && thresh.length() > 0) {</div>
+<div>773&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_threshold = Double.parseDouble(thresh);</div>
+<div>774&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>775&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String width = model.getAttribute("width");</div>
+<div>776&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (width != null && width.length() > 0) {</div>
+<div>777&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_width = Double.parseDouble(width);</div>
+<div>778&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>779&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String alt = model.getAttribute("altitude");</div>
+<div>780&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (alt != null && alt.length() > 0) {</div>
+<div>781&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_altitude = Double.parseDouble(alt);</div>
+<div>782&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>783&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>784&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get all the inputs</div>
+<div>785&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NodeList inputL = model.getElementsByTagName("NeuralInput");</div>
+<div>786&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_numberOfInputs = inputL.getLength();</div>
+<div>787&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_inputs = new NeuralInput[m_numberOfInputs];</div>
+<div>788&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; m_numberOfInputs; i++) {</div>
+<div>789&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Node inputN = inputL.item(i);</div>
+<div>790&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (inputN.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>791&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        NeuralInput nI = new NeuralInput((Element)inputN, m_miningSchema);</div>
+<div>792&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_inputs[i] = nI;</div>
+<div>793&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>794&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>796&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the layers</div>
+<div>797&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NodeList layerL = model.getElementsByTagName("NeuralLayer");</div>
+<div>798&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_numberOfLayers = layerL.getLength();</div>
+<div>799&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_layers = new NeuralLayer[m_numberOfLayers];</div>
+<div>800&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; m_numberOfLayers; i++) {</div>
+<div>801&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Node layerN = layerL.item(i);</div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (layerN.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>803&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        NeuralLayer nL = new NeuralLayer((Element)layerN);</div>
+<div>804&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_layers[i] = nL;</div>
+<div>805&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>806&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>807&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>808&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the outputs</div>
+<div>809&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NodeList outputL = model.getElementsByTagName("NeuralOutputs");</div>
+<div>810&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (outputL.getLength() != 1) {</div>
+<div>811&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[NeuralNetwork] Should be just one NeuralOutputs element defined!");</div>
+<div>812&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>813&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>814&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_outputs = new NeuralOutputs((Element)outputL.item(0), m_miningSchema);</div>
+<div>815&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>816&emsp;&emsp;</div>
+<div>817&emsp;&emsp;&nbsp;&nbsp;  /* (non-Javadoc)</div>
+<div>818&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see weka.core.RevisionHandler#getRevision()</div>
+<div>819&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>820&emsp;&emsp;&nbsp;&nbsp;  public String getRevision() {</div>
+<div>821&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return RevisionUtils.extract("$Revision: 8034 $");</div>
+<div>822&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>823&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>824&emsp;&emsp;&nbsp;&nbsp;  /**                                                                                                             </div>
+<div>825&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Classifies the given test instance. The instance has to belong to a                                          </div>
+<div>826&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * dataset when it's being classified.                                                          </div>
+<div>827&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *                                                                                                              </div>
+<div>828&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param inst the instance to be classified                                                                </div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the predicted most likely class for the instance or                                                  </div>
+<div>830&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Utils.missingValue() if no prediction is made                                                             </div>
+<div>831&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @exception Exception if an error occurred during the prediction                                              </div>
+<div>832&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>833&emsp;&emsp;&nbsp;&nbsp;  public double[] distributionForInstance(Instance inst) throws Exception {</div>
+<div style="background-color:limegreen;">834&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!m_initialized) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>835&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      mapToMiningSchema(inst.dataset());</div>
+<div>836&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>837&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] preds = null;</div>
+<div>838&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">839&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_miningSchema.getFieldsAsInstances().classAttribute().isNumeric()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>840&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      preds = new double[1];</div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>842&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      preds = new double[m_miningSchema.getFieldsAsInstances().classAttribute().numValues()];</div>
+<div>843&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>845&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] incoming = m_fieldsMap.instanceToSchema(inst, m_miningSchema);</div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>847&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean hasMissing = false;</div>
+<div style="background-color:limegreen;">848&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; incoming.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">849&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (i != m_miningSchema.getFieldsAsInstances().classIndex() && &nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">850&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          Double.isNaN(incoming[i])) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>851&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        hasMissing = true;</div>
+<div>852&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        //System.err.println("Missing value for att : " + m_miningSchema.getFieldsAsInstances().attribute(i).name());</div>
+<div>853&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        break;</div>
+<div>854&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>855&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>856&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (hasMissing) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">858&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!m_miningSchema.hasTargetMetaData()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>859&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String message = "[NeuralNetwork] WARNING: Instance to predict has missing value(s) but "</div>
+<div>860&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "there is no missing value handling meta data and no "</div>
+<div>861&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "prior probabilities/default value to fall back to. No "</div>
+<div>862&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "prediction will be made (" </div>
+<div style="background-color:limegreen;">863&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          + ((m_miningSchema.getFieldsAsInstances().classAttribute().isNominal()&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">864&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>              || m_miningSchema.getFieldsAsInstances().classAttribute().isString())&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>865&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              ? "zero probabilities output)."</div>
+<div>866&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              : "NaN output).");</div>
+<div style="background-color:limegreen;">867&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_log == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>868&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          System.err.println(message);</div>
+<div>869&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>870&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_log.logMessage(message);</div>
+<div>871&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>872&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        </div>
+<div style="background-color:limegreen;">873&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_miningSchema.getFieldsAsInstances().classAttribute().isNumeric()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>874&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds[0] = Utils.missingValue();</div>
+<div>875&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return preds;</div>
+<div>877&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>878&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // use prior probablilities/default value</div>
+<div>879&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        TargetMetaInfo targetData = m_miningSchema.getTargetMetaData();</div>
+<div style="background-color:limegreen;">880&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_miningSchema.getFieldsAsInstances().classAttribute().isNumeric()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>881&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds[0] = targetData.getDefaultValue();</div>
+<div>882&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>883&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Instances miningSchemaI = m_miningSchema.getFieldsAsInstances();</div>
+<div style="background-color:limegreen;">884&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          for (int i = 0; i &#60; miningSchemaI.classAttribute().numValues(); i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>885&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            preds[i] = targetData.getPriorProbability(miningSchemaI.classAttribute().value(i));</div>
+<div>886&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>888&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return preds;</div>
+<div>889&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>890&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>891&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>892&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // construct the input to the network for this instance</div>
+<div>893&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_inputMap.clear();</div>
+<div style="background-color:limegreen;">894&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int i = 0; i &#60; m_inputs.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>895&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double networkInVal = m_inputs[i].getValue(incoming);</div>
+<div>896&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String ID = m_inputs[i].getID();</div>
+<div>897&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_inputMap.put(ID, networkInVal);</div>
+<div>898&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>899&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>900&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // now compute the output of each layer</div>
+<div>901&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      HashMap&#60;String, Double> layerOut = m_layers[0].computeOutput(m_inputMap);</div>
+<div style="background-color:limegreen;">902&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int i = 1; i &#60; m_layers.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        layerOut = m_layers[i].computeOutput(layerOut);</div>
+<div>904&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>905&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>906&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // now do the output</div>
+<div>907&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_outputs.getOuput(layerOut, preds);</div>
+<div>908&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>909&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>910&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return preds;</div>
+<div>911&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>912&emsp;&emsp;</div>
+<div>913&emsp;&emsp;&nbsp;&nbsp;  public String toString() {</div>
+<div>914&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    StringBuffer temp = new StringBuffer();</div>
+<div>915&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>916&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("PMML version " + getPMMLVersion());</div>
+<div style="background-color:limegreen;">917&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!getCreatorApplication().equals("?")) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>918&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("\nApplication: " + getCreatorApplication());</div>
+<div>919&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>920&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("\nPMML Model: Neural network");</div>
+<div>921&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("\n\n");</div>
+<div>922&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append(m_miningSchema);</div>
+<div>923&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>924&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("Inputs:\n");</div>
+<div style="background-color:limegreen;">925&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; m_inputs.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>926&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append(m_inputs[i] + "\n");</div>
+<div>927&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>928&emsp;&emsp;</div>
+<div style="background-color:limegreen;">929&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; m_layers.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>930&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("Layer: " + (i+1) + "\n");</div>
+<div>931&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append(m_layers[i] + "\n");</div>
+<div>932&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>933&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>934&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("Outputs:\n");</div>
+<div>935&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append(m_outputs);</div>
+<div>936&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>937&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return temp.toString();</div>
+<div>938&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>939&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

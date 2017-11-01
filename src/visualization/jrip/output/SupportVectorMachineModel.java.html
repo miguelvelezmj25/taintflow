@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SupportVectorMachineModel.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *   This program is free software: you can redistribute it and/or modify</div>
+<div>3&emsp;&emsp;&nbsp; *   it under the terms of the GNU General Public License as published by</div>
+<div>4&emsp;&emsp;&nbsp; *   the Free Software Foundation, either version 3 of the License, or</div>
+<div>5&emsp;&emsp;&nbsp; *   (at your option) any later version.</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; *   This program is distributed in the hope that it will be useful,</div>
+<div>8&emsp;&emsp;&nbsp; *   but WITHOUT ANY WARRANTY; without even the implied warranty of</div>
+<div>9&emsp;&emsp;&nbsp; *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</div>
+<div>10&emsp;&emsp;&nbsp; *   GNU General Public License for more details.</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; *   You should have received a copy of the GNU General Public License</div>
+<div>13&emsp;&emsp;&nbsp; *   along with this program.  If not, see &#60;http://www.gnu.org/licenses/>.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/*</div>
+<div>17&emsp;&emsp;&nbsp; *    SupportVectorMachineModel.java</div>
+<div>18&emsp;&emsp;&nbsp; *    Copyright (C) 2010-2012 University of Waikato, Hamilton, New Zealand</div>
+<div>19&emsp;&emsp;&nbsp; *</div>
+<div>20&emsp;&emsp;&nbsp; */</div>
+<div>21&emsp;&emsp;</div>
+<div>22&emsp;&emsp;package weka.classifiers.pmml.consumer;</div>
+<div>23&emsp;&emsp;</div>
+<div>24&emsp;&emsp;import java.io.Serializable;</div>
+<div>25&emsp;&emsp;import java.util.ArrayList;</div>
+<div>26&emsp;&emsp;import java.util.List;</div>
+<div>27&emsp;&emsp;</div>
+<div>28&emsp;&emsp;import org.w3c.dom.Element;</div>
+<div>29&emsp;&emsp;import org.w3c.dom.Node;</div>
+<div>30&emsp;&emsp;import org.w3c.dom.NodeList;</div>
+<div>31&emsp;&emsp;</div>
+<div>32&emsp;&emsp;import weka.classifiers.pmml.consumer.NeuralNetwork.MiningFunction;</div>
+<div>33&emsp;&emsp;import weka.core.Attribute;</div>
+<div>34&emsp;&emsp;import weka.core.Instance;</div>
+<div>35&emsp;&emsp;import weka.core.Instances;</div>
+<div>36&emsp;&emsp;import weka.core.RevisionUtils;</div>
+<div>37&emsp;&emsp;import weka.core.Utils;</div>
+<div>38&emsp;&emsp;import weka.core.pmml.MiningSchema;</div>
+<div>39&emsp;&emsp;import weka.core.pmml.TargetMetaInfo;</div>
+<div>40&emsp;&emsp;import weka.core.pmml.VectorDictionary;</div>
+<div>41&emsp;&emsp;import weka.core.pmml.VectorInstance;</div>
+<div>42&emsp;&emsp;import weka.gui.Logger;</div>
+<div>43&emsp;&emsp;</div>
+<div>44&emsp;&emsp;/**</div>
+<div>45&emsp;&emsp;&nbsp; * Implements a PMML SupportVectorMachineModel</div>
+<div>46&emsp;&emsp;&nbsp; * </div>
+<div>47&emsp;&emsp;&nbsp; * @author Mark Hall (mhall{[at]}pentaho{[dot]}com)</div>
+<div>48&emsp;&emsp;&nbsp; * @version $Revision: 8034 $</div>
+<div>49&emsp;&emsp;&nbsp; */</div>
+<div>50&emsp;&emsp;public class SupportVectorMachineModel extends PMMLClassifier </div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;  implements Serializable {</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;  /** For serialization */</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;  private static final long serialVersionUID = 6225095165118374296L;</div>
+<div>55&emsp;&emsp;</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Abstract base class for kernels</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;  static abstract class Kernel implements Serializable {</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The log object to use */</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Logger m_log = null;</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Kernel(Logger log) {</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_log = log;</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** For serialization */</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -6696443459968934767L;</div>
+<div>70&emsp;&emsp;</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute the result of the kernel evaluation on the supplied vectors</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x the first vector instance</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param y the second vector instance</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the result of the kernel evaluation</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public abstract double evaluate(VectorInstance x, VectorInstance y) </div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception;</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute the result of the kernel evaluation on the supplied vectors</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x the first vector instance</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param y the second vector (as an array of values)</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the result of the kernel evaluation</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public abstract double evaluate(VectorInstance x, double[] y) </div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception;</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Factory method returning a new Kernel constructed from </div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the supplied XML element</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param svmMachineModelElement the XML element containing the kernel</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param log the logging object to use</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return a new Kernel</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static Kernel getKernel(Element svmMachineModelElement,</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Logger log) throws Exception {</div>
+<div>104&emsp;&emsp;</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NodeList kList = svmMachineModelElement.getElementsByTagName("LinearKernelType");</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (kList.getLength() > 0) {</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return new LinearKernel(log);</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      kList = svmMachineModelElement.getElementsByTagName("PolynomialKernelType");</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (kList.getLength() > 0) {</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return new PolynomialKernel((Element)kList.item(0), log);</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      kList = svmMachineModelElement.getElementsByTagName("RadialBasisKernelType");</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (kList.getLength() > 0) {</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return new RadialBasisKernel((Element)kList.item(0), log);</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      kList = svmMachineModelElement.getElementsByTagName("SigmoidKernelType");</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (kList.getLength() > 0) {</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return new SigmoidKernel((Element)kList.item(0), log);</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[Kernel] Can't find a kernel that I recognize!");</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Subclass of Kernel implementing a simple linear (dot product) kernel</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;  static class LinearKernel extends Kernel implements Serializable {</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public LinearKernel(Logger log) {</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      super(log);</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public LinearKernel() {</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      super(null);</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** For serialization */</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = 8991716708484953837L;</div>
+<div>145&emsp;&emsp;</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute the result of the kernel evaluation on the supplied vectors</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x the first vector instance</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param y the second vector instance</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the result of the kernel evaluation</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public double evaluate(VectorInstance x, VectorInstance y) </div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return x.dotProduct(y);</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute the result of the kernel evaluation on the supplied vectors</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x the first vector instance</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param y the second vector (as an array of values)</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the result of the kernel evaluation</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public double evaluate(VectorInstance x, double[] y)</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return x.dotProduct(y);</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Return a textual description of this kernel</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return a string describing this kernel</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return "Linear kernel: K(x,y) = &#60;x,y>";</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Subclass of Kernel implementing a polynomial kernel</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;  static class PolynomialKernel extends Kernel implements Serializable {</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** For serialization */</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -616176630397865281L;</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double m_gamma = 1;</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double m_coef0 = 1;</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double m_degree = 1;</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public PolynomialKernel(Element polyNode) {</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      this(polyNode, null);</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public PolynomialKernel(Element polyNode, Logger log) {</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      super(log);</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String gammaString = polyNode.getAttribute("gamma");</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (gammaString != null && gammaString.length() > 0) {</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_gamma = Double.parseDouble(gammaString);</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (NumberFormatException e) {</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String message = "[PolynomialKernel] : WARNING, can't parse "</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + "gamma attribute. Using default value of 1.";</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (m_log == null) {</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            System.err.println(message);</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_log.logMessage(message);</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String coefString = polyNode.getAttribute("coef0");</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (coefString != null && coefString.length() > 0) {</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_coef0 = Double.parseDouble(coefString);</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (NumberFormatException e) {</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String message = "[PolynomialKernel] : WARNING, can't parse "</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + "coef0 attribute. Using default value of 1.";</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (m_log == null) {</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            System.err.println(message);</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_log.logMessage(message);</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String degreeString = polyNode.getAttribute("degree");</div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (degreeString != null && degreeString.length() > 0) {</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_degree = Double.parseDouble(degreeString);</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (NumberFormatException e) {</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String message = "[PolynomialKernel] : WARNING, can't parse "</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + "degree attribute. Using default value of 1.";</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (m_log == null) {</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            System.err.println(message);</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_log.logMessage(message);</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute the result of the kernel evaluation on the supplied vectors</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x the first vector instance</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param y the second vector instance</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the result of the kernel evaluation</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public double evaluate(VectorInstance x, VectorInstance y)</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double dotProd = x.dotProduct(y);</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return Math.pow(m_gamma * dotProd + m_coef0, m_degree);      </div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute the result of the kernel evaluation on the supplied vectors</div>
+<div>263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x the first vector instance</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param y the second vector (as an array of values)</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the result of the kernel evaluation</div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public double evaluate(VectorInstance x, double[] y)</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double dotProd = x.dotProduct(y);</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return Math.pow(m_gamma * dotProd + m_coef0, m_degree);      </div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Return a textual description of this kernel</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return a string describing this kernel</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return "Polynomial kernel: K(x,y) = (" + m_gamma + " * &#60;x,y> + " </div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + m_coef0 +")^" + m_degree;</div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>286&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Subclass of Kernel implementing a radial basis function kernel</div>
+<div>288&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>289&emsp;&emsp;&nbsp;&nbsp;  static class RadialBasisKernel extends Kernel implements Serializable {</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** For serialization */</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -3834238621822239042L;</div>
+<div>293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double m_gamma = 1;</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public RadialBasisKernel(Element radialElement) {</div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      this(radialElement, null);</div>
+<div>298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public RadialBasisKernel(Element radialElement, Logger log) {</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      super(log);</div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String gammaString = radialElement.getAttribute("gamma");</div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (gammaString != null && gammaString.length() > 0) {</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_gamma = Double.parseDouble(gammaString);</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (NumberFormatException e) {</div>
+<div>308&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String message = "[RadialBasisKernel] : WARNING, can't parse "</div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + "gamma attribute. Using default value of 1.";</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (m_log == null) {</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            System.err.println(message);</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_log.logMessage(message);</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;   </div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute the result of the kernel evaluation on the supplied vectors</div>
+<div>321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x the first vector instance</div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param y the second vector instance</div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the result of the kernel evaluation</div>
+<div>325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public double evaluate(VectorInstance x, VectorInstance y)</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      VectorInstance diff = x.subtract(y);</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double result = -m_gamma * diff.dotProduct(diff);</div>
+<div>331&emsp;&emsp;</div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return Math.exp(result);    </div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>334&emsp;&emsp;</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>336&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute the result of the kernel evaluation on the supplied vectors</div>
+<div>337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x the first vector instance</div>
+<div>339&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param y the second vector (as an array of values)</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the result of the kernel evaluation</div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public double evaluate(VectorInstance x, double[] y)</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      VectorInstance diff = x.subtract(y);</div>
+<div>346&emsp;&emsp;//      System.err.println("diff: " + diff.getValues());</div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double result = -m_gamma * diff.dotProduct(diff);</div>
+<div>348&emsp;&emsp;//      System.err.println("Result: " + result);</div>
+<div>349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return Math.exp(result);</div>
+<div>350&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Return a textual description of this kernel</div>
+<div>354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return a string describing this kernel</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return "Radial kernel: K(x,y) = exp(-" + m_gamma + " * ||x - y||^2)"; </div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }    </div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Subclass of Kernel implementing a sigmoid function</div>
+<div>364&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;  static class SigmoidKernel extends Kernel implements Serializable {</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>367&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** For serialization */</div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = 8713475894705750117L;</div>
+<div>369&emsp;&emsp;</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double m_gamma = 1;</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double m_coef0 = 1;</div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public SigmoidKernel(Element sigElement) {</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      this(sigElement, null);</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>377&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public SigmoidKernel(Element sigElement, Logger log) {</div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      super(log);</div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String gammaString = sigElement.getAttribute("gamma");</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (gammaString != null && gammaString.length() > 0) {</div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_gamma = Double.parseDouble(gammaString);</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (NumberFormatException e) {</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String message = "[SigmoidKernel] : WARNING, can't parse "</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + "gamma attribute. Using default value of 1.";</div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (m_log == null) {</div>
+<div>389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            System.err.println(message);</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_log.logMessage(message);</div>
+<div>392&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String coefString = sigElement.getAttribute("coef0");</div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (coefString != null && coefString.length() > 0) {</div>
+<div>398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_coef0 = Double.parseDouble(coefString);</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (NumberFormatException e) {</div>
+<div>401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String message = "[SigmoidKernel] : WARNING, can't parse "</div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + "coef0 attribute. Using default value of 1.";</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (m_log == null) {</div>
+<div>404&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            System.err.println(message);</div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_log.logMessage(message);</div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>410&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute the result of the kernel evaluation on the supplied vectors</div>
+<div>414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x the first vector instance</div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param y the second vector instance</div>
+<div>417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the result of the kernel evaluation</div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public double evaluate(VectorInstance x, VectorInstance y)</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double dotProd = x.dotProduct(y);</div>
+<div>424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double z = m_gamma * dotProd + m_coef0;</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double a = Math.exp(z);</div>
+<div>426&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double b = Math.exp(-z);</div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return ((a - b) / (a + b));      </div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>429&emsp;&emsp;</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>431&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Compute the result of the kernel evaluation on the supplied vectors</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x the first vector instance</div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param y the second vector (as an array of values)</div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the result of the kernel evaluation</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>437&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public double evaluate(VectorInstance x, double[] y)</div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div>440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double dotProd = x.dotProduct(y);</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double z = m_gamma * dotProd + m_coef0;</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double a = Math.exp(z);</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double b = Math.exp(-z);</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return ((a - b) / (a + b));</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Return a textual description of this kernel</div>
+<div>450&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return a string describing this kernel</div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return "Sigmoid kernel: K(x,y) = tanh(" + m_gamma + " * &#60;x,y> + " </div>
+<div>455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + m_coef0 +")";</div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>459&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Inner class implementing a single binary (classification) SVM</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;  static class SupportVectorMachine implements Serializable {</div>
+<div>463&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** For serialization */</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = -7650496802836815608L;</div>
+<div>466&emsp;&emsp;</div>
+<div>467&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The target label for classification problems */</div>
+<div>468&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String m_targetCategory;</div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The index of the global alternate target label for classification */</div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected int m_globalAlternateTargetCategoryIndex = -1;</div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The index of the target label for classification problems */</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected int m_targetCategoryIndex = -1;</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        </div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** PMML 4.0 - index of the alternate category for one-vs-one */</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected int m_localAlternateTargetCategoryIndex = -1;</div>
+<div>478&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>479&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** PMML 4.0 - local threshold (overrides the global one, if set) */</div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double m_localThreshold = Double.MAX_VALUE; // default - not set</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        </div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The mining schema */</div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected MiningSchema m_miningSchema;</div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The log object to use (if supplied) */</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Logger m_log;</div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** </div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * True if this is a linear machine expressed in terms of the original</div>
+<div>490&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * attributes</div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected boolean m_coeffsOnly = false;</div>
+<div>493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The support vectors used by this machine (if not linear with coeffs only */</div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected List&#60;VectorInstance> m_supportVectors = </div>
+<div>496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new ArrayList&#60;VectorInstance>();</div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The constant term - b */</div>
+<div>499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double m_intercept = 0;</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** The coefficients for the vectors */</div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double[] m_coefficients;</div>
+<div>503&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Computes the prediction from this support vector machine. For classification,</div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * it fills in the appropriate element in the preds array with either a 0 or a 1.</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * If the output of the machine is &#60; 0, then a 1 is entered into the array</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * element corresponding to this machine's targetCategory, otherwise a 0 is entered.</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Note that this is different to the scoring procedure in the 3.2 spec (see the comments</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * in the source code of this method for more information about this).</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param input the test instance to predict</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param kernel the kernel to use</div>
+<div>514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param vecDict the vector dictionary (null if the machine is linear and expressed</div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * in terms of attribute weights)</div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param preds the prediction array to fill in</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param cMethod the classification method to use (for classification problems)</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param globalThreshold the global threshold (used if there is no local threshold</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * for this machine)</div>
+<div>520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void distributionForInstance(double[] input, Kernel kernel, </div>
+<div>523&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        VectorDictionary vecDict, double[] preds, classificationMethod cMethod,</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double globalThreshold) </div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws Exception {</div>
+<div>526&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int targetIndex = 0;</div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>528&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!m_coeffsOnly) {</div>
+<div>529&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // get an array that only holds the values that are referenced</div>
+<div>530&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // by the support vectors</div>
+<div>531&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        input = vecDict.incomingInstanceToVectorFieldVals(input);</div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>533&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>534&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (m_miningSchema.getFieldsAsInstances().classAttribute().isNominal()) {</div>
+<div>535&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        targetIndex = m_targetCategoryIndex;</div>
+<div>536&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>537&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double result = 0;</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; m_coefficients.length; i++) {</div>
+<div>540&emsp;&emsp;&nbsp;&nbsp;&nbsp;   //     System.err.println("X : " + m_supportVectors.get(i).getValues());</div>
+<div>541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double val = 0;</div>
+<div>542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (!m_coeffsOnly) {</div>
+<div>543&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          val = kernel.evaluate(m_supportVectors.get(i), input);</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>545&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          val = input[i];</div>
+<div>546&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>547&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        val *= m_coefficients[i];</div>
+<div>548&emsp;&emsp;//        System.err.println("val " + val);</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result += val;</div>
+<div>550&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result += m_intercept;</div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>553&emsp;&emsp;/*      if (result &#60; 0 && m_miningSchema.getFieldsAsInstances().classAttribute().isNominal()) {</div>
+<div>554&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          System.err.println("[SupportVectorMachine] result (" </div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + result + ") is less than zero" +</div>
+<div>556&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        		" for a nominal class value!");</div>
+<div>557&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result = 0;</div>
+<div>558&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else if (result > 1 && m_miningSchema.getFieldsAsInstances().classAttribute().isNominal()) {</div>
+<div>559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println("[SupportVectorMachine] result (" </div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + result + ") is greater than one" +</div>
+<div>561&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                        " for a nominal class value!");</div>
+<div>562&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result = 1;</div>
+<div>563&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>564&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.err.println("result " + result); */</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>566&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // TODO revisit this when I actually find out what is going on with</div>
+<div>567&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // the Zementis model (the only easily available SVM model out there</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // at this time).</div>
+<div>569&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>570&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (cMethod == classificationMethod.NONE || </div>
+<div>571&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_miningSchema.getFieldsAsInstances().classAttribute().isNumeric()) {</div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // ----------------------------------------------------------------------</div>
+<div>573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // The PMML 3.2 spec states that the output of the machine should lie</div>
+<div>574&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // between 0 and 1 for a binary classification case with 1 corresponding</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // to the machine's targetCategory and 0 corresponding to the</div>
+<div>576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // alternateBinaryTargetCategory (implying a threshold of 0.5). This seems kind of</div>
+<div>577&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // non standard, and indeed, in the 4.0 spec, it has changed to output &#60; threshold</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // corresponding to the machine's targetCategory and >= threshold corresponding</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // to the alternateBinaryTargetCategory. What has been implemented here is</div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // the later with a default threshold of 0 (since the 3.2 spec doesn't have</div>
+<div>581&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // a way to specify a threshold). The example SVM PMML model from Zementis,</div>
+<div>582&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // which is PMML version 3.2, produces output between -1 and 1 (give or take).</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Implementing the 3.2 scoring mechanism as described in the spec (and truncating </div>
+<div>584&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // output at 0 and 1) results in all the predicted labels getting flipped on the data</div>
+<div>585&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // used to construct the Zementis model!</div>
+<div>586&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        //</div>
+<div>587&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // April 2010 - the Zementis guys have emailed me to say that their model</div>
+<div>588&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // has been prepared for PMML 4.0, even though it states it is 3.2 in the</div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // XML.</div>
+<div>590&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // ----------------------------------------------------------------------</div>
+<div>591&emsp;&emsp;</div>
+<div>592&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (m_miningSchema.getFieldsAsInstances().classAttribute().isNominal()) {</div>
+<div>593&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (result &#60; 0) {</div>
+<div>594&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            preds[targetIndex] = 1;</div>
+<div>595&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>596&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            preds[targetIndex] = 0;</div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>598&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>599&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds[targetIndex] = result;</div>
+<div>600&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>601&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>602&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // PMML 4.0</div>
+<div>603&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (cMethod == classificationMethod.ONE_AGAINST_ALL) {</div>
+<div>604&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // smallest value output by a machine is the predicted class</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds[targetIndex] = result;</div>
+<div>606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // one-vs-one</div>
+<div>608&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          double threshold = (m_localThreshold &#60; Double.MAX_VALUE)</div>
+<div>609&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ? m_localThreshold</div>
+<div>610&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            : globalThreshold;</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          </div>
+<div>612&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // vote</div>
+<div>613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (result &#60; threshold) {</div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            preds[targetIndex]++;</div>
+<div>615&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int altCat = (m_localAlternateTargetCategoryIndex != -1)</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              ? m_localAlternateTargetCategoryIndex</div>
+<div>618&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              : m_globalAlternateTargetCategoryIndex;</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            </div>
+<div>620&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            preds[altCat]++;</div>
+<div>621&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>622&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>623&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>624&emsp;&emsp;//      preds[targetIndex] = result;</div>
+<div>625&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>626&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        </div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>628&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Constructs a new SupportVectorMachine from the supplied XML element</div>
+<div>629&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>630&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param machineElement the XML element containing the SVM</div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param miningSchema the mining schema for the PMML model</div>
+<div>632&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param dictionary the VectorDictionary from which to look up the support</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * vectors used by this machine (may be null if the machine is linear and</div>
+<div>634&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * expressed in terms of attribute weights)</div>
+<div>635&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param svmRep the representation of this SVM (uses support vectors or is linear</div>
+<div>636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * an uses attribute weights)</div>
+<div>637&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param altCategoryInd the index of the global alternateBinaryTarget (if classification)</div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param log the log object to use</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws Exception if something goes wrong</div>
+<div>640&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>641&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public SupportVectorMachine(Element machineElement, </div>
+<div>642&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        MiningSchema miningSchema, VectorDictionary dictionary, SVM_representation svmRep, </div>
+<div>643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int altCategoryInd, Logger log) throws Exception {</div>
+<div>644&emsp;&emsp;</div>
+<div>645&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_miningSchema = miningSchema;</div>
+<div>646&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_log = log;</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String targetCat = machineElement.getAttribute("targetCategory");</div>
+<div>649&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (targetCat != null && targetCat.length() > 0) {</div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_targetCategory = targetCat;</div>
+<div>651&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Attribute classAtt = m_miningSchema.getFieldsAsInstances().classAttribute(); </div>
+<div>652&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (classAtt.isNominal()) {</div>
+<div>653&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          int index = classAtt.indexOfValue(m_targetCategory);</div>
+<div>654&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          </div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (index &#60; 0) {</div>
+<div>656&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new Exception("[SupportVectorMachine] : can't find target category: "</div>
+<div>657&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                + m_targetCategory + " in the class attribute!");</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>659&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          </div>
+<div>660&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_targetCategoryIndex = index;</div>
+<div>661&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          </div>
+<div>662&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // now check for the PMML 4.0 alternateTargetCategory</div>
+<div>663&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String altTargetCat = machineElement.getAttribute("alternateTargetCategory");</div>
+<div>664&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (altTargetCat != null && altTargetCat.length() > 0) {</div>
+<div>665&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            index = classAtt.indexOfValue(altTargetCat);</div>
+<div>666&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (index &#60; 0) {</div>
+<div>667&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              throw new Exception("[SupportVectorMachine] : can't find alternate target category: "</div>
+<div>668&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  + altTargetCat + " in the class attribute!");</div>
+<div>669&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }            </div>
+<div>670&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_localAlternateTargetCategoryIndex = index;</div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>672&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // set the global one</div>
+<div>673&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_globalAlternateTargetCategoryIndex = altCategoryInd;</div>
+<div>674&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>675&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          </div>
+<div>676&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>677&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw new Exception("[SupportVectorMachine] : target category supplied " +</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          		"but class attribute is numeric!");</div>
+<div>679&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>680&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (m_miningSchema.getFieldsAsInstances().classAttribute().isNominal()) {</div>
+<div>682&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_targetCategoryIndex = (altCategoryInd == 0)</div>
+<div>683&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ? 1</div>
+<div>684&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            : 0;</div>
+<div>685&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          </div>
+<div>686&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_globalAlternateTargetCategoryIndex = altCategoryInd;</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          System.err.println("Setting target index for machine to " + m_targetCategoryIndex);</div>
+<div>688&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>689&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>690&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>691&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (svmRep == SVM_representation.SUPPORT_VECTORS) {</div>
+<div>692&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // get the vectors</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        NodeList vectorsL = </div>
+<div>694&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          machineElement.getElementsByTagName("SupportVectors");</div>
+<div>695&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (vectorsL.getLength() > 0) {</div>
+<div>696&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Element vectors = (Element)vectorsL.item(0);</div>
+<div>697&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          NodeList allTheVectorsL = </div>
+<div>698&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            vectors.getElementsByTagName("SupportVector");</div>
+<div>699&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          for (int i = 0; i &#60; allTheVectorsL.getLength(); i++) {</div>
+<div>700&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Node vec = allTheVectorsL.item(i);</div>
+<div>701&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            String vecId = ((Element)vec).getAttribute("vectorId");</div>
+<div>702&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            VectorInstance suppV = dictionary.getVector(vecId);</div>
+<div>703&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (suppV == null) {</div>
+<div>704&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              throw new Exception("[SupportVectorMachine] : can't find " +</div>
+<div>705&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  "vector with ID: " + vecId + " in the " +</div>
+<div>706&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              "vector dictionary!");</div>
+<div>707&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>708&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_supportVectors.add(suppV);</div>
+<div>709&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>710&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>712&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_coeffsOnly = true;</div>
+<div>713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>714&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the coefficients</div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NodeList coefficientsL = machineElement.getElementsByTagName("Coefficients");</div>
+<div>717&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // should be just one list of coefficients</div>
+<div>718&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (coefficientsL.getLength() != 1) {</div>
+<div>719&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[SupportVectorMachine] Should be just one list of " +</div>
+<div>720&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        		"coefficients per binary SVM!");</div>
+<div>721&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>722&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Element cL = (Element)coefficientsL.item(0);</div>
+<div>723&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String intercept = cL.getAttribute("absoluteValue");</div>
+<div>724&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (intercept != null && intercept.length() > 0) {</div>
+<div>725&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_intercept = Double.parseDouble(intercept);</div>
+<div>726&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>727&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            </div>
+<div>728&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // now get the individual coefficient elements</div>
+<div>729&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      NodeList coeffL = cL.getElementsByTagName("Coefficient");</div>
+<div>730&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (coeffL.getLength() == 0) {</div>
+<div>731&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[SupportVectorMachine] No coefficients defined!");</div>
+<div>732&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>733&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>734&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_coefficients = new double[coeffL.getLength()];</div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>736&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; coeffL.getLength(); i++) {</div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Element coeff = ((Element) coeffL.item(i));</div>
+<div>738&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String val = coeff.getAttribute("value");</div>
+<div>739&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_coefficients[i] = Double.parseDouble(val);</div>
+<div>740&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>741&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>742&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>743&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>744&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get a textual description of this binary SVM</div>
+<div>745&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>746&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return a description of this SVM as a string.</div>
+<div>747&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>748&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      StringBuffer temp = new StringBuffer();</div>
+<div>750&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>751&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("Binary SVM");</div>
+<div>752&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (m_miningSchema.getFieldsAsInstances().classAttribute().isNominal()) {</div>
+<div>753&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append(" (target category = " + m_targetCategory + ")");</div>
+<div>754&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (m_localAlternateTargetCategoryIndex != -1) {</div>
+<div>755&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          temp.append("\n (alternate category = " </div>
+<div>756&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              + m_miningSchema.getFieldsAsInstances().classAttribute().</div>
+<div>757&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                value(m_localAlternateTargetCategoryIndex) + ")");</div>
+<div>758&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>760&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("\n\n");</div>
+<div>761&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>762&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (int i = 0; i &#60; m_supportVectors.size(); i++) {</div>
+<div>763&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("\n" + m_coefficients[i] + " * [" </div>
+<div>764&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + m_supportVectors.get(i).getValues() + " * X]");</div>
+<div>765&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>766&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (m_intercept >= 0) {</div>
+<div>768&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("\n +" + m_intercept);</div>
+<div>769&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>770&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("\n " + m_intercept);</div>
+<div>771&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>772&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return temp.toString();</div>
+<div>773&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>774&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>775&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>776&emsp;&emsp;&nbsp;&nbsp;  static enum SVM_representation {</div>
+<div>777&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    SUPPORT_VECTORS,</div>
+<div>778&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    COEFFICIENTS; // for the inputs if machine is linear and expressed in terms of the attributes</div>
+<div>779&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>780&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>781&emsp;&emsp;&nbsp;&nbsp;  static enum classificationMethod {</div>
+<div>782&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NONE, // PMML 3.x</div>
+<div>783&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ONE_AGAINST_ALL, // PMML 4.0 default</div>
+<div>784&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ONE_AGAINST_ONE;</div>
+<div>785&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>786&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>787&emsp;&emsp;&nbsp;&nbsp;  /** The mining function **/</div>
+<div>788&emsp;&emsp;&nbsp;&nbsp;  protected MiningFunction m_functionType = MiningFunction.CLASSIFICATION;</div>
+<div>789&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>790&emsp;&emsp;&nbsp;&nbsp;  /** The classification method (PMML 4.0) */</div>
+<div>791&emsp;&emsp;&nbsp;&nbsp;  protected classificationMethod m_classificationMethod = </div>
+<div>792&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    classificationMethod.NONE; // PMML 3.x (only handles binary problems)</div>
+<div>793&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>794&emsp;&emsp;&nbsp;&nbsp;  /** The model name (if defined) */</div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;  protected String m_modelName;</div>
+<div>796&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>797&emsp;&emsp;&nbsp;&nbsp;  /** The algorithm name (if defined) */</div>
+<div>798&emsp;&emsp;&nbsp;&nbsp;  protected String m_algorithmName;</div>
+<div>799&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>800&emsp;&emsp;&nbsp;&nbsp;  /** The dictionary of support vectors */</div>
+<div>801&emsp;&emsp;&nbsp;&nbsp;  protected VectorDictionary m_vectorDictionary;</div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>803&emsp;&emsp;&nbsp;&nbsp;  /** The kernel function to use */</div>
+<div>804&emsp;&emsp;&nbsp;&nbsp;  protected Kernel m_kernel;</div>
+<div>805&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>806&emsp;&emsp;&nbsp;&nbsp;  /** The individual binary SVMs */</div>
+<div>807&emsp;&emsp;&nbsp;&nbsp;  protected List&#60;SupportVectorMachine> m_machines = </div>
+<div>808&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    new ArrayList&#60;SupportVectorMachine>();</div>
+<div>809&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>810&emsp;&emsp;&nbsp;&nbsp;  /** The other class index (in the case of a single binary SVM - PMML 3.2). */</div>
+<div>811&emsp;&emsp;&nbsp;&nbsp;  protected int m_alternateBinaryTargetCategory = -1;</div>
+<div>812&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>813&emsp;&emsp;&nbsp;&nbsp;  /** Do we have support vectors, or just attribute coefficients for a linear machine? */</div>
+<div>814&emsp;&emsp;&nbsp;&nbsp;  protected SVM_representation m_svmRepresentation = SVM_representation.SUPPORT_VECTORS;</div>
+<div>815&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>816&emsp;&emsp;&nbsp;&nbsp;  /** PMML 4.0 threshold value */</div>
+<div>817&emsp;&emsp;&nbsp;&nbsp;  protected double m_threshold = 0;</div>
+<div>818&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>819&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>820&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Construct a new SupportVectorMachineModel encapsulating the information provided</div>
+<div>821&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * in the PMML document.</div>
+<div>822&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>823&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param model the SVM element from the PMML document</div>
+<div>824&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param dataDictionary the data dictionary</div>
+<div>825&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param miningSchema the mining schema</div>
+<div>826&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the model can't be constructed from the PMML</div>
+<div>827&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>828&emsp;&emsp;&nbsp;&nbsp;  public SupportVectorMachineModel(Element model, Instances dataDictionary,</div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      MiningSchema miningSchema) throws Exception {</div>
+<div>830&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>831&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    super(dataDictionary, miningSchema);</div>
+<div>832&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>833&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!getPMMLVersion().equals("3.2")) {</div>
+<div>834&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      //TODO might have to throw an exception and only support 3.2</div>
+<div>835&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>836&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>837&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String fn = model.getAttribute("functionName");</div>
+<div>838&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (fn.equals("regression")) {</div>
+<div>839&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_functionType = MiningFunction.REGRESSION;</div>
+<div>840&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>842&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String modelName = model.getAttribute("modelName");</div>
+<div>843&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (modelName != null && modelName.length() > 0) {</div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_modelName = modelName;</div>
+<div>845&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>847&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String algoName = model.getAttribute("algorithmName");</div>
+<div>848&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (algoName != null && algoName.length() > 0) {</div>
+<div>849&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_algorithmName = algoName;</div>
+<div>850&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>851&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>852&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String svmRep = model.getAttribute("svmRepresentation");</div>
+<div>853&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (svmRep != null && svmRep.length() > 0) {</div>
+<div>854&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (svmRep.equals("Coefficients")) {</div>
+<div>855&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_svmRepresentation = SVM_representation.COEFFICIENTS;</div>
+<div>856&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>858&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>859&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String altTargetCat = model.getAttribute("alternateBinaryTargetCategory");</div>
+<div>860&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (altTargetCat != null && altTargetCat.length() > 0) {</div>
+<div>861&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int altTargetInd = </div>
+<div>862&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_miningSchema.getFieldsAsInstances().classAttribute().indexOfValue(altTargetCat);</div>
+<div>863&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>864&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (altTargetInd &#60; 0) {</div>
+<div>865&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[SupportVectorMachineModel] can't find alternate " +</div>
+<div>866&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        		"target value " + altTargetCat);</div>
+<div>867&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>868&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_alternateBinaryTargetCategory = altTargetInd;</div>
+<div>869&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>870&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>871&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // PMML 4.0</div>
+<div>872&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String thresholdS = model.getAttribute("threshold");</div>
+<div>873&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (thresholdS != null && thresholdS.length() > 0) {</div>
+<div>874&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_threshold = Double.parseDouble(thresholdS);</div>
+<div>875&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>877&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // PMML 4.0</div>
+<div>878&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (getPMMLVersion().startsWith("4.")) {</div>
+<div>879&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_classificationMethod = classificationMethod.ONE_AGAINST_ALL; // default for PMML 4.0</div>
+<div>880&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>881&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>882&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String classificationMethodS = model.getAttribute("classificationMethod");</div>
+<div>883&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (classificationMethodS != null && classificationMethodS.length()> 0) {</div>
+<div>884&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (classificationMethodS.equals("OneAgainstOne")) {</div>
+<div>885&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_classificationMethod = classificationMethod.ONE_AGAINST_ONE;</div>
+<div>886&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>888&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>889&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (m_svmRepresentation == SVM_representation.SUPPORT_VECTORS) {</div>
+<div>890&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_vectorDictionary = VectorDictionary.getVectorDictionary(model, miningSchema);</div>
+<div>891&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>892&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>893&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_kernel = Kernel.getKernel(model, m_log);</div>
+<div>894&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (m_svmRepresentation == SVM_representation.COEFFICIENTS && </div>
+<div>895&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        !(m_kernel instanceof LinearKernel)) {</div>
+<div>896&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[SupportVectorMachineModel] representation is " +</div>
+<div>897&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      		"coefficients, but kernel is not linear!");</div>
+<div>898&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>899&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>900&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Get the individual machines</div>
+<div>901&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NodeList machineL = model.getElementsByTagName("SupportVectorMachine");</div>
+<div>902&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (machineL.getLength() == 0) {</div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[SupportVectorMachineModel] No binary SVMs" +</div>
+<div>904&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      		" defined in model file!");</div>
+<div>905&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>906&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; machineL.getLength(); i++) {</div>
+<div>907&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Node machine = machineL.item(i);</div>
+<div>908&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      SupportVectorMachine newMach = </div>
+<div>909&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new SupportVectorMachine((Element)machine, </div>
+<div>910&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_miningSchema, m_vectorDictionary, m_svmRepresentation,</div>
+<div>911&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_alternateBinaryTargetCategory, m_log);</div>
+<div>912&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_machines.add(newMach);</div>
+<div>913&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>914&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>915&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>916&emsp;&emsp;&nbsp;&nbsp;  /**                                                                                                             </div>
+<div>917&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Classifies the given test instance. The instance has to belong to a                                          </div>
+<div>918&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * dataset when it's being classified.                                                          </div>
+<div>919&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *                                                                                                              </div>
+<div>920&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param inst the instance to be classified                                                                </div>
+<div>921&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the predicted most likely class for the instance or                                                  </div>
+<div>922&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Utils.missingValue() if no prediction is made                                                             </div>
+<div>923&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @exception Exception if an error occurred during the prediction                                              </div>
+<div>924&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>925&emsp;&emsp;&nbsp;&nbsp;  public double[] distributionForInstance(Instance inst) throws Exception {</div>
+<div style="background-color:limegreen;">926&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!m_initialized) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>927&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      mapToMiningSchema(inst.dataset());</div>
+<div>928&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>929&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] preds = null;</div>
+<div>930&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">931&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_miningSchema.getFieldsAsInstances().classAttribute().isNumeric()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>932&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      preds = new double[1];</div>
+<div>933&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>934&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      preds = new double[m_miningSchema.getFieldsAsInstances().classAttribute().numValues()];</div>
+<div style="background-color:limegreen;">935&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int i = 0; i &#60; preds.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>936&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        preds[i] = -1; // mark all entries as not calculated to begin with</div>
+<div>937&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>938&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>939&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>940&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] incoming = m_fieldsMap.instanceToSchema(inst, m_miningSchema);</div>
+<div>941&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>942&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean hasMissing = false;</div>
+<div style="background-color:limegreen;">943&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; incoming.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">944&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (i != m_miningSchema.getFieldsAsInstances().classIndex() && &nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">945&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          Double.isNaN(incoming[i])) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>946&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        hasMissing = true;</div>
+<div>947&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        //System.err.println("Missing value for att : " + m_miningSchema.getFieldsAsInstances().attribute(i).name());</div>
+<div>948&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        break;</div>
+<div>949&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>950&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>951&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">952&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (hasMissing) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">953&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!m_miningSchema.hasTargetMetaData()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>954&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String message = "[SupportVectorMachineModel] WARNING: Instance to predict has missing value(s) but "</div>
+<div>955&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "there is no missing value handling meta data and no "</div>
+<div>956&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "prior probabilities/default value to fall back to. No "</div>
+<div>957&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "prediction will be made (" </div>
+<div style="background-color:limegreen;">958&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          + ((m_miningSchema.getFieldsAsInstances().classAttribute().isNominal()&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">959&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>              || m_miningSchema.getFieldsAsInstances().classAttribute().isString())&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>960&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              ? "zero probabilities output)."</div>
+<div>961&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              : "NaN output).");</div>
+<div style="background-color:limegreen;">962&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_log == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>963&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          System.err.println(message);</div>
+<div>964&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>965&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_log.logMessage(message);</div>
+<div>966&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>967&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        </div>
+<div style="background-color:limegreen;">968&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_miningSchema.getFieldsAsInstances().classAttribute().isNumeric()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>969&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds[0] = Utils.missingValue();</div>
+<div>970&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>971&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return preds;</div>
+<div>972&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>973&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // use prior probablilities/default value</div>
+<div>974&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        TargetMetaInfo targetData = m_miningSchema.getTargetMetaData();</div>
+<div style="background-color:limegreen;">975&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_miningSchema.getFieldsAsInstances().classAttribute().isNumeric()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>976&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds[0] = targetData.getDefaultValue();</div>
+<div>977&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>978&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Instances miningSchemaI = m_miningSchema.getFieldsAsInstances();</div>
+<div style="background-color:limegreen;">979&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          for (int i = 0; i &#60; miningSchemaI.classAttribute().numValues(); i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>980&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            preds[i] = targetData.getPriorProbability(miningSchemaI.classAttribute().value(i));</div>
+<div>981&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>982&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>983&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return preds;</div>
+<div>984&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>985&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div style="background-color:limegreen;">986&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (SupportVectorMachine m : m_machines) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>987&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m.distributionForInstance(incoming, m_kernel, m_vectorDictionary, </div>
+<div>988&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            preds, m_classificationMethod, m_threshold);</div>
+<div>989&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>990&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>991&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">992&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_classificationMethod != classificationMethod.NONE &&&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">993&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        m_miningSchema.getFieldsAsInstances().classAttribute().isNominal()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>994&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // PMML 4.0</div>
+<div style="background-color:limegreen;">995&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_classificationMethod == classificationMethod.ONE_AGAINST_ALL) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>996&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // find the minimum value</div>
+<div>997&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int minI = Utils.minIndex(preds);</div>
+<div>998&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        preds = new double[preds.length];</div>
+<div>999&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        preds[minI] = 1.0;</div>
+<div>1000&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1001&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // nothing to do for one-against-one - just normalize the</div>
+<div>1002&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // votes</div>
+<div>1003&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1004&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1005&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">1006&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_machines.size() == preds.length - 1) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1007&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double total = 0;</div>
+<div>1008&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int unset = -1;</div>
+<div style="background-color:limegreen;">1009&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int i = 0; i &#60; preds.length; i++) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1010&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (preds[i] != -1) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1011&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          total += preds[i];</div>
+<div>1012&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1013&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          unset = i;</div>
+<div>1014&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1015&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1016&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div style="background-color:limegreen;">1017&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (total > 1.0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1018&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[SupportVectorMachineModel] total of probabilities" +</div>
+<div>1019&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        		" is greater than 1!");</div>
+<div>1020&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1021&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div>1022&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      preds[unset] = 1.0 - total;</div>
+<div>1023&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1024&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">1025&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (preds.length > 1) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1026&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Utils.normalize(preds);</div>
+<div>1027&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1028&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1029&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return preds;</div>
+<div>1030&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1031&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>1032&emsp;&emsp;&nbsp;&nbsp;  public String getRevision() {</div>
+<div>1033&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return RevisionUtils.extract("$Revision: 8034 $");</div>
+<div>1034&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1035&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>1036&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1037&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get a textual description of this SupportVectorMachineModel</div>
+<div>1038&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1039&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a description of this SupportVectorMachineModel as a string</div>
+<div>1040&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1041&emsp;&emsp;&nbsp;&nbsp;  public String toString() {</div>
+<div>1042&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    StringBuffer temp = new StringBuffer();</div>
+<div>1043&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1044&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("PMML version " + getPMMLVersion());</div>
+<div style="background-color:limegreen;">1045&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!getCreatorApplication().equals("?")) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1046&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("\nApplication: " + getCreatorApplication());</div>
+<div>1047&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1048&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("\nPMML Model: Support Vector Machine Model");</div>
+<div>1049&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1050&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("\n\n");</div>
+<div>1051&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append(m_miningSchema);</div>
+<div>1052&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1053&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("Kernel: \n\t");</div>
+<div>1054&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append(m_kernel);</div>
+<div>1055&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("\n");</div>
+<div>1056&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">1057&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_classificationMethod != classificationMethod.NONE) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1058&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("Multi-class classifcation using ");</div>
+<div style="background-color:limegreen;">1059&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_classificationMethod == classificationMethod.ONE_AGAINST_ALL) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1060&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("one-against-all");</div>
+<div>1061&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1062&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("one-against-one");</div>
+<div>1063&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1064&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("\n\n");</div>
+<div>1065&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1066&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">1067&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (SupportVectorMachine v : m_machines) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1068&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("\n" + v);</div>
+<div>1069&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1070&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1071&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return temp.toString();</div>
+<div>1072&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1073&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

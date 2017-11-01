@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PluginManager.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *   This program is free software: you can redistribute it and/or modify</div>
+<div>3&emsp;&emsp;&nbsp; *   it under the terms of the GNU General Public License as published by</div>
+<div>4&emsp;&emsp;&nbsp; *   the Free Software Foundation, either version 3 of the License, or</div>
+<div>5&emsp;&emsp;&nbsp; *   (at your option) any later version.</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; *   This program is distributed in the hope that it will be useful,</div>
+<div>8&emsp;&emsp;&nbsp; *   but WITHOUT ANY WARRANTY; without even the implied warranty of</div>
+<div>9&emsp;&emsp;&nbsp; *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</div>
+<div>10&emsp;&emsp;&nbsp; *   GNU General Public License for more details.</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; *   You should have received a copy of the GNU General Public License</div>
+<div>13&emsp;&emsp;&nbsp; *   along with this program.  If not, see &#60;http://www.gnu.org/licenses/>.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/*</div>
+<div>17&emsp;&emsp;&nbsp; *    PluginManager.java</div>
+<div>18&emsp;&emsp;&nbsp; *    Copyright (C) 2011-2012 University of Waikato, Hamilton, New Zealand</div>
+<div>19&emsp;&emsp;&nbsp; *</div>
+<div>20&emsp;&emsp;&nbsp; */</div>
+<div>21&emsp;&emsp;</div>
+<div>22&emsp;&emsp;package weka.core;</div>
+<div>23&emsp;&emsp;</div>
+<div>24&emsp;&emsp;import java.io.BufferedInputStream;</div>
+<div>25&emsp;&emsp;import java.io.File;</div>
+<div>26&emsp;&emsp;import java.io.FileInputStream;</div>
+<div>27&emsp;&emsp;import java.io.IOException;</div>
+<div>28&emsp;&emsp;import java.io.InputStream;</div>
+<div>29&emsp;&emsp;import java.util.HashMap;</div>
+<div>30&emsp;&emsp;import java.util.HashSet;</div>
+<div>31&emsp;&emsp;import java.util.LinkedHashMap;</div>
+<div>32&emsp;&emsp;import java.util.LinkedHashSet;</div>
+<div>33&emsp;&emsp;import java.util.List;</div>
+<div>34&emsp;&emsp;import java.util.Map;</div>
+<div>35&emsp;&emsp;import java.util.Properties;</div>
+<div>36&emsp;&emsp;import java.util.Set;</div>
+<div>37&emsp;&emsp;import java.util.TreeMap;</div>
+<div>38&emsp;&emsp;</div>
+<div>39&emsp;&emsp;/**</div>
+<div>40&emsp;&emsp;&nbsp; * Class that manages a global map of plugins. Provides static methods for</div>
+<div>41&emsp;&emsp;&nbsp; * registering and instantiating plugins. The package manager looks for, and</div>
+<div>42&emsp;&emsp;&nbsp; * processes, a PluginManager.props file in the top-level of a package.</div>
+<div>43&emsp;&emsp;&nbsp; * </div>
+<div>44&emsp;&emsp;&nbsp; * @author Mark Hall (mhall{[at]}pentaho{[dot]}com)</div>
+<div>45&emsp;&emsp;&nbsp; * @version $Revision: 12312 $</div>
+<div>46&emsp;&emsp;&nbsp; */</div>
+<div>47&emsp;&emsp;public class PluginManager {</div>
+<div>48&emsp;&emsp;</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Global map of plugin classes that is keyed by plugin base class/interface</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * type. The inner Map then stores individual plugin instances of the</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * interface type, keyed by plugin name/short title with values the actual</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * fully qualified class name</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;  protected static Map&#60;String, Map&#60;String, String>> PLUGINS =</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    new HashMap&#60;String, Map&#60;String, String>>();</div>
+<div>57&emsp;&emsp;</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Set of concrete fully qualified class names or abstract/interface base</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * types to "disable". Entries in this list wont ever be returned by any of</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the getPlugin() methods. Registering an abstract/interface base name will</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * disable all concrete implementations of that type</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;  protected static Set&#60;String> DISABLED = new HashSet&#60;String>();</div>
+<div>65&emsp;&emsp;</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Global map of plugin resources (loadable from the classpath). Outer map is</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * keyed by group ID, i.e. an ID of a logical group of resources (e.g.</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * knowledge flow template files). The inner map then stores individual</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * resource paths keyed by their short description.</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;  protected static Map&#60;String, Map&#60;String, String>> RESOURCES =</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    new HashMap&#60;String, Map&#60;String, String>>();</div>
+<div>74&emsp;&emsp;</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Global lookup map to locate a package owner for resources. Keyed by group</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * ID:resource description. Used to see if a package owns a resource, in which</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * case the package classloader should be used to load the resource rather</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * than the application classloader</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;  protected static Map&#60;String, String> RESOURCE_OWNER_PACKAGE = new HashMap&#60;>();</div>
+<div>82&emsp;&emsp;</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add the supplied list of fully qualified class names to the disabled list</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classnames a list of class names to add</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void addToDisabledList(List&#60;String> classnames) {</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (String s : classnames) {</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      addToDisabledList(s);</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>93&emsp;&emsp;</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add the supplied fully qualified class name to the list of disabled plugins</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classname the fully qualified name of a class to add</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void addToDisabledList(String classname) {</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    DISABLED.add(classname);</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>102&emsp;&emsp;</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Remove the supplied list of fully qualified class names to the disabled</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * list</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classnames a list of class names to remove</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    removeFromDisabledList(List&#60;String> classnames) {</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (String s : classnames) {</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      removeFromDisabledList(s);</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>115&emsp;&emsp;</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Remove the supplied fully qualified class name from the list of disabled</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * plugins</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classname the fully qualified name of a class to remove</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void removeFromDisabledList(String classname) {</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    DISABLED.remove(classname);</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>125&emsp;&emsp;</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns true if the supplied fully qualified class name is in the disabled</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * list</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classname the name of the class to check</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if the supplied class name is in the disabled list</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;  public static boolean isInDisabledList(String classname) {</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return DISABLED.contains(classname);</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>136&emsp;&emsp;</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add all key value pairs from the supplied property file</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param propsFile the properties file to add</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void addFromProperties(File propsFile)</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    addFromProperties(null, propsFile);</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>147&emsp;&emsp;</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add all key value pairs from the supplied property file</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the Weka package that owns this properties</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          object. Can be null if not owned by a Weka package</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param propsFile the properties file to add</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void addFromProperties(String packageName,</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    File propsFile) throws Exception {</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    addFromProperties(packageName, propsFile, false);</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>160&emsp;&emsp;</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add all key value pairs from the supplied property file</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param propsFile the properties file to add</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param maintainInsertionOrder true if the order of insertion of</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          implementations is to be preserved (rather than sorted order)</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void addFromProperties(File propsFile,</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean maintainInsertionOrder) throws Exception {</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    addFromProperties(null, propsFile, maintainInsertionOrder);</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>173&emsp;&emsp;</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add all key value pairs from the supplied property file</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the Weka package that owns this properties</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          object. Can be null if not owned by a Weka package</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param propsFile the properties file to add</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param maintainInsertionOrder true if the order of insertion of</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          implementations is to be preserved (rather than sorted order)</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void addFromProperties(String packageName,</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    File propsFile, boolean maintainInsertionOrder) throws Exception {</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    BufferedInputStream bi =</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new BufferedInputStream(new FileInputStream(propsFile));</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    addFromProperties(packageName, bi, maintainInsertionOrder);</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>190&emsp;&emsp;</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add all key value pairs from the supplied properties stream</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param propsStream an input stream to a properties file</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void addFromProperties(InputStream propsStream)</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    addFromProperties(null, propsStream);</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>201&emsp;&emsp;</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add all key value pairs from the supplied properties stream</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the Weka package that owns this properties</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          object. Can be null if not owned by a Weka package</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param propsStream an input stream to a properties file</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void addFromProperties(String packageName,</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    InputStream propsStream) throws Exception {</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    addFromProperties(packageName, propsStream, false);</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>214&emsp;&emsp;</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add all key value pairs from the supplied properties stream</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param propsStream an input stream to a properties file</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param maintainInsertionOrder true if the order of insertion of</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          implementations is to be preserved (rather than sorted order)</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void addFromProperties(InputStream propsStream,</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean maintainInsertionOrder) throws Exception {</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    addFromProperties(null, propsStream, maintainInsertionOrder);</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>227&emsp;&emsp;</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add all key value pairs from the supplied properties stream</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the Weka package that owns this properties</div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          object. Can be null if not owned by a Weka package</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param propsStream an input stream to a properties file</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param maintainInsertionOrder true if the order of insertion of</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          implementations is to be preserved (rather than sorted order)</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void addFromProperties(String packageName,</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    InputStream propsStream, boolean maintainInsertionOrder) throws Exception {</div>
+<div>240&emsp;&emsp;</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Properties expProps = new Properties();</div>
+<div>242&emsp;&emsp;</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    expProps.load(propsStream);</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    propsStream.close();</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    propsStream = null;</div>
+<div>246&emsp;&emsp;</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    addFromProperties(packageName, expProps, maintainInsertionOrder);</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>249&emsp;&emsp;</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add all key value pairs from the supplied properties object</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param props a Properties object</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void addFromProperties(Properties props)</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    addFromProperties(props, false);</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>260&emsp;&emsp;</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add all key value pairs from the supplied properties object</div>
+<div>263&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the Weka package that owns this properties</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          object. Can be null if not owned by a Weka package</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param props a Properties object</div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void addFromProperties(String packageName,</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Properties props) throws Exception {</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    addFromProperties(packageName, props, false);</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>273&emsp;&emsp;</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add all key value pairs from the supplied properties object</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param props a Properties object</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param maintainInsertionOrder true if the order of insertion of</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          implementations is to be preserved (rather than sorted order)</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;  public synchronized static void addFromProperties(Properties props,</div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean maintainInsertionOrder) throws Exception {</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    addFromProperties(null, props, maintainInsertionOrder);</div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>286&emsp;&emsp;</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>288&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add all key value pairs from the supplied properties object</div>
+<div>289&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the Weka package that owns this properties</div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          object. Can be null if not owned by a Weka package</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param props a Properties object</div>
+<div>293&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param maintainInsertionOrder true if the order of insertion of</div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          implementations is to be preserved (rather than sorted order)</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs</div>
+<div>296&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void addFromProperties(String packageName,</div>
+<div>298&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Properties props, boolean maintainInsertionOrder) throws Exception {</div>
+<div>299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    java.util.Enumeration&#60;?> keys = props.propertyNames();</div>
+<div>300&emsp;&emsp;</div>
+<div style="background-color:limegreen;">301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    while (keys.hasMoreElements()) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, CHECKERROR, DEBUG, NOCHECKCAPABILITIES]</b></div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String baseType = (String) keys.nextElement();</div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String implementations = props.getProperty(baseType);</div>
+<div style="background-color:limegreen;">304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (baseType.equalsIgnoreCase("*resources*")) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, CHECKERROR, DEBUG, NOCHECKCAPABILITIES]</b></div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        addPluginResourcesFromProperty(packageName, implementations);</div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div style="background-color:limegreen;">307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (implementations != null && implementations.length() > 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, CHECKERROR, DEBUG, NOCHECKCAPABILITIES] & [BATCHSIZE, NUMDECIMAL, PRUNE, CHECKERROR, DEBUG, NOCHECKCAPABILITIES]</b></div>
+<div>308&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String[] parts = implementations.split(",");</div>
+<div style="background-color:limegreen;">309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          for (String impl : parts) {&nbsp;&#8594; [BATCHSIZE, NUMDECIMAL, PRUNE, CHECKERROR, DEBUG, NOCHECKCAPABILITIES]</b></div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            impl = impl.trim();</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            String name = impl;</div>
+<div style="background-color:limegreen;">312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (impl.charAt(0) == '[') {&nbsp;&#8594; [BATCHSIZE, NUMDECIMAL, PRUNE, CHECKERROR, DEBUG, NOCHECKCAPABILITIES]</b></div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              name = impl.substring(1, impl.indexOf(']'));</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              impl = impl.substring(impl.indexOf(']') + 1);</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            PluginManager.addPlugin(baseType, name.trim(), impl,</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              maintainInsertionOrder);</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>322&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>323&emsp;&emsp;</div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>325&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add resources from a list. String format for a list of resources (as might</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * be supplied from a *resources* entry in an property file:&#60;br></div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;br></div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;pre></div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * [groupID|description|path],[groupID|description|path],...</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;/pre></div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param resourceList a list of resources to add</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;  public static void addPluginResourcesFromProperty(String resourceList) {</div>
+<div>336&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    addPluginResourcesFromProperty(null, resourceList);</div>
+<div>337&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>338&emsp;&emsp;</div>
+<div>339&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add resources from a list. String format for a list of resources (as might</div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * be supplied from a *resources* entry in an property file:&#60;br></div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;br></div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;pre></div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * [groupID|description|path],[groupID|description|path],...</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;/pre></div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the Weka package that owns these resources. Can be null</div>
+<div>349&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          if not owned by a Weka package</div>
+<div>350&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param resourceList a list of resources to add</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;  protected static synchronized void addPluginResourcesFromProperty(</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String packageName, String resourceList) {</div>
+<div>354&emsp;&emsp;</div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // Format: [groupID|description|path],[...],...</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String[] resources = resourceList.split(",");</div>
+<div style="background-color:limegreen;">357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (String r : resources) {&nbsp;&#8594; [BATCHSIZE, NUMDECIMAL, PRUNE, CHECKERROR, DEBUG, NOCHECKCAPABILITIES]</b></div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      r = r.trim();</div>
+<div style="background-color:limegreen;">359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!r.startsWith("[") || !r.endsWith("]")) {&nbsp;&#8594; [BATCHSIZE, NUMDECIMAL, PRUNE, CHECKERROR, DEBUG, NOCHECKCAPABILITIES] & [BATCHSIZE, NUMDECIMAL, PRUNE, CHECKERROR, DEBUG, NOCHECKCAPABILITIES]</b></div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println("[PluginManager] Malformed resource in: "</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + resourceList);</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        continue;</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>364&emsp;&emsp;</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      r = r.replace("[", "").replace("]", "");</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String[] rParts = r.split("\\|");</div>
+<div style="background-color:limegreen;">367&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (rParts.length != 3) {&nbsp;&#8594; [BATCHSIZE, NUMDECIMAL, PRUNE, DEBUG, NOCHECKCAPABILITIES]</b></div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          .println("[PluginManager] Was expecting 3 pipe separated parts in "</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + "resource spec: " + r);</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        continue;</div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>373&emsp;&emsp;</div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String groupID = rParts[0].trim();</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String resourceDesc = rParts[1].trim();</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String resourcePath = rParts[2].trim();</div>
+<div style="background-color:limegreen;">377&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (groupID.length() == 0 || resourceDesc.length() == 0&nbsp;&#8594; [BATCHSIZE, NUMDECIMAL, PRUNE, DEBUG, NOCHECKCAPABILITIES] & [BATCHSIZE, NUMDECIMAL, PRUNE, DEBUG, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        || resourcePath.length() == 0) {&nbsp;&#8594; [BATCHSIZE, NUMDECIMAL, PRUNE, DEBUG, NOCHECKCAPABILITIES]</b></div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.err.println("[PluginManager] Empty part in resource spec: " + r);</div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        continue;</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      addPluginResource(packageName, groupID, resourceDesc, resourcePath);</div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>385&emsp;&emsp;</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add a resource.</div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>389&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param resourceGroupID the ID of the group under which the resource should</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          be stored</div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param resourceDescription the description/ID of the resource</div>
+<div>392&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param resourcePath the path to the resource</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;  public static void addPluginResource(String resourceGroupID,</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String resourceDescription, String resourcePath) {</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    addPluginResource(null, resourceGroupID, resourceDescription, resourcePath);</div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>398&emsp;&emsp;</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add a resource.</div>
+<div>401&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param packageName the name of the package that owns this resource. Can be</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          null if not owned by a package, in which case the current</div>
+<div>404&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          classloader will be used to load the resource.</div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param resourceGroupID the ID of the group under which the resource should</div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          be stored</div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param resourceDescription the description/ID of the resource</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param resourcePath the path to the resource</div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>410&emsp;&emsp;&nbsp;&nbsp;  public static synchronized void addPluginResource(String packageName,</div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String resourceGroupID, String resourceDescription, String resourcePath) {</div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Map&#60;String, String> groupMap = RESOURCES.get(resourceGroupID);</div>
+<div style="background-color:limegreen;">413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (groupMap == null) {&nbsp;&#8594; [BATCHSIZE, NUMDECIMAL, PRUNE, NOCHECKCAPABILITIES]</b></div>
+<div>414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      groupMap = new LinkedHashMap&#60;String, String>();</div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      RESOURCES.put(resourceGroupID, groupMap);</div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>417&emsp;&emsp;</div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    groupMap.put(resourceDescription, resourcePath);</div>
+<div style="background-color:limegreen;">419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (packageName != null && packageName.length() > 0) {&nbsp;&#8594; [BATCHSIZE, NUMDECIMAL, PRUNE, NOCHECKCAPABILITIES] & [BATCHSIZE, NUMDECIMAL, PRUNE, NOCHECKCAPABILITIES]</b></div>
+<div>420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      RESOURCE_OWNER_PACKAGE.put(resourceGroupID + ":" + resourceDescription,</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        packageName);</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>424&emsp;&emsp;</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>426&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get an input stream for a named resource under a given resource group ID.</div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param resourceGroupID the group ID that the resource falls under</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param resourceDescription the description/ID of the resource</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return an InputStream for the resource</div>
+<div>431&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws IOException if the group ID or resource description/ID are not</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *           known to the PluginManager, or a problem occurs while trying to</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *           open an input stream</div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;  public static InputStream getPluginResourceAsStream(String resourceGroupID,</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String resourceDescription) throws IOException {</div>
+<div>437&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Map&#60;String, String> groupMap = RESOURCES.get(resourceGroupID);</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (groupMap == null) {</div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new IOException("Unknown resource group ID: " + resourceGroupID);</div>
+<div>440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>441&emsp;&emsp;</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String resourcePath = groupMap.get(resourceDescription);</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (resourcePath == null) {</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new IOException("Unknown resource: " + resourceDescription);</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>446&emsp;&emsp;</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // owned by a package?</div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String ownerPackage =</div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      RESOURCE_OWNER_PACKAGE.get(resourceGroupID + ":" + resourceDescription);</div>
+<div>450&emsp;&emsp;</div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (ownerPackage == null) {</div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return PluginManager.class.getClassLoader().getResourceAsStream(</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        resourcePath);</div>
+<div>454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>455&emsp;&emsp;</div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return WekaPackageClassLoaderManager.getWekaPackageClassLoaderManager()</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .getPackageClassLoader(ownerPackage).getResourceAsStream(resourcePath);</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>459&emsp;&emsp;</div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get the number of resources available under a given resource group ID.</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>463&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param resourceGroupID the group ID of the resources</div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the number of resources registered under the supplied group ID</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;  public static int numResourcesForWithGroupID(String resourceGroupID) {</div>
+<div>467&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Map&#60;String, String> groupMap = RESOURCES.get(resourceGroupID);</div>
+<div>468&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return groupMap == null ? 0 : groupMap.size();</div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>470&emsp;&emsp;</div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get a map of resources (description,path) registered under a given resource</div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * group ID.</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param resourceGroupID the group ID of the resources to get</div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a map of resources registered under the supplied group ID, or null</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         if the resourceGroupID is not known to the plugin manager</div>
+<div>478&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>479&emsp;&emsp;&nbsp;&nbsp;  public static Map&#60;String, String> getResourcesWithGroupID(</div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String resourceGroupID) {</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return RESOURCES.get(resourceGroupID);</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>483&emsp;&emsp;</div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get a set of names of plugins that implement the supplied interface.</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param interfaceName the fully qualified name of the interface to list</div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          plugins for</div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>490&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a set of names of plugins</div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;  public static Set&#60;String> getPluginNamesOfType(String interfaceName) {</div>
+<div style="background-color:limegreen;">493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (PLUGINS.get(interfaceName) != null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Set&#60;String> match = PLUGINS.get(interfaceName).keySet();</div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Set&#60;String> result = new LinkedHashSet&#60;String>();</div>
+<div style="background-color:limegreen;">496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (String s : match) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String impl = PLUGINS.get(interfaceName).get(s);</div>
+<div style="background-color:limegreen;">498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!DISABLED.contains(impl)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          result.add(s);</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // return PLUGINS.get(interfaceName).keySet();</div>
+<div>503&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>505&emsp;&emsp;</div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return null;</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>508&emsp;&emsp;</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add a plugin.</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param interfaceName the fully qualified interface name that the plugin</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          implements</div>
+<div>514&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name/short description of the plugin</div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param concreteType the fully qualified class name of the actual concrete</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          implementation</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;  public static void addPlugin(String interfaceName, String name,</div>
+<div>520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String concreteType) {</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    addPlugin(interfaceName, name, concreteType, false);</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>523&emsp;&emsp;</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Add a plugin.</div>
+<div>526&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param interfaceName the fully qualified interface name that the plugin</div>
+<div>528&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          implements</div>
+<div>529&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>530&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name/short description of the plugin</div>
+<div>531&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param concreteType the fully qualified class name of the actual concrete</div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          implementation</div>
+<div>533&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param maintainInsertionOrder true if the order of insertion of</div>
+<div>534&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          implementations is to be preserved (rather than sorted order)</div>
+<div>535&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>536&emsp;&emsp;&nbsp;&nbsp;  public static void addPlugin(String interfaceName, String name,</div>
+<div>537&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String concreteType, boolean maintainInsertionOrder) {</div>
+<div>538&emsp;&emsp;</div>
+<div style="background-color:limegreen;">539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (PLUGINS.get(interfaceName) == null) {&nbsp;&#8594; [BATCHSIZE, NUMDECIMAL, PRUNE, DEBUG, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">540&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      Map&#60;String, String> pluginsOfInterfaceType =&nbsp;&#8594; [BATCHSIZE, NUMDECIMAL, PRUNE, DEBUG, NOCHECKCAPABILITIES]</b></div>
+<div>541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        maintainInsertionOrder ? new LinkedHashMap&#60;String, String>()</div>
+<div>542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          : new TreeMap&#60;String, String>();</div>
+<div>543&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      pluginsOfInterfaceType.put(name, concreteType);</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      PLUGINS.put(interfaceName, pluginsOfInterfaceType);</div>
+<div>545&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>546&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      PLUGINS.get(interfaceName).put(name, concreteType);</div>
+<div>547&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>548&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>549&emsp;&emsp;</div>
+<div>550&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Remove plugins of a specific type.</div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>553&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param interfaceName the fully qualified interface name that the plugins to</div>
+<div>554&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          be remove implement</div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param names a list of named plugins to remove</div>
+<div>556&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>557&emsp;&emsp;&nbsp;&nbsp;  public static void removePlugins(String interfaceName, List&#60;String> names) {</div>
+<div>558&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (String name : names) {</div>
+<div>559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      removePlugin(interfaceName, name);</div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>561&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>562&emsp;&emsp;</div>
+<div>563&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>564&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Remove a plugin.</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>566&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param interfaceName the fully qualified interface name that the plugin</div>
+<div>567&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          implements</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>569&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name/short description of the plugin</div>
+<div>570&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>571&emsp;&emsp;&nbsp;&nbsp;  public static void removePlugin(String interfaceName, String name) {</div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (PLUGINS.get(interfaceName) != null) {</div>
+<div>573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      PLUGINS.get(interfaceName).remove(name);</div>
+<div>574&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>576&emsp;&emsp;</div>
+<div>577&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Checks if a named plugin exists in the map of registered plugins</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param interfaceType the fully qualified interface name of the plugin type</div>
+<div>581&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name/short description of the plugin to get</div>
+<div>582&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if the named plugin exists</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>584&emsp;&emsp;&nbsp;&nbsp;  public static boolean pluginRegistered(String interfaceType, String name) {</div>
+<div>585&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Map&#60;String, String> pluginsOfInterfaceType = PLUGINS.get(interfaceType);</div>
+<div>586&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return pluginsOfInterfaceType.get(name) != null;</div>
+<div>587&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>588&emsp;&emsp;</div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>590&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get an instance of a concrete implementation of a plugin type</div>
+<div>591&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>592&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param interfaceType the fully qualified interface name of the plugin type</div>
+<div>593&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name/short description of the plugin to get</div>
+<div>594&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the concrete plugin or null if the plugin is disabled</div>
+<div>595&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the plugin can't be found or instantiated</div>
+<div>596&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;  public static Object getPluginInstance(String interfaceType, String name)</div>
+<div>598&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div style="background-color:limegreen;">599&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (PLUGINS.get(interfaceType) == null&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">600&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      || PLUGINS.get(interfaceType).size() == 0) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>601&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("No plugins of interface type: " + interfaceType</div>
+<div>602&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + " available!!");</div>
+<div>603&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>604&emsp;&emsp;</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Map&#60;String, String> pluginsOfInterfaceType = PLUGINS.get(interfaceType);</div>
+<div style="background-color:limegreen;">606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (pluginsOfInterfaceType.get(name) == null) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("Can't find named plugin '" + name + "' of type '"</div>
+<div>608&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + interfaceType + "'!");</div>
+<div>609&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>610&emsp;&emsp;</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String concreteImpl = pluginsOfInterfaceType.get(name);</div>
+<div>612&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Object plugin = null;</div>
+<div style="background-color:limegreen;">613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!DISABLED.contains(concreteImpl)) {&nbsp;&#8594; [OPTIMIZATIONS, BATCHSIZE, NUMDECIMAL, PRUNE, SEED, CHECKERROR, MINNO, DEBUG, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      plugin =</div>
+<div>615&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        WekaPackageClassLoaderManager.forName(concreteImpl).newInstance();</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>617&emsp;&emsp;</div>
+<div>618&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return plugin;</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>620&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>
