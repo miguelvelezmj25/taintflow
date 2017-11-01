@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GeneralRegression.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *   This program is free software: you can redistribute it and/or modify</div>
+<div>3&emsp;&emsp;&nbsp; *   it under the terms of the GNU General Public License as published by</div>
+<div>4&emsp;&emsp;&nbsp; *   the Free Software Foundation, either version 3 of the License, or</div>
+<div>5&emsp;&emsp;&nbsp; *   (at your option) any later version.</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; *   This program is distributed in the hope that it will be useful,</div>
+<div>8&emsp;&emsp;&nbsp; *   but WITHOUT ANY WARRANTY; without even the implied warranty of</div>
+<div>9&emsp;&emsp;&nbsp; *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</div>
+<div>10&emsp;&emsp;&nbsp; *   GNU General Public License for more details.</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; *   You should have received a copy of the GNU General Public License</div>
+<div>13&emsp;&emsp;&nbsp; *   along with this program.  If not, see &#60;http://www.gnu.org/licenses/>.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/*</div>
+<div>17&emsp;&emsp;&nbsp; *    GeneralRegression.java</div>
+<div>18&emsp;&emsp;&nbsp; *    Copyright (C) 2008-2012 University of Waikato, Hamilton, New Zealand</div>
+<div>19&emsp;&emsp;&nbsp; *</div>
+<div>20&emsp;&emsp;&nbsp; */</div>
+<div>21&emsp;&emsp;</div>
+<div>22&emsp;&emsp;package weka.classifiers.pmml.consumer;</div>
+<div>23&emsp;&emsp;</div>
+<div>24&emsp;&emsp;import java.io.Serializable;</div>
+<div>25&emsp;&emsp;import java.util.ArrayList;</div>
+<div>26&emsp;&emsp;</div>
+<div>27&emsp;&emsp;import org.w3c.dom.Element;</div>
+<div>28&emsp;&emsp;import org.w3c.dom.Node;</div>
+<div>29&emsp;&emsp;import org.w3c.dom.NodeList;</div>
+<div>30&emsp;&emsp;</div>
+<div>31&emsp;&emsp;import weka.core.Attribute;</div>
+<div>32&emsp;&emsp;import weka.core.Instance;</div>
+<div>33&emsp;&emsp;import weka.core.Instances;</div>
+<div>34&emsp;&emsp;import weka.core.RevisionUtils;</div>
+<div>35&emsp;&emsp;import weka.core.Utils;</div>
+<div>36&emsp;&emsp;import weka.core.pmml.MiningSchema;</div>
+<div>37&emsp;&emsp;import weka.core.pmml.PMMLUtils;</div>
+<div>38&emsp;&emsp;import weka.core.pmml.TargetMetaInfo;</div>
+<div>39&emsp;&emsp;</div>
+<div>40&emsp;&emsp;/**</div>
+<div>41&emsp;&emsp;&nbsp; * Class implementing import of PMML General Regression model. Can be</div>
+<div>42&emsp;&emsp;&nbsp; * used as a Weka classifier for prediction (buildClassifier()</div>
+<div>43&emsp;&emsp;&nbsp; * raises an Exception).</div>
+<div>44&emsp;&emsp;&nbsp; *</div>
+<div>45&emsp;&emsp;&nbsp; * @author Mark Hall (mhall{[at]}pentaho{[dot]}com)</div>
+<div>46&emsp;&emsp;&nbsp; * @version $Revision: 8034 $</div>
+<div>47&emsp;&emsp;&nbsp; */</div>
+<div>48&emsp;&emsp;public class GeneralRegression extends PMMLClassifier</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;  implements Serializable {</div>
+<div>50&emsp;&emsp;</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * For serialization</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;  private static final long serialVersionUID = 2583880411828388959L;</div>
+<div>55&emsp;&emsp;</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Enumerated type for the model type.</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;  enum ModelType {</div>
+<div>60&emsp;&emsp;</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // same type of model</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    REGRESSION ("regression"), </div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      GENERALLINEAR ("generalLinear"), </div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      MULTINOMIALLOGISTIC ("multinomialLogistic"),</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ORDINALMULTINOMIAL ("ordinalMultinomial"), </div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      GENERALIZEDLINEAR ("generalizedLinear");</div>
+<div>67&emsp;&emsp;</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final String m_stringVal;</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ModelType(String name) {</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_stringVal = name;</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_stringVal;</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;  // the model type</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;  protected ModelType m_modelType = ModelType.REGRESSION;</div>
+<div>80&emsp;&emsp;</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;  // the model name (if defined)</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;  protected String m_modelName;</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;  // the algorithm name (if defined)</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;  protected String m_algorithmName;</div>
+<div>86&emsp;&emsp;</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;  // the function type (regression or classification)</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;  protected int m_functionType = Regression.RegressionTable.REGRESSION;</div>
+<div>89&emsp;&emsp;</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Enumerated type for the cumulative link function</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * (ordinal multinomial model type only).</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;  enum CumulativeLinkFunction {</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NONE ("none") {</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset) {</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Double.NaN; // no evaluation defined in this case!</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    LOGIT ("logit") {</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset) {</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return 1.0 / (1.0 + Math.exp(-(value + offset)));</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PROBIT ("probit") {</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset) {</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return weka.core.matrix.Maths.pnorm(value + offset); </div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    CLOGLOG ("cloglog") {</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset) {</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return 1.0 - Math.exp(-Math.exp(value + offset));</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    LOGLOG ("loglog") {</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset) {</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Math.exp(-Math.exp(-(value + offset))); </div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    CAUCHIT ("cauchit") {</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset) {</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return 0.5 + (1.0 / Math.PI) * Math.atan(value + offset);</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    };</div>
+<div>125&emsp;&emsp;</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Evaluation function.</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param value the raw response value</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param offset the offset to add to the raw value </div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the result of the link function</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    abstract double eval(double value, double offset);</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final String m_stringVal;</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Constructor</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param name textual name for this enum</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    CumulativeLinkFunction(String name) {</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_stringVal = name;</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* (non-Javadoc)</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @see java.lang.Enum#toString()</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_stringVal;</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;  // cumulative link function (ordinal multinomial only)</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;  protected CumulativeLinkFunction m_cumulativeLinkFunction </div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    = CumulativeLinkFunction.NONE;</div>
+<div>157&emsp;&emsp;</div>
+<div>158&emsp;&emsp;</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Enumerated type for the link function (general linear and</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * generalized linear model types only).</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;  enum LinkFunction {</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NONE ("none") {</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset, double trials,</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  double distParam, double linkParam) {</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Double.NaN; // no evaluation defined in this case!</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    CLOGLOG ("cloglog") {</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset, double trials,</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  double distParam, double linkParam) {</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (1.0 - Math.exp(-Math.exp(value + offset))) * trials;</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    IDENTITY ("identity") {</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset, double trials,</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  double distParam, double linkParam) {</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (value + offset) * trials;</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    LOG ("log") {</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset, double trials,</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  double distParam, double linkParam) {</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Math.exp(value + offset) * trials;</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    LOGC ("logc") {</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset, double trials,</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  double distParam, double linkParam) {</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (1.0 - Math.exp(value + offset)) * trials;</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    LOGIT ("logit") {</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset, double trials,</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  double distParam, double linkParam) {</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (1.0 / (1.0 + Math.exp(-(value + offset)))) * trials;</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    LOGLOG ("loglog") {</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset, double trials,</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  double distParam, double linkParam) {</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Math.exp(-Math.exp(-(value + offset))) * trials;</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NEGBIN ("negbin") {</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset, double trials,</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  double distParam, double linkParam) {</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (1.0 / (distParam * (Math.exp(-(value + offset)) - 1.0))) * trials;</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ODDSPOWER ("oddspower") {</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset, double trials,</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  double distParam, double linkParam) {</div>
+<div style="background-color:limegreen;">215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return (linkParam &#60; 0.0 || linkParam > 0.0)&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ? (1.0 / (1.0 + Math.pow(1.0 + linkParam * (value + offset), (-1.0 / linkParam)))) * trials</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        : (1.0 / (1.0 + Math.exp(-(value + offset)))) * trials;</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    POWER ("power") {</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset, double trials,</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  double distParam, double linkParam) {</div>
+<div style="background-color:limegreen;">223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        return (linkParam &#60; 0.0 || linkParam > 0.0)&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ? Math.pow(value + offset, (1.0 / linkParam)) * trials</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            : Math.exp(value + offset) * trials;</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    },</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PROBIT ("probit") {</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double eval(double value, double offset, double trials,</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  double distParam, double linkParam) {</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return weka.core.matrix.Maths.pnorm(value + offset) * trials;</div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    };</div>
+<div>234&emsp;&emsp;</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Evaluation function.</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param value the raw response value</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param offset the offset to add to the raw value</div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param trials the trials value to multiply the result by</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param distParam the distribution parameter (negbin only)</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param linkParam the link parameter (power and oddspower only) </div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the result of the link function</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    abstract double eval(double value, double offset, double trials, </div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                         double distParam, double linkParam);</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final String m_stringVal;</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Constructor.</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param name the textual name of this link function</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    LinkFunction(String name) {</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_stringVal = name;</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>258&emsp;&emsp;</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* (non-Javadoc)</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @see java.lang.Enum#toString()</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_stringVal;</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;  // link function (generalLinear model type only)</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;  protected LinkFunction m_linkFunction = LinkFunction.NONE;</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;  protected double m_linkParameter = Double.NaN;</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;  protected String m_trialsVariable;</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;  protected double m_trialsValue = Double.NaN;</div>
+<div>272&emsp;&emsp;</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Enumerated type for the distribution (general linear</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * and generalized linear model types only).</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;  enum Distribution {</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NONE ("none"),</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NORMAL ("normal"),</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    BINOMIAL ("binomial"),</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    GAMMA ("gamma"),</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    INVGAUSSIAN ("igauss"),</div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NEGBINOMIAL ("negbin"),</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    POISSON ("poisson");</div>
+<div>285&emsp;&emsp;</div>
+<div>286&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private final String m_stringVal;</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Distribution(String name) {</div>
+<div>288&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_stringVal = name;</div>
+<div>289&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>290&emsp;&emsp;</div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* (non-Javadoc)</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @see java.lang.Enum#toString()</div>
+<div>293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_stringVal;</div>
+<div>296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>298&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>299&emsp;&emsp;&nbsp;&nbsp;  // generalLinear and generalizedLinear model type only</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;  protected Distribution m_distribution = Distribution.NORMAL;</div>
+<div>301&emsp;&emsp;</div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;  // ancillary parameter value for the negative binomial distribution</div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;  protected double m_distParameter = Double.NaN;</div>
+<div>304&emsp;&emsp;</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;  // if present, this variable is used during scoring generalizedLinear/generalLinear or</div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;  // ordinalMultinomial models</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;  protected String m_offsetVariable;</div>
+<div>308&emsp;&emsp;</div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;  // if present, this variable is used during scoring generalizedLinear/generalLinear or</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;  // ordinalMultinomial models. It works like a user-specified intercept.</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;  // At most, only one of offsetVariable or offsetValue may be specified.</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;  protected double m_offsetValue = Double.NaN;</div>
+<div>313&emsp;&emsp;</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Small inner class to hold the name of a parameter plus</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * its optional descriptive label</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;  static class Parameter implements Serializable {</div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // ESCA-JAVA0096:</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** For serialization */</div>
+<div>321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // CHECK ME WITH serialver</div>
+<div>322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = 6502780192411755341L;</div>
+<div>323&emsp;&emsp;</div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String m_name = null;</div>
+<div>325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String m_label = null;</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>327&emsp;&emsp;</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;  // List of model parameters</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;  protected ArrayList&#60;Parameter> m_parameterList = new ArrayList&#60;Parameter>();</div>
+<div>330&emsp;&emsp;</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Small inner class to hold the name of a factor or covariate,</div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * plus the index of the attribute it corresponds to in the</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * mining schema.</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>336&emsp;&emsp;&nbsp;&nbsp;  static class Predictor implements Serializable {</div>
+<div>337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** For serialization */</div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // CHECK ME WITH serialver</div>
+<div>339&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = 6502780192411755341L;</div>
+<div>340&emsp;&emsp;</div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String m_name = null;</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected int m_miningSchemaIndex = -1;</div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String toString() {</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_name;</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>349&emsp;&emsp;&nbsp;&nbsp;  // FactorList</div>
+<div>350&emsp;&emsp;&nbsp;&nbsp;  protected ArrayList&#60;Predictor> m_factorList = new ArrayList&#60;Predictor>();</div>
+<div>351&emsp;&emsp;</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;  // CovariateList</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;  protected ArrayList&#60;Predictor> m_covariateList = new ArrayList&#60;Predictor>();</div>
+<div>354&emsp;&emsp;</div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Small inner class to hold details on a predictor-to-parameter</div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * correlation.</div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;  static class PPCell implements Serializable {</div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** For serialization */</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // CHECK ME WITH serialver</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = 6502780192411755341L;</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>364&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String m_predictorName = null;</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String m_parameterName = null;</div>
+<div>366&emsp;&emsp;</div>
+<div>367&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // either the exponent of a numeric attribute or the index of</div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // a discrete value</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double m_value = 0;</div>
+<div>370&emsp;&emsp;</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // optional. The default is for all target categories to</div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // share the same PPMatrix.</div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // TO-DO: implement multiple PPMatrixes </div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String m_targetCategory = null;</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>377&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;  // PPMatrix (predictor-to-parameter matrix)</div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;  // rows = parameters, columns = predictors (attributes)</div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;  protected PPCell[][] m_ppMatrix;</div>
+<div>381&emsp;&emsp;</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Small inner class to hold a single entry in the </div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * ParamMatrix (parameter matrix).</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;  static class PCell implements Serializable {</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** For serialization */</div>
+<div>389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // CHECK ME WITH serialver</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private static final long serialVersionUID = 6502780192411755341L;</div>
+<div>391&emsp;&emsp;</div>
+<div>392&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // may be null for numeric target. May also be null if this coefficent</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // applies to all target categories.</div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String m_targetCategory = null;</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String m_parameterName = null;</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // coefficient</div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double m_beta = 0.0;</div>
+<div>398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // optional degrees of freedom</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected int m_df = -1;</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>401&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;  // ParamMatrix. rows = target categories (only one if target is numeric),</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;  // columns = parameters (in order that they occur in the parameter list).</div>
+<div>404&emsp;&emsp;&nbsp;&nbsp;  protected PCell[][] m_paramMatrix;</div>
+<div>405&emsp;&emsp;</div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Constructs a GeneralRegression classifier.</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param model the Element that holds the model definition</div>
+<div>410&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param dataDictionary the data dictionary as a set of Instances</div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param miningSchema the mining schema</div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if there is a problem constructing the general regression</div>
+<div>413&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * object from the PMML.</div>
+<div>414&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;  public GeneralRegression(Element model, Instances dataDictionary,</div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                           MiningSchema miningSchema) throws Exception {</div>
+<div>417&emsp;&emsp;</div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    super(dataDictionary, miningSchema);</div>
+<div>419&emsp;&emsp;&nbsp; </div>
+<div>420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the model type</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String mType = model.getAttribute("modelType");</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean found = false;</div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (ModelType m : ModelType.values()) {</div>
+<div>424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (m.toString().equals(mType)) {</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_modelType = m;</div>
+<div>426&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        found = true;</div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        break;</div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }      </div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!found) {</div>
+<div>431&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[GeneralRegression] unknown model type: " + mType);</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>433&emsp;&emsp;</div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (m_modelType == ModelType.ORDINALMULTINOMIAL) {</div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the cumulative link function</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String cLink = model.getAttribute("cumulativeLink");</div>
+<div>437&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      found = false;</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (CumulativeLinkFunction c : CumulativeLinkFunction.values()) {</div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (c.toString().equals(cLink)) {</div>
+<div>440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_cumulativeLinkFunction = c;</div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          found = true;</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!found) {</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] cumulative link function " + cLink);</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else if (m_modelType == ModelType.GENERALIZEDLINEAR || </div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                m_modelType == ModelType.GENERALLINEAR) {</div>
+<div>450&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the link function</div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String link = model.getAttribute("linkFunction");</div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      found = false;</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (LinkFunction l : LinkFunction.values()) {</div>
+<div>454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (l.toString().equals(link)) {</div>
+<div>455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_linkFunction = l;</div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          found = true;</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>459&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!found) {</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] unknown link function " + link);</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>463&emsp;&emsp;</div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the link parameter</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String linkP = model.getAttribute("linkParameter");</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (linkP != null && linkP.length() > 0) {</div>
+<div>467&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>468&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_linkParameter = Double.parseDouble(linkP);</div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (IllegalArgumentException ex) {</div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw new Exception("[GeneralRegression] unable to parse the link parameter");</div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>473&emsp;&emsp;</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the trials variable</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String trials = model.getAttribute("trialsVariable");</div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (trials != null && trials.length() > 0) {</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_trialsVariable = trials;</div>
+<div>478&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>479&emsp;&emsp;</div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get the trials value</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String trialsV = model.getAttribute("trialsValue");</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (trialsV != null && trialsV.length() > 0) {</div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_trialsValue = Double.parseDouble(trialsV);</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (IllegalArgumentException ex) {</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw new Exception("[GeneralRegression] unable to parse the trials value"); </div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>490&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String mName = model.getAttribute("modelName");</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (mName != null && mName.length() > 0) {</div>
+<div>493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_modelName = mName;</div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>495&emsp;&emsp;</div>
+<div>496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String fName = model.getAttribute("functionName");</div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (fName.equals("classification")) {</div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_functionType = Regression.RegressionTable.CLASSIFICATION;</div>
+<div>499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>500&emsp;&emsp;</div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String algName = model.getAttribute("algorithmName");</div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (algName != null && algName.length() > 0) {</div>
+<div>503&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_algorithmName = algName;</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>505&emsp;&emsp;</div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String distribution = model.getAttribute("distribution");</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (distribution != null && distribution.length() > 0) {</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      found = false;</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (Distribution d : Distribution.values()) {</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (d.toString().equals(distribution)) {</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_distribution = d;</div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          found = true;</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!found) {</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] unknown distribution type " + distribution);</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>520&emsp;&emsp;</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String distP = model.getAttribute("distParameter");</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (distP != null && distP.length() > 0) {</div>
+<div>523&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_distParameter = Double.parseDouble(distP);</div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (IllegalArgumentException ex) {</div>
+<div>526&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] unable to parse the distribution parameter");</div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>528&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>529&emsp;&emsp;</div>
+<div>530&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String offsetV = model.getAttribute("offsetVariable");</div>
+<div>531&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (offsetV != null && offsetV.length() > 0) {</div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;       m_offsetVariable = offsetV;</div>
+<div>533&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>534&emsp;&emsp;</div>
+<div>535&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String offsetVal = model.getAttribute("offsetValue");</div>
+<div>536&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (offsetVal != null && offsetVal.length() > 0) {</div>
+<div>537&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_offsetValue = Double.parseDouble(offsetVal);</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (IllegalArgumentException ex) {</div>
+<div>540&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] unable to parse the offset value");</div>
+<div>541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>543&emsp;&emsp;</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the parameter list</div>
+<div>545&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    readParameterList(model);</div>
+<div>546&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>547&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the factors and covariates</div>
+<div>548&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    readFactorsAndCovariates(model, "FactorList");</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    readFactorsAndCovariates(model, "CovariateList");</div>
+<div>550&emsp;&emsp;</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // read the PPMatrix</div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    readPPMatrix(model);</div>
+<div>553&emsp;&emsp;</div>
+<div>554&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // read the parameter estimates</div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    readParamMatrix(model);</div>
+<div>556&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>557&emsp;&emsp;</div>
+<div>558&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>559&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Read the list of parameters.</div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>561&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param model the Element that contains the model</div>
+<div>562&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if there is some problem with extracting the</div>
+<div>563&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * parameters.</div>
+<div>564&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;  protected void readParameterList(Element model) throws Exception {</div>
+<div>566&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NodeList paramL = model.getElementsByTagName("ParameterList");</div>
+<div>567&emsp;&emsp;</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // should be just one parameter list</div>
+<div>569&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (paramL.getLength() == 1) {</div>
+<div>570&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Node paramN = paramL.item(0);</div>
+<div>571&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (paramN.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        NodeList parameterList = ((Element)paramN).getElementsByTagName("Parameter");</div>
+<div>573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (int i = 0; i &#60; parameterList.getLength(); i++) {</div>
+<div>574&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Node parameter = parameterList.item(i);</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (parameter.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Parameter p = new Parameter();</div>
+<div>577&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            p.m_name = ((Element)parameter).getAttribute("name");</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            String label = ((Element)parameter).getAttribute("label");</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (label != null && label.length() > 0) {</div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              p.m_label = label;</div>
+<div>581&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>582&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_parameterList.add(p);</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>584&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>585&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>586&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>587&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[GeneralRegression] more than one parameter list!");</div>
+<div>588&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>590&emsp;&emsp;</div>
+<div>591&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>592&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Read the lists of factors and covariates.</div>
+<div>593&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>594&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param model the Element that contains the model</div>
+<div>595&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param factorOrCovariate holds the String "FactorList" or</div>
+<div>596&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * "CovariateList"</div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if there is a factor or covariate listed</div>
+<div>598&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * that isn't in the mining schema</div>
+<div>599&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>600&emsp;&emsp;&nbsp;&nbsp;  protected void readFactorsAndCovariates(Element model, </div>
+<div>601&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                          String factorOrCovariate) </div>
+<div>602&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>603&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances miningSchemaI = m_miningSchema.getFieldsAsInstances();</div>
+<div>604&emsp;&emsp;</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NodeList factorL = model.getElementsByTagName(factorOrCovariate);</div>
+<div>606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (factorL.getLength() == 1) { // should be 0 or 1 FactorList element</div>
+<div>607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Node factor = factorL.item(0);</div>
+<div>608&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (factor.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>609&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        NodeList predL = ((Element)factor).getElementsByTagName("Predictor");</div>
+<div>610&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (int i = 0; i &#60; predL.getLength(); i++) {</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Node pred = predL.item(i);</div>
+<div>612&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (pred.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Predictor p = new Predictor();</div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            p.m_name = ((Element)pred).getAttribute("name");</div>
+<div>615&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // find the index of this predictor in the mining schema</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            boolean found = false;</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            for (int j = 0; j &#60; miningSchemaI.numAttributes(); j++) {</div>
+<div>618&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              if (miningSchemaI.attribute(j).name().equals(p.m_name)) {</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                found = true;</div>
+<div>620&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                p.m_miningSchemaIndex = j;</div>
+<div>621&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                break;</div>
+<div>622&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              }</div>
+<div>623&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>624&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (found) {</div>
+<div>625&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              if (factorOrCovariate.equals("FactorList")) {</div>
+<div>626&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                m_factorList.add(p);</div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              } else {</div>
+<div>628&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                m_covariateList.add(p);</div>
+<div>629&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              }</div>
+<div>630&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } else {</div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              throw new Exception("[GeneralRegression] reading factors and covariates - "</div>
+<div>632&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                  + "unable to find predictor " +</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                  p.m_name + " in the mining schema");</div>
+<div>634&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>635&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>637&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else if (factorL.getLength() > 1){</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[GeneralRegression] more than one " + factorOrCovariate</div>
+<div>640&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                          + "! ");</div>
+<div>641&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>642&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>643&emsp;&emsp;</div>
+<div>644&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>645&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Read the PPMatrix from the xml. Does not handle multiple PPMatrixes yet.</div>
+<div>646&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param model the Element that contains the model</div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if there is a problem parsing cell values.</div>
+<div>649&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;  protected void readPPMatrix(Element model) throws Exception {</div>
+<div>651&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances miningSchemaI = m_miningSchema.getFieldsAsInstances();</div>
+<div>652&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>653&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NodeList matrixL = model.getElementsByTagName("PPMatrix");</div>
+<div>654&emsp;&emsp;</div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // should be exactly one PPMatrix</div>
+<div>656&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (matrixL.getLength() == 1) {</div>
+<div>657&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // allocate space for the matrix</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // column that corresponds to the class will be empty (and will be missed out</div>
+<div>659&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // when printing the model).</div>
+<div>660&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_ppMatrix = new PPCell[m_parameterList.size()][miningSchemaI.numAttributes()];</div>
+<div>661&emsp;&emsp;</div>
+<div>662&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Node ppM = matrixL.item(0);</div>
+<div>663&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (ppM.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>664&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        NodeList cellL = ((Element)ppM).getElementsByTagName("PPCell");</div>
+<div>665&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (int i = 0; i &#60; cellL.getLength(); i++) {</div>
+<div>666&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Node cell = cellL.item(i);</div>
+<div>667&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (cell.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>668&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            String predictorName = ((Element)cell).getAttribute("predictorName");</div>
+<div>669&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            String parameterName = ((Element)cell).getAttribute("parameterName");</div>
+<div>670&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            String value = ((Element)cell).getAttribute("value");</div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            double expOrIndex = -1;</div>
+<div>672&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int predictorIndex = -1;</div>
+<div>673&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int parameterIndex = -1;</div>
+<div>674&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            for (int j = 0; j &#60; m_parameterList.size(); j++) {</div>
+<div>675&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              if (m_parameterList.get(j).m_name.equals(parameterName)) {</div>
+<div>676&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                parameterIndex = j;</div>
+<div>677&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                break;</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              }</div>
+<div>679&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>680&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (parameterIndex == -1) {</div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              throw new Exception("[GeneralRegression] unable to find parameter name "</div>
+<div>682&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                  + parameterName + " in parameter list");</div>
+<div>683&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>684&emsp;&emsp;</div>
+<div>685&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Predictor p = getCovariate(predictorName);</div>
+<div>686&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (p != null) {</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              try {</div>
+<div>688&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                expOrIndex = Double.parseDouble(value);</div>
+<div>689&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                predictorIndex = p.m_miningSchemaIndex;</div>
+<div>690&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              } catch (IllegalArgumentException ex) {</div>
+<div>691&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw new Exception("[GeneralRegression] unable to parse PPCell value: "</div>
+<div>692&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                    + value);</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              }</div>
+<div>694&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } else {</div>
+<div>695&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              // try as a factor</div>
+<div>696&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              p = getFactor(predictorName);</div>
+<div>697&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              if (p != null) {</div>
+<div>698&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                // An example pmml file from DMG seems to suggest that it</div>
+<div>699&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                // is possible for a continuous variable in the mining schema</div>
+<div>700&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                // to be treated as a factor, so we have to check for this</div>
+<div>701&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if (miningSchemaI.attribute(p.m_miningSchemaIndex).isNumeric()) {</div>
+<div>702&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  // parse this value as a double. It will be treated as a value</div>
+<div>703&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  // to match rather than an exponent since we are dealing with</div>
+<div>704&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  // a factor here</div>
+<div>705&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  try {</div>
+<div>706&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    expOrIndex = Double.parseDouble(value);</div>
+<div>707&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  } catch (IllegalArgumentException ex) {</div>
+<div>708&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    throw new Exception("[GeneralRegresion] unable to parse PPCell value: "</div>
+<div>709&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                        + value);</div>
+<div>710&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  }</div>
+<div>711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                } else {</div>
+<div>712&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  // it is a nominal attribute in the mining schema so find</div>
+<div>713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  // the index that correponds to this value</div>
+<div>714&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  Attribute att = miningSchemaI.attribute(p.m_miningSchemaIndex); </div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  expOrIndex = att.indexOfValue(value);</div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  if (expOrIndex == -1) {</div>
+<div>717&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    throw new Exception("[GeneralRegression] unable to find PPCell value "</div>
+<div>718&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                        + value + " in mining schema attribute "</div>
+<div>719&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                        + att.name());</div>
+<div>720&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  }</div>
+<div>721&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>722&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              } else {</div>
+<div>723&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw new Exception("[GeneralRegression] cant find predictor "</div>
+<div>724&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                    + predictorName + "in either the factors list "</div>
+<div>725&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                    + "or the covariates list");</div>
+<div>726&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              }</div>
+<div>727&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              predictorIndex = p.m_miningSchemaIndex;</div>
+<div>728&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>729&emsp;&emsp;</div>
+<div>730&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // fill in cell value</div>
+<div>731&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            PPCell ppc = new PPCell();</div>
+<div>732&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ppc.m_predictorName = predictorName; ppc.m_parameterName = parameterName;</div>
+<div>733&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ppc.m_value = expOrIndex;</div>
+<div>734&emsp;&emsp;</div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // TO-DO: ppc.m_targetCategory (when handling for multiple PPMatrixes is implemented)</div>
+<div>736&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_ppMatrix[parameterIndex][predictorIndex] = ppc;</div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>738&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>739&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>740&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>741&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[GeneralRegression] more than one PPMatrix!");</div>
+<div>742&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>743&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>744&emsp;&emsp;</div>
+<div>745&emsp;&emsp;&nbsp;&nbsp;  private Predictor getCovariate(String predictorName) {</div>
+<div style="background-color:limegreen;">746&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; m_covariateList.size(); i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">747&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (predictorName.equals(m_covariateList.get(i).m_name)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>748&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return m_covariateList.get(i);</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>750&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>751&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return null;</div>
+<div>752&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>753&emsp;&emsp;</div>
+<div>754&emsp;&emsp;&nbsp;&nbsp;  private Predictor getFactor(String predictorName) {</div>
+<div style="background-color:limegreen;">755&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; m_factorList.size(); i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">756&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (predictorName.equals(m_factorList.get(i).m_name)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>757&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return m_factorList.get(i);</div>
+<div>758&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>760&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return null;</div>
+<div>761&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>762&emsp;&emsp;</div>
+<div>763&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>764&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Read the parameter matrix from the xml.</div>
+<div>765&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>766&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param model Element that holds the model</div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem is encountered during extraction of</div>
+<div>768&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the parameter matrix</div>
+<div>769&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>770&emsp;&emsp;&nbsp;&nbsp;  private void readParamMatrix(Element model) throws Exception {</div>
+<div>771&emsp;&emsp;</div>
+<div>772&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances miningSchemaI = m_miningSchema.getFieldsAsInstances();</div>
+<div>773&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Attribute classAtt = miningSchemaI.classAttribute();</div>
+<div>774&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // used when function type is classification but class attribute is numeric</div>
+<div>775&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // in the mining schema. We will assume that there is a Target specified in</div>
+<div>776&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // the pmml that defines the legal values for this class.</div>
+<div>777&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    ArrayList&#60;String> targetVals = null;</div>
+<div>778&emsp;&emsp;</div>
+<div>779&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NodeList matrixL = model.getElementsByTagName("ParamMatrix");</div>
+<div>780&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (matrixL.getLength() != 1) {</div>
+<div>781&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("[GeneralRegression] more than one ParamMatrix!");</div>
+<div>782&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>783&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Element matrix = (Element)matrixL.item(0);</div>
+<div>784&emsp;&emsp;</div>
+<div>785&emsp;&emsp;</div>
+<div>786&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // check for the case where the class in the mining schema is numeric,</div>
+<div>787&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // but this attribute is treated as discrete</div>
+<div>788&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (m_functionType == Regression.RegressionTable.CLASSIFICATION &&</div>
+<div>789&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        classAtt.isNumeric()) {</div>
+<div>790&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // try and convert the class attribute to nominal. For this to succeed</div>
+<div>791&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // there has to be a Target element defined in the PMML.</div>
+<div>792&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!m_miningSchema.hasTargetMetaData()) {</div>
+<div>793&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] function type is classification and "</div>
+<div>794&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                            + "class attribute in mining schema is numeric, however, "</div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                            + "there is no Target element "</div>
+<div>796&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                            + "specifying legal discrete values for the target!");</div>
+<div>797&emsp;&emsp;</div>
+<div>798&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>799&emsp;&emsp;</div>
+<div>800&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (m_miningSchema.getTargetMetaData().getOptype() </div>
+<div>801&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          != TargetMetaInfo.Optype.CATEGORICAL) {</div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] function type is classification and "</div>
+<div>803&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                            + "class attribute in mining schema is numeric, however "</div>
+<div>804&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                            + "Target element in PMML does not have optype categorical!");</div>
+<div>805&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>806&emsp;&emsp;</div>
+<div>807&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // OK now get legal values</div>
+<div>808&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      targetVals = m_miningSchema.getTargetMetaData().getValues();</div>
+<div>809&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (targetVals.size() == 0) {</div>
+<div>810&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] function type is classification and "</div>
+<div>811&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                            + "class attribute in mining schema is numeric, however "</div>
+<div>812&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                            + "Target element in PMML does not have any discrete values "</div>
+<div>813&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                            + "defined!");</div>
+<div>814&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>815&emsp;&emsp;</div>
+<div>816&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Finally, convert the class in the mining schema to nominal</div>
+<div>817&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_miningSchema.convertNumericAttToNominal(miningSchemaI.classIndex(), targetVals);</div>
+<div>818&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>819&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>820&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // allocate space for the matrix </div>
+<div>821&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_paramMatrix = </div>
+<div>822&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new PCell[(classAtt.isNumeric())</div>
+<div>823&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  ? 1</div>
+<div>824&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  : classAtt.numValues()][m_parameterList.size()];</div>
+<div>825&emsp;&emsp;</div>
+<div>826&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    NodeList pcellL = matrix.getElementsByTagName("PCell");</div>
+<div>827&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (int i = 0; i &#60; pcellL.getLength(); i++) {</div>
+<div>828&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // indicates that that this beta applies to all target categories</div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // or target is numeric</div>
+<div>830&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int targetCategoryIndex = -1;</div>
+<div>831&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int parameterIndex = -1;</div>
+<div>832&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Node pcell = pcellL.item(i);</div>
+<div>833&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (pcell.getNodeType() == Node.ELEMENT_NODE) {</div>
+<div>834&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String paramName = ((Element)pcell).getAttribute("parameterName");</div>
+<div>835&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String targetCatName = ((Element)pcell).getAttribute("targetCategory");</div>
+<div>836&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String coefficient = ((Element)pcell).getAttribute("beta");</div>
+<div>837&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String df = ((Element)pcell).getAttribute("df");</div>
+<div>838&emsp;&emsp;</div>
+<div>839&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (int j = 0; j &#60; m_parameterList.size(); j++) {</div>
+<div>840&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (m_parameterList.get(j).m_name.equals(paramName)) {</div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            parameterIndex = j;</div>
+<div>842&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // use the label if defined</div>
+<div>843&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if (m_parameterList.get(j).m_label != null) {</div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              paramName = m_parameterList.get(j).m_label;</div>
+<div>845&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>847&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>848&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>849&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (parameterIndex == -1) {</div>
+<div>850&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw new Exception("[GeneralRegression] unable to find parameter name "</div>
+<div>851&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                              + paramName + " in parameter list");</div>
+<div>852&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>853&emsp;&emsp;</div>
+<div>854&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (targetCatName != null && targetCatName.length() > 0) {</div>
+<div>855&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          if (classAtt.isNominal() || classAtt.isString()) {</div>
+<div>856&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            targetCategoryIndex = classAtt.indexOfValue(targetCatName);</div>
+<div>857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>858&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new Exception("[GeneralRegression] found a PCell with a named "</div>
+<div>859&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                + "target category: " + targetCatName</div>
+<div>860&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                + " but class attribute is numeric in "</div>
+<div>861&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                + "mining schema");</div>
+<div>862&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>863&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>864&emsp;&emsp;</div>
+<div>865&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        PCell p = new PCell();</div>
+<div>866&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (targetCategoryIndex != -1) {</div>
+<div>867&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          p.m_targetCategory = targetCatName;</div>
+<div>868&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>869&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        p.m_parameterName = paramName;</div>
+<div>870&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>871&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          p.m_beta = Double.parseDouble(coefficient);</div>
+<div>872&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (IllegalArgumentException ex) {</div>
+<div>873&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          throw new Exception("[GeneralRegression] unable to parse beta value "</div>
+<div>874&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                              + coefficient + " as a double from PCell");</div>
+<div>875&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (df != null && df.length() > 0) {</div>
+<div>877&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          try {</div>
+<div>878&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            p.m_df = Integer.parseInt(df);</div>
+<div>879&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } catch (IllegalArgumentException ex) {</div>
+<div>880&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new Exception("[GeneralRegression] unable to parse df value "</div>
+<div>881&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                              + df + " as an int from PCell");</div>
+<div>882&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>883&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>884&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        </div>
+<div>885&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (targetCategoryIndex != -1) {</div>
+<div>886&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_paramMatrix[targetCategoryIndex][parameterIndex] = p;</div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>888&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // this PCell to all target categories (covers numeric class, in</div>
+<div>889&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // which case there will be only one row in the matrix anyway)</div>
+<div>890&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          for (int j = 0; j &#60; m_paramMatrix.length; j++) {</div>
+<div>891&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_paramMatrix[j][parameterIndex] = p;</div>
+<div>892&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>893&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>894&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>895&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>896&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>897&emsp;&emsp;</div>
+<div>898&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>899&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Return a textual description of this general regression.</div>
+<div>900&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>901&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a description of this general regression</div>
+<div>902&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;  public String toString() {</div>
+<div>904&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    StringBuffer temp = new StringBuffer();</div>
+<div>905&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("PMML version " + getPMMLVersion());</div>
+<div style="background-color:limegreen;">906&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!getCreatorApplication().equals("?")) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>907&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("\nApplication: " + getCreatorApplication());</div>
+<div>908&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>909&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("\nPMML Model: " + m_modelType);</div>
+<div>910&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("\n\n");</div>
+<div>911&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append(m_miningSchema);</div>
+<div>912&emsp;&emsp;</div>
+<div style="background-color:limegreen;">913&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_factorList.size() > 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>914&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("Factors:\n");</div>
+<div style="background-color:limegreen;">915&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (Predictor p : m_factorList) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>916&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("\t" + p + "\n");</div>
+<div>917&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>918&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>919&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("\n");</div>
+<div style="background-color:limegreen;">920&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_covariateList.size() > 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>921&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("Covariates:\n");</div>
+<div style="background-color:limegreen;">922&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (Predictor p : m_covariateList) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>923&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("\t" + p + "\n");</div>
+<div>924&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>925&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>926&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("\n");</div>
+<div>927&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>928&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    printPPMatrix(temp);</div>
+<div>929&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("\n");</div>
+<div>930&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    printParameterMatrix(temp);</div>
+<div>931&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>932&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // do the link function stuff</div>
+<div>933&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("\n");</div>
+<div>934&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">935&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_linkFunction != LinkFunction.NONE) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>936&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("Link function: " + m_linkFunction);</div>
+<div style="background-color:limegreen;">937&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_offsetVariable != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>938&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("\n\tOffset variable " + m_offsetVariable);</div>
+<div style="background-color:limegreen;">939&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      } else if (!Double.isNaN(m_offsetValue)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>940&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("\n\tOffset value " + m_offsetValue);</div>
+<div>941&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>942&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div style="background-color:limegreen;">943&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_trialsVariable != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>944&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("\n\tTrials variable " + m_trialsVariable);</div>
+<div style="background-color:limegreen;">945&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      } else if (!Double.isNaN(m_trialsValue)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>946&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("\n\tTrials value " + m_trialsValue);</div>
+<div>947&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>948&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div style="background-color:limegreen;">949&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_distribution != Distribution.NONE) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>950&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("\nDistribution: " + m_distribution);</div>
+<div>951&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>952&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div style="background-color:limegreen;">953&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_linkFunction == LinkFunction.NEGBIN &&&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>954&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_distribution == Distribution.NEGBINOMIAL &&</div>
+<div style="background-color:limegreen;">955&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          !Double.isNaN(m_distParameter)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>956&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("\n\tDistribution parameter " + m_distParameter);</div>
+<div>957&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>958&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div style="background-color:limegreen;">959&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_linkFunction == LinkFunction.POWER ||&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>960&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_linkFunction == LinkFunction.ODDSPOWER) {</div>
+<div style="background-color:limegreen;">961&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!Double.isNaN(m_linkParameter)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>962&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          temp.append("\n\nLink parameter " + m_linkParameter);</div>
+<div>963&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>964&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>965&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>966&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">967&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_cumulativeLinkFunction != CumulativeLinkFunction.NONE) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>968&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      temp.append("Cumulative link function: " + m_cumulativeLinkFunction);</div>
+<div>969&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      </div>
+<div style="background-color:limegreen;">970&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_offsetVariable != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>971&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("\n\tOffset variable " + m_offsetVariable);</div>
+<div style="background-color:limegreen;">972&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      } else if (!Double.isNaN(m_offsetValue)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>973&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        temp.append("\n\tOffset value " + m_offsetValue);</div>
+<div>974&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>975&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>976&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    temp.append("\n");</div>
+<div>977&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>978&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return temp.toString();</div>
+<div>979&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>980&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>981&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>982&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Format and print the PPMatrix to the supplied StringBuffer.</div>
+<div>983&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>984&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param buff the StringBuffer to append to</div>
+<div>985&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>986&emsp;&emsp;&nbsp;&nbsp;  protected void printPPMatrix(StringBuffer buff) {</div>
+<div>987&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances miningSchemaI = m_miningSchema.getFieldsAsInstances();</div>
+<div>988&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int maxAttWidth = 0;</div>
+<div style="background-color:limegreen;">989&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; miningSchemaI.numAttributes(); i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>990&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute a = miningSchemaI.attribute(i);</div>
+<div style="background-color:limegreen;">991&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (a.name().length() > maxAttWidth) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>992&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        maxAttWidth = a.name().length();</div>
+<div>993&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>994&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>995&emsp;&emsp;</div>
+<div>996&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // check the width of the values</div>
+<div style="background-color:limegreen;">997&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; m_parameterList.size(); i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">998&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int j = 0; j &#60; miningSchemaI.numAttributes(); j++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">999&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_ppMatrix[i][j] != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1000&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          double width = Math.log(Math.abs(m_ppMatrix[i][j].m_value)) /</div>
+<div>1001&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Math.log(10.0);</div>
+<div style="background-color:limegreen;">1002&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (width &#60; 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1003&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            width = 1;</div>
+<div>1004&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1005&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // decimal + # decimal places + 1</div>
+<div>1006&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          width += 2.0;</div>
+<div style="background-color:limegreen;">1007&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if ((int)width > maxAttWidth) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1008&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            maxAttWidth = (int)width;</div>
+<div>1009&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div style="background-color:limegreen;">1010&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (miningSchemaI.attribute(j).isNominal() || &nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1011&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>              miningSchemaI.attribute(j).isString()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1012&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // check the width of this value</div>
+<div>1013&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            String val = miningSchemaI.attribute(j).value((int)m_ppMatrix[i][j].m_value) + " ";</div>
+<div style="background-color:limegreen;">1014&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (val.length() > maxAttWidth) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1015&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              maxAttWidth = val.length();</div>
+<div>1016&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1017&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1018&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1019&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1020&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1021&emsp;&emsp;</div>
+<div>1022&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the max parameter width</div>
+<div>1023&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int maxParamWidth = "Parameter  ".length();</div>
+<div style="background-color:limegreen;">1024&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (Parameter p : m_parameterList) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1025&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      String temp = (p.m_label != null)&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1026&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ? p.m_label + " "</div>
+<div>1027&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        : p.m_name + " ";</div>
+<div>1028&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1029&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (temp.length() > maxParamWidth) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1030&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        maxParamWidth = temp.length();</div>
+<div>1031&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1032&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1033&emsp;&emsp;</div>
+<div>1034&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    buff.append("Predictor-to-Parameter matrix:\n");</div>
+<div>1035&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    buff.append(PMMLUtils.pad("Predictor", " ", (maxParamWidth + (maxAttWidth * 2 + 2))</div>
+<div>1036&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                              - "Predictor".length(), true));</div>
+<div>1037&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    buff.append("\n" + PMMLUtils.pad("Parameter", " ", maxParamWidth - "Parameter".length(), false));</div>
+<div>1038&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // attribute names</div>
+<div style="background-color:limegreen;">1039&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; miningSchemaI.numAttributes(); i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1040&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (i != miningSchemaI.classIndex()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1041&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String attName = miningSchemaI.attribute(i).name();</div>
+<div>1042&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        buff.append(PMMLUtils.pad(attName, " ", maxAttWidth + 1 - attName.length(), true));</div>
+<div>1043&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1044&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1045&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    buff.append("\n");</div>
+<div>1046&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1047&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; m_parameterList.size(); i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1048&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Parameter param = m_parameterList.get(i);</div>
+<div style="background-color:limegreen;">1049&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      String paramS = (param.m_label != null)&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1050&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ? param.m_label</div>
+<div>1051&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        : param.m_name;</div>
+<div>1052&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      buff.append(PMMLUtils.pad(paramS, " ", </div>
+<div>1053&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                maxParamWidth - paramS.length(), false));</div>
+<div style="background-color:limegreen;">1054&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int j = 0; j &#60; miningSchemaI.numAttributes(); j++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1055&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (j != miningSchemaI.classIndex()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1056&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          PPCell p = m_ppMatrix[i][j];</div>
+<div>1057&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String val = " ";</div>
+<div style="background-color:limegreen;">1058&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (p != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1059&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (miningSchemaI.attribute(j).isNominal() ||&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1060&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                miningSchemaI.attribute(j).isString()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1061&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              val = miningSchemaI.attribute(j).value((int)p.m_value);</div>
+<div>1062&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } else {</div>
+<div>1063&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              val = "" + Utils.doubleToString(p.m_value, maxAttWidth, 4).trim();</div>
+<div>1064&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1065&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1066&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          buff.append(PMMLUtils.pad(val, " ", maxAttWidth + 1 - val.length(), true));</div>
+<div>1067&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1068&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1069&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      buff.append("\n");</div>
+<div>1070&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1071&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1072&emsp;&emsp;</div>
+<div>1073&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1074&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Format and print the parameter matrix to the supplied StringBuffer.</div>
+<div>1075&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1076&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param buff the StringBuffer to append to</div>
+<div>1077&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1078&emsp;&emsp;&nbsp;&nbsp;  protected void printParameterMatrix(StringBuffer buff) {</div>
+<div>1079&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances miningSchemaI = m_miningSchema.getFieldsAsInstances();</div>
+<div>1080&emsp;&emsp;</div>
+<div>1081&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the maximum class value width (nominal)</div>
+<div>1082&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int maxClassWidth = miningSchemaI.classAttribute().name().length();</div>
+<div style="background-color:limegreen;">1083&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (miningSchemaI.classAttribute().isNominal()&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1084&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        || miningSchemaI.classAttribute().isString()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1085&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int i = 0; i &#60; miningSchemaI.classAttribute().numValues(); i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1086&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (miningSchemaI.classAttribute().value(i).length() > maxClassWidth) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1087&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          maxClassWidth = miningSchemaI.classAttribute().value(i).length();</div>
+<div>1088&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1089&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1090&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1091&emsp;&emsp;</div>
+<div>1092&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the maximum parameter name/label width</div>
+<div>1093&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int maxParamWidth = 0;</div>
+<div style="background-color:limegreen;">1094&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; m_parameterList.size(); i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1095&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Parameter p = m_parameterList.get(i);</div>
+<div style="background-color:limegreen;">1096&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      String val = (p.m_label != null)&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1097&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ? p.m_label + " "</div>
+<div>1098&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        : p.m_name + " ";</div>
+<div style="background-color:limegreen;">1099&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (val.length() > maxParamWidth) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        maxParamWidth = val.length();</div>
+<div>1101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1103&emsp;&emsp;</div>
+<div>1104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get the max beta value width</div>
+<div>1105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int maxBetaWidth = "Coeff.".length();</div>
+<div style="background-color:limegreen;">1106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; m_paramMatrix.length; i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int j = 0; j &#60; m_parameterList.size(); j++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        PCell p = m_paramMatrix[i][j];</div>
+<div style="background-color:limegreen;">1109&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (p != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          double width = Math.log(Math.abs(p.m_beta)) / Math.log(10);</div>
+<div style="background-color:limegreen;">1111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (width &#60; 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            width = 1;</div>
+<div>1113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // decimal + # decimal places + 1</div>
+<div>1115&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          width += 7.0;</div>
+<div style="background-color:limegreen;">1116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if ((int)width > maxBetaWidth) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            maxBetaWidth = (int)width;</div>
+<div>1118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1122&emsp;&emsp;</div>
+<div>1123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    buff.append("Parameter estimates:\n");</div>
+<div>1124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    buff.append(PMMLUtils.pad(miningSchemaI.classAttribute().name(), " ", </div>
+<div>1125&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                              maxClassWidth + maxParamWidth + 2 - </div>
+<div>1126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                              miningSchemaI.classAttribute().name().length(), false));</div>
+<div>1127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    buff.append(PMMLUtils.pad("Coeff.", " ", maxBetaWidth + 1 - "Coeff.".length(), true));</div>
+<div>1128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    buff.append(PMMLUtils.pad("df", " ", maxBetaWidth - "df".length(), true));</div>
+<div>1129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    buff.append("\n");</div>
+<div style="background-color:limegreen;">1130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; m_paramMatrix.length; i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // scan for non-null entry for this class value</div>
+<div>1132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      boolean ok = false;</div>
+<div style="background-color:limegreen;">1133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int j = 0; j &#60; m_parameterList.size(); j++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_paramMatrix[i][j] != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          ok = true;</div>
+<div>1136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div style="background-color:limegreen;">1138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!ok) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        continue;</div>
+<div>1140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // first the class value (if nominal)</div>
+<div style="background-color:limegreen;">1142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      String cVal = (miningSchemaI.classAttribute().isNominal() || &nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          miningSchemaI.classAttribute().isString())&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ? miningSchemaI.classAttribute().value(i)</div>
+<div>1145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        : " ";</div>
+<div>1146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      buff.append(PMMLUtils.pad(cVal, " ", maxClassWidth - cVal.length(), false));     </div>
+<div>1147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      buff.append("\n");</div>
+<div style="background-color:limegreen;">1148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int j = 0; j &#60; m_parameterList.size(); j++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        PCell p = m_paramMatrix[i][j];</div>
+<div style="background-color:limegreen;">1150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (p != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String label = p.m_parameterName;</div>
+<div>1152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          buff.append(PMMLUtils.pad(label, " ", maxClassWidth + maxParamWidth + 2 -</div>
+<div>1153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                    label.length(), true));</div>
+<div>1154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String betaS = Utils.doubleToString(p.m_beta, maxBetaWidth, 4).trim();</div>
+<div>1155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          buff.append(PMMLUtils.pad(betaS, " ", maxBetaWidth + 1 - betaS.length(), true));</div>
+<div>1156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String dfS = Utils.doubleToString(p.m_df, maxBetaWidth, 4).trim();</div>
+<div>1157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          buff.append(PMMLUtils.pad(dfS, " ", maxBetaWidth - dfS.length(), true));</div>
+<div>1158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          buff.append("\n");</div>
+<div>1159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1162&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1163&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>1164&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1165&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Construct the incoming parameter vector based on the values</div>
+<div>1166&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * in the incoming test instance.</div>
+<div>1167&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1168&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param incomingInst the values of the incoming test instance</div>
+<div>1169&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the populated parameter vector ready to be multiplied against</div>
+<div>1170&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the vector of coefficients.</div>
+<div>1171&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if there is some problem whilst constructing the</div>
+<div>1172&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * parameter vector</div>
+<div>1173&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1174&emsp;&emsp;&nbsp;&nbsp;  private double[] incomingParamVector(double[] incomingInst) throws Exception {</div>
+<div>1175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances miningSchemaI = m_miningSchema.getFieldsAsInstances();</div>
+<div>1176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] incomingPV = new double[m_parameterList.size()];</div>
+<div>1177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">1178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; m_parameterList.size(); i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      //</div>
+<div>1180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // default is that this row represents the intercept.</div>
+<div>1181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // this will be the case if there are all null entries in this row</div>
+<div>1182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      incomingPV[i] = 1.0;</div>
+<div>1183&emsp;&emsp;</div>
+<div>1184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // loop over the attributes (predictors)</div>
+<div style="background-color:limegreen;">1185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int j = 0; j &#60; miningSchemaI.numAttributes(); j++) {        &nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        PPCell cellEntry = m_ppMatrix[i][j];</div>
+<div>1187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Predictor p = null;</div>
+<div style="background-color:limegreen;">1188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (cellEntry != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if ((p = getFactor(cellEntry.m_predictorName)) != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if ((int)incomingInst[p.m_miningSchemaIndex] == (int)cellEntry.m_value) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              incomingPV[i] *= 1.0; // we have a match</div>
+<div>1192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } else {</div>
+<div>1193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              incomingPV[i] *= 0.0;</div>
+<div>1194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div style="background-color:limegreen;">1195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          } else if ((p = getCovariate(cellEntry.m_predictorName)) != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              incomingPV[i] *= Math.pow(incomingInst[p.m_miningSchemaIndex], cellEntry.m_value);</div>
+<div>1197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>1198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new Exception("[GeneralRegression] can't find predictor "</div>
+<div>1199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                + cellEntry.m_predictorName + " in either the list of factors or covariates");</div>
+<div>1200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return incomingPV;</div>
+<div>1206&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1207&emsp;&emsp;</div>
+<div>1208&emsp;&emsp;&nbsp;&nbsp;  /**                                                                                                             </div>
+<div>1209&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Classifies the given test instance. The instance has to belong to a                                          </div>
+<div>1210&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * dataset when it's being classified.                                                          </div>
+<div>1211&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *                                                                                                              </div>
+<div>1212&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param inst the instance to be classified                                                                </div>
+<div>1213&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the predicted most likely class for the instance or                                                  </div>
+<div>1214&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Utils.missingValue() if no prediction is made                                                             </div>
+<div>1215&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @exception Exception if an error occurred during the prediction                                              </div>
+<div>1216&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1217&emsp;&emsp;&nbsp;&nbsp;  public double[] distributionForInstance(Instance inst) throws Exception {</div>
+<div style="background-color:limegreen;">1218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!m_initialized) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      mapToMiningSchema(inst.dataset());</div>
+<div>1220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] preds = null;</div>
+<div style="background-color:limegreen;">1222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_miningSchema.getFieldsAsInstances().classAttribute().isNumeric()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      preds = new double[1];</div>
+<div>1224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>1225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      preds = new double[m_miningSchema.getFieldsAsInstances().classAttribute().numValues()];</div>
+<div>1226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // create an array of doubles that holds values from the incoming</div>
+<div>1229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // instance; in order of the fields in the mining schema. We will</div>
+<div>1230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // also handle missing values and outliers here.</div>
+<div>1231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] incoming = m_fieldsMap.instanceToSchema(inst, m_miningSchema);</div>
+<div>1232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // In this implementation we will default to information in the Target element (default</div>
+<div>1234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // value for numeric prediction and prior probabilities for classification). If there is</div>
+<div>1235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // no Target element defined, then an Exception is thrown.</div>
+<div>1236&emsp;&emsp;</div>
+<div>1237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean hasMissing = false;</div>
+<div style="background-color:limegreen;">1238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; incoming.length; i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (i != m_miningSchema.getFieldsAsInstances().classIndex() && &nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          Double.isNaN(incoming[i])) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        hasMissing = true;</div>
+<div>1242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        break;</div>
+<div>1243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">1246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (hasMissing) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!m_miningSchema.hasTargetMetaData()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String message = "[GeneralRegression] WARNING: Instance to predict has missing value(s) but "</div>
+<div>1249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "there is no missing value handling meta data and no "</div>
+<div>1250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "prior probabilities/default value to fall back to. No "</div>
+<div>1251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + "prediction will be made (" </div>
+<div style="background-color:limegreen;">1252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          + ((m_miningSchema.getFieldsAsInstances().classAttribute().isNominal()&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>              || m_miningSchema.getFieldsAsInstances().classAttribute().isString())&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              ? "zero probabilities output)."</div>
+<div>1255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              : "NaN output).");</div>
+<div style="background-color:limegreen;">1256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_log == null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          System.err.println(message);</div>
+<div>1258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_log.logMessage(message);</div>
+<div>1260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        </div>
+<div style="background-color:limegreen;">1262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_miningSchema.getFieldsAsInstances().classAttribute().isNumeric()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds[0] = Utils.missingValue();</div>
+<div>1264&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return preds;</div>
+<div>1266&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // use prior probablilities/default value</div>
+<div>1268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        TargetMetaInfo targetData = m_miningSchema.getTargetMetaData();</div>
+<div style="background-color:limegreen;">1269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_miningSchema.getFieldsAsInstances().classAttribute().isNumeric()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          preds[0] = targetData.getDefaultValue();</div>
+<div>1271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Instances miningSchemaI = m_miningSchema.getFieldsAsInstances();</div>
+<div style="background-color:limegreen;">1273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          for (int i = 0; i &#60; miningSchemaI.classAttribute().numValues(); i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            preds[i] = targetData.getPriorProbability(miningSchemaI.classAttribute().value(i));</div>
+<div>1275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1277&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return preds;</div>
+<div>1278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>1280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // construct input parameter vector here</div>
+<div>1281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] inputParamVector = incomingParamVector(incoming);</div>
+<div>1282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      computeResponses(incoming, inputParamVector, preds);</div>
+<div>1283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1285&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return preds;</div>
+<div>1286&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1287&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>1288&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1289&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Compute the responses for the function given the parameter values corresponding</div>
+<div>1290&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * to the current incoming instance.</div>
+<div>1291&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1292&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param incomingInst raw incoming instance values (after missing value</div>
+<div>1293&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * replacement and outlier treatment)</div>
+<div>1294&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param incomingParamVector incoming instance values mapped to parameters</div>
+<div>1295&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param responses will contain the responses computed by the function</div>
+<div>1296&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong</div>
+<div>1297&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1298&emsp;&emsp;&nbsp;&nbsp;  private void computeResponses(double[] incomingInst, </div>
+<div>1299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                double[] incomingParamVector,</div>
+<div>1300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                double[] responses) throws Exception {</div>
+<div style="background-color:limegreen;">1301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; responses.length; i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int j = 0; j &#60; m_parameterList.size(); j++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // a row of the parameter matrix should have all non-null entries</div>
+<div>1304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // except for the last class (in the case of classification) which</div>
+<div>1305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // should have just an intercept of 0. Need to handle the case where</div>
+<div>1306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // no intercept has been defined in the pmml file for the last class</div>
+<div>1307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        PCell p = m_paramMatrix[i][j];</div>
+<div style="background-color:limegreen;">1308&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (p == null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          responses[i] += 0.0 * incomingParamVector[j];</div>
+<div>1310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          responses[i] += incomingParamVector[j] * p.m_beta;</div>
+<div>1312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">1316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    switch(m_modelType) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    case MULTINOMIALLOGISTIC:</div>
+<div>1318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      computeProbabilitiesMultinomialLogistic(responses);</div>
+<div>1319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      break;</div>
+<div>1320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    case REGRESSION:</div>
+<div>1321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // nothing to be done</div>
+<div>1322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      break;</div>
+<div>1323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    case GENERALLINEAR:</div>
+<div>1324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    case GENERALIZEDLINEAR:</div>
+<div style="background-color:limegreen;">1325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_linkFunction != LinkFunction.NONE) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        computeResponseGeneralizedLinear(incomingInst, responses);</div>
+<div>1327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] no link function specified!");</div>
+<div>1329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      break;</div>
+<div>1331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    case ORDINALMULTINOMIAL:</div>
+<div style="background-color:limegreen;">1332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_cumulativeLinkFunction != CumulativeLinkFunction.NONE) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        computeResponseOrdinalMultinomial(incomingInst, responses);</div>
+<div>1334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] no cumulative link function specified!");</div>
+<div>1336&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      break;</div>
+<div>1338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      default:</div>
+<div>1339&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] unknown model type");</div>
+<div>1340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1341&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1342&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>1343&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1344&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Computes probabilities for the multinomial logistic model type.</div>
+<div>1345&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1346&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param responses will hold the responses computed by the function.</div>
+<div>1347&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1348&emsp;&emsp;&nbsp;&nbsp;  private static void computeProbabilitiesMultinomialLogistic(double[] responses) {</div>
+<div>1349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] r = responses.clone();</div>
+<div style="background-color:limegreen;">1350&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int j = 0; j &#60; r.length; j++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double sum = 0;</div>
+<div>1352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      boolean overflow = false;</div>
+<div style="background-color:limegreen;">1353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int k = 0; k &#60; r.length; k++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (r[k] - r[j] > 700) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1355&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          overflow = true;</div>
+<div>1356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>1357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        sum += Math.exp(r[k] - r[j]);</div>
+<div>1359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div style="background-color:limegreen;">1360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (overflow) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        responses[j] = 0.0;</div>
+<div>1362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        responses[j] = 1.0 / sum;</div>
+<div>1364&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1366&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1367&emsp;&emsp;&nbsp;&nbsp;  </div>
+<div>1368&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1369&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Computes responses for the general linear and generalized linear model</div>
+<div>1370&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * types.</div>
+<div>1371&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1372&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param incomingInst the raw incoming instance values (after missing value</div>
+<div>1373&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * replacement and outlier treatment etc).</div>
+<div>1374&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param responses will hold the responses computed by the function</div>
+<div>1375&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs. </div>
+<div>1376&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1377&emsp;&emsp;&nbsp;&nbsp;  private void computeResponseGeneralizedLinear(double[] incomingInst, </div>
+<div>1378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                                double[] responses) </div>
+<div>1379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>1380&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] r = responses.clone();</div>
+<div>1381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double offset = 0;</div>
+<div style="background-color:limegreen;">1383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_offsetVariable != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute offsetAtt = </div>
+<div>1385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_miningSchema.getFieldsAsInstances().attribute(m_offsetVariable);</div>
+<div style="background-color:limegreen;">1386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (offsetAtt == null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] unable to find offset variable "</div>
+<div>1388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + m_offsetVariable + " in the mining schema!");</div>
+<div>1389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      offset = incomingInst[offsetAtt.index()];</div>
+<div style="background-color:limegreen;">1391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (!Double.isNaN(m_offsetValue)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1392&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      offset = m_offsetValue;</div>
+<div>1393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double trials = 1;</div>
+<div style="background-color:limegreen;">1396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_trialsVariable != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1397&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute trialsAtt = m_miningSchema.getFieldsAsInstances().attribute(m_trialsVariable);</div>
+<div style="background-color:limegreen;">1398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (trialsAtt == null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] unable to find trials variable "</div>
+<div>1400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + m_trialsVariable + " in the mining schema!");</div>
+<div>1401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1402&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trials = incomingInst[trialsAtt.index()];</div>
+<div style="background-color:limegreen;">1403&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (!Double.isNaN(m_trialsValue)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1404&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trials = m_trialsValue;</div>
+<div>1405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double distParam = 0;</div>
+<div style="background-color:limegreen;">1408&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_linkFunction == LinkFunction.NEGBIN && &nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1409&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_distribution == Distribution.NEGBINOMIAL) {</div>
+<div style="background-color:limegreen;">1410&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (Double.isNaN(m_distParameter)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] no distribution parameter defined!");</div>
+<div>1412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      distParam = m_distParameter;</div>
+<div>1414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double linkParam = 0;</div>
+<div style="background-color:limegreen;">1417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_linkFunction == LinkFunction.POWER || &nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_linkFunction == LinkFunction.ODDSPOWER) {</div>
+<div style="background-color:limegreen;">1419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (Double.isNaN(m_linkParameter)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] no link parameter defined!");</div>
+<div>1421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      linkParam = m_linkParameter;</div>
+<div>1423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1424&emsp;&emsp;&nbsp;&nbsp;&nbsp;   </div>
+<div style="background-color:limegreen;">1425&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; r.length; i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1426&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      responses[i] = m_linkFunction.eval(r[i], offset, trials, distParam, linkParam);</div>
+<div>1427&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1428&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1430&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1431&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Computes responses for the ordinal multinomial model type.</div>
+<div>1432&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1433&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param incomingInst the raw incoming instance values (after missing value</div>
+<div>1434&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * replacement and outlier treatment etc).</div>
+<div>1435&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param responses will hold the responses computed by the function</div>
+<div>1436&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if a problem occurs. </div>
+<div>1437&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1438&emsp;&emsp;&nbsp;&nbsp;  private void computeResponseOrdinalMultinomial(double[] incomingInst, </div>
+<div>1439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                                                  double[] responses) throws Exception {</div>
+<div>1440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double[] r = responses.clone();</div>
+<div>1442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div>1443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    double offset = 0;</div>
+<div style="background-color:limegreen;">1444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_offsetVariable != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Attribute offsetAtt = </div>
+<div>1446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_miningSchema.getFieldsAsInstances().attribute(m_offsetVariable);</div>
+<div style="background-color:limegreen;">1447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (offsetAtt == null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new Exception("[GeneralRegression] unable to find offset variable "</div>
+<div>1449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            + m_offsetVariable + " in the mining schema!");</div>
+<div>1450&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      offset = incomingInst[offsetAtt.index()];</div>
+<div style="background-color:limegreen;">1452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (!Double.isNaN(m_offsetValue)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      offset = m_offsetValue;</div>
+<div>1454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    </div>
+<div style="background-color:limegreen;">1456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (int i = 0; i &#60; r.length; i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (i == 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        responses[i] = m_cumulativeLinkFunction.eval(r[i], offset);</div>
+<div>1459&emsp;&emsp;&nbsp;&nbsp;&nbsp;   </div>
+<div style="background-color:limegreen;">1460&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      } else if (i == (r.length - 1)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        responses[i] = 1.0 - responses[i - 1];</div>
+<div>1462&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1463&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        responses[i] = m_cumulativeLinkFunction.eval(r[i], offset) - responses[i - 1];</div>
+<div>1464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1466&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1467&emsp;&emsp;</div>
+<div>1468&emsp;&emsp;&nbsp;&nbsp;  /* (non-Javadoc)</div>
+<div>1469&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see weka.core.RevisionHandler#getRevision()</div>
+<div>1470&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1471&emsp;&emsp;&nbsp;&nbsp;  public String getRevision() {</div>
+<div>1472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return RevisionUtils.extract("$Revision: 8034 $");</div>
+<div>1473&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1474&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

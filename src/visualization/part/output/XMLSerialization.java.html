@@ -1,0 +1,1868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>XMLSerialization.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *   This program is free software: you can redistribute it and/or modify</div>
+<div>3&emsp;&emsp;&nbsp; *   it under the terms of the GNU General Public License as published by</div>
+<div>4&emsp;&emsp;&nbsp; *   the Free Software Foundation, either version 3 of the License, or</div>
+<div>5&emsp;&emsp;&nbsp; *   (at your option) any later version.</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; *   This program is distributed in the hope that it will be useful,</div>
+<div>8&emsp;&emsp;&nbsp; *   but WITHOUT ANY WARRANTY; without even the implied warranty of</div>
+<div>9&emsp;&emsp;&nbsp; *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</div>
+<div>10&emsp;&emsp;&nbsp; *   GNU General Public License for more details.</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; *   You should have received a copy of the GNU General Public License</div>
+<div>13&emsp;&emsp;&nbsp; *   along with this program.  If not, see &#60;http://www.gnu.org/licenses/>.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/*</div>
+<div>17&emsp;&emsp;&nbsp; * XMLSerialization.java</div>
+<div>18&emsp;&emsp;&nbsp; * Copyright (C) 2004-2012 University of Waikato, Hamilton, New Zealand</div>
+<div>19&emsp;&emsp;&nbsp; *</div>
+<div>20&emsp;&emsp;&nbsp; */</div>
+<div>21&emsp;&emsp;</div>
+<div>22&emsp;&emsp;package weka.core.xml;</div>
+<div>23&emsp;&emsp;</div>
+<div>24&emsp;&emsp;import java.beans.BeanInfo;</div>
+<div>25&emsp;&emsp;import java.beans.Introspector;</div>
+<div>26&emsp;&emsp;import java.beans.PropertyDescriptor;</div>
+<div>27&emsp;&emsp;import java.io.BufferedInputStream;</div>
+<div>28&emsp;&emsp;import java.io.BufferedOutputStream;</div>
+<div>29&emsp;&emsp;import java.io.File;</div>
+<div>30&emsp;&emsp;import java.io.FileInputStream;</div>
+<div>31&emsp;&emsp;import java.io.FileOutputStream;</div>
+<div>32&emsp;&emsp;import java.io.InputStream;</div>
+<div>33&emsp;&emsp;import java.io.ObjectInputStream;</div>
+<div>34&emsp;&emsp;import java.io.ObjectOutputStream;</div>
+<div>35&emsp;&emsp;import java.io.OutputStream;</div>
+<div>36&emsp;&emsp;import java.io.Reader;</div>
+<div>37&emsp;&emsp;import java.io.Writer;</div>
+<div>38&emsp;&emsp;import java.lang.reflect.Array;</div>
+<div>39&emsp;&emsp;import java.lang.reflect.Constructor;</div>
+<div>40&emsp;&emsp;import java.lang.reflect.Method;</div>
+<div>41&emsp;&emsp;import java.util.ArrayList;</div>
+<div>42&emsp;&emsp;import java.util.Enumeration;</div>
+<div>43&emsp;&emsp;import java.util.Hashtable;</div>
+<div>44&emsp;&emsp;import java.util.List;</div>
+<div>45&emsp;&emsp;import java.util.Vector;</div>
+<div>46&emsp;&emsp;</div>
+<div>47&emsp;&emsp;import org.w3c.dom.Document;</div>
+<div>48&emsp;&emsp;import org.w3c.dom.Element;</div>
+<div>49&emsp;&emsp;</div>
+<div>50&emsp;&emsp;import weka.core.RevisionHandler;</div>
+<div>51&emsp;&emsp;import weka.core.RevisionUtils;</div>
+<div>52&emsp;&emsp;import weka.core.Utils;</div>
+<div>53&emsp;&emsp;import weka.core.Version;</div>
+<div>54&emsp;&emsp;import weka.core.WekaPackageClassLoaderManager;</div>
+<div>55&emsp;&emsp;</div>
+<div>56&emsp;&emsp;/**</div>
+<div>57&emsp;&emsp;&nbsp; * With this class objects can be serialized to XML instead into a binary</div>
+<div>58&emsp;&emsp;&nbsp; * format. It uses introspection (cf. beans) to retrieve the data from the given</div>
+<div>59&emsp;&emsp;&nbsp; * object, i.e. it can only access beans-conform fields automatically.</div>
+<div>60&emsp;&emsp;&nbsp; * &#60;p></div>
+<div>61&emsp;&emsp;&nbsp; * The generic approach of writing data as XML can be overriden by adding custom</div>
+<div>62&emsp;&emsp;&nbsp; * methods for reading/writing in a derived class (cf. &#60;code>m_Properties&#60;/code>, &#60;code>m_CustomMethods&#60;/code>).&#60;br></div>
+<div>63&emsp;&emsp;&nbsp; * Custom read and write methods must have the same signature (and also be</div>
+<div>64&emsp;&emsp;&nbsp; * &#60;code>public&#60;/code>!) as the &#60;code>readFromXML&#60;/code> and</div>
+<div>65&emsp;&emsp;&nbsp; * &#60;code>writeToXML&#60;/code> methods. Methods that apply to the naming rule</div>
+<div>66&emsp;&emsp;&nbsp; * &#60;code>read + property name&#60;/code> are added automatically to the list of</div>
+<div>67&emsp;&emsp;&nbsp; * methods by the method</div>
+<div>68&emsp;&emsp;&nbsp; * &#60;code>XMLSerializationMethodHandler.addMethods(...)&#60;/code>.</div>
+<div>69&emsp;&emsp;&nbsp; * &#60;p></div>
+<div>70&emsp;&emsp;&nbsp; * Other properties that are not conform the bean set/get-methods have to be</div>
+<div>71&emsp;&emsp;&nbsp; * processed manually in a derived class (cf.</div>
+<div>72&emsp;&emsp;&nbsp; * &#60;code>readPostProcess(Object)&#60;/code>, &#60;code>writePostProcess(Object)&#60;/code>).</div>
+<div>73&emsp;&emsp;&nbsp; * &#60;p></div>
+<div>74&emsp;&emsp;&nbsp; * For a complete XML serialization/deserialization have a look at the</div>
+<div>75&emsp;&emsp;&nbsp; * &#60;code>KOML&#60;/code> class.</div>
+<div>76&emsp;&emsp;&nbsp; * &#60;p></div>
+<div>77&emsp;&emsp;&nbsp; * If a stored class has a constructor that takes a String to initialize (e.g.</div>
+<div>78&emsp;&emsp;&nbsp; * String or Double) then the content of the tag will used for the constructor,</div>
+<div>79&emsp;&emsp;&nbsp; * e.g. from</div>
+<div>80&emsp;&emsp;&nbsp; * </div>
+<div>81&emsp;&emsp;&nbsp; * &#60;pre></div>
+<div>82&emsp;&emsp;&nbsp; * &lt;object name="name" class="String" primitive="no"&gt;Smith&lt;/object&gt;</div>
+<div>83&emsp;&emsp;&nbsp; * &#60;/pre></div>
+<div>84&emsp;&emsp;&nbsp; * </div>
+<div>85&emsp;&emsp;&nbsp; * "Smith" will be used to instantiate a String object as constructor argument.</div>
+<div>86&emsp;&emsp;&nbsp; * &#60;p></div>
+<div>87&emsp;&emsp;&nbsp; * </div>
+<div>88&emsp;&emsp;&nbsp; * @see KOML</div>
+<div>89&emsp;&emsp;&nbsp; * @see #fromXML(Document)</div>
+<div>90&emsp;&emsp;&nbsp; * @see #toXML(Object)</div>
+<div>91&emsp;&emsp;&nbsp; * @see #m_Properties</div>
+<div>92&emsp;&emsp;&nbsp; * @see #m_CustomMethods</div>
+<div>93&emsp;&emsp;&nbsp; * @see #readPostProcess(Object)</div>
+<div>94&emsp;&emsp;&nbsp; * @see #writePostProcess(Object)</div>
+<div>95&emsp;&emsp;&nbsp; * @see #readFromXML(Element)</div>
+<div>96&emsp;&emsp;&nbsp; * @see #writeToXML(Element, Object, String)</div>
+<div>97&emsp;&emsp;&nbsp; * </div>
+<div>98&emsp;&emsp;&nbsp; * @author FracPete (fracpete at waikato dot ac dot nz)</div>
+<div>99&emsp;&emsp;&nbsp; * @version $Revision: 13476 $</div>
+<div>100&emsp;&emsp;&nbsp; */</div>
+<div>101&emsp;&emsp;public class XMLSerialization implements RevisionHandler {</div>
+<div>102&emsp;&emsp;</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;  /** for debugging purposes only */</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;  protected static boolean DEBUG = false;</div>
+<div>105&emsp;&emsp;</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the node that is currently processed, in case of writing the parent node</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * (something might go wrong writing the new child) and in case of reading the</div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * actual node that is tried to process</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;  protected Element m_CurrentNode = null;</div>
+<div>112&emsp;&emsp;</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;  /** the tag for an object */</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;  public final static String TAG_OBJECT = "object";</div>
+<div>115&emsp;&emsp;</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;  /** the version attribute */</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;  public final static String ATT_VERSION = XMLDocument.ATT_VERSION;</div>
+<div>118&emsp;&emsp;</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;  /** the tag for the name */</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;  public final static String ATT_NAME = XMLDocument.ATT_NAME;</div>
+<div>121&emsp;&emsp;</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;  /** the tag for the class */</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;  public final static String ATT_CLASS = "class";</div>
+<div>124&emsp;&emsp;</div>
+<div>125&emsp;&emsp;&nbsp;&nbsp;  /** the tag whether primitive or not (yes/no) */</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;  public final static String ATT_PRIMITIVE = "primitive";</div>
+<div>127&emsp;&emsp;</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;  /** the tag whether array or not (yes/no) */</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;  public final static String ATT_ARRAY = "array";</div>
+<div>130&emsp;&emsp;</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;  /** the tag whether null or not (yes/no) */</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;  public final static String ATT_NULL = "null";</div>
+<div>133&emsp;&emsp;</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;  /** the value "yes" for the primitive and array attribute */</div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;  public final static String VAL_YES = XMLDocument.VAL_YES;</div>
+<div>136&emsp;&emsp;</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;  /** the value "no" for the primitive and array attribute */</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;  public final static String VAL_NO = XMLDocument.VAL_NO;</div>
+<div>139&emsp;&emsp;</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;  /** the value of the name for the root node */</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;  public final static String VAL_ROOT = "__root__";</div>
+<div>142&emsp;&emsp;</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;  /** the root node of the XML document */</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;  public final static String ROOT_NODE = TAG_OBJECT;</div>
+<div>145&emsp;&emsp;</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * default value for attribute ATT_PRIMITIVE</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #ATT_PRIMITIVE</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;  public final static String ATT_PRIMITIVE_DEFAULT = VAL_NO;</div>
+<div>152&emsp;&emsp;</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * default value for attribute ATT_ARRAY</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #ATT_ARRAY</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;  public final static String ATT_ARRAY_DEFAULT = VAL_NO;</div>
+<div>159&emsp;&emsp;</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * default value for attribute ATT_NULL</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #ATT_NULL</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;  public final static String ATT_NULL_DEFAULT = VAL_NO;</div>
+<div>166&emsp;&emsp;</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;  /** the DOCTYPE for the serialization */</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;  public final static String DOCTYPE = "&#60;!" + XMLDocument.DTD_DOCTYPE + " "</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + ROOT_NODE + "\n" + "[\n" + "   &#60;!" + XMLDocument.DTD_ELEMENT + " "</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + TAG_OBJECT + " (" + XMLDocument.DTD_PCDATA + XMLDocument.DTD_SEPARATOR</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + TAG_OBJECT + ")" + XMLDocument.DTD_ZERO_OR_MORE + ">\n" + "   &#60;!"</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + XMLDocument.DTD_ATTLIST + " " + TAG_OBJECT + " " + ATT_NAME + "      "</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + XMLDocument.DTD_CDATA + " " + XMLDocument.DTD_REQUIRED + ">\n" + "   &#60;!"</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + XMLDocument.DTD_ATTLIST + " " + TAG_OBJECT + " " + ATT_CLASS + "     "</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + XMLDocument.DTD_CDATA + " " + XMLDocument.DTD_REQUIRED + ">\n" + "   &#60;!"</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + XMLDocument.DTD_ATTLIST + " " + TAG_OBJECT + " " + ATT_PRIMITIVE + " "</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + XMLDocument.DTD_CDATA + " \"" + ATT_PRIMITIVE_DEFAULT + "\">\n" + "   &#60;!"</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + XMLDocument.DTD_ATTLIST + " " + TAG_OBJECT + " " + ATT_ARRAY + "     "</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + XMLDocument.DTD_CDATA + " \"" + ATT_ARRAY_DEFAULT</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + "\">   &#60;!-- the dimensions of the array; no=0, yes=1 -->\n" + "   &#60;!"</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + XMLDocument.DTD_ATTLIST + " " + TAG_OBJECT + " " + ATT_NULL + "      "</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + XMLDocument.DTD_CDATA + " \"" + ATT_NULL_DEFAULT + "\">\n" + "   &#60;!"</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + XMLDocument.DTD_ATTLIST + " " + TAG_OBJECT + " " + ATT_VERSION + "   "</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    + XMLDocument.DTD_CDATA + " \"" + Version.VERSION + "\">\n" + "]\n" + ">";</div>
+<div>185&emsp;&emsp;</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * List of fully qualified property names to suppress any warning messages for</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;  public final static List&#60;String> SUPPRESS_PROPERTY_WARNINGS =</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    new ArrayList&#60;String>();</div>
+<div>191&emsp;&emsp;</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;  /** the XMLDocument that performs the transformation to and fro XML */</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;  protected XMLDocument m_Document = null;</div>
+<div>194&emsp;&emsp;</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;  /** for handling properties (ignored/allowed) */</div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;  protected PropertyHandler m_Properties = null;</div>
+<div>197&emsp;&emsp;</div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;  /** for handling custom read/write methods */</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;  protected XMLSerializationMethodHandler m_CustomMethods = null;</div>
+<div>200&emsp;&emsp;</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * for overriding class names (Class &lt;-&gt; Classname (String))</div>
+<div>203&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #overrideClassname(Object)</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;  protected Hashtable&#60;Class&#60;?>, String> m_ClassnameOverride = null;</div>
+<div>207&emsp;&emsp;</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;  /** true to suppress warnings about loading newer/older versions etc. */</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;  protected boolean m_suppressWarnings;</div>
+<div>210&emsp;&emsp;</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * initializes the serialization</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if initialization fails</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;  public XMLSerialization() throws Exception {</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    super();</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    clear();</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>220&emsp;&emsp;</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Set whether to suppress warning messages or not</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param suppress true to suppress warnings</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;  public void setSuppressWarnings(boolean suppress) {</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_suppressWarnings = suppress;</div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>229&emsp;&emsp;</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * used for debugging purposes, i.e. only if DEBUG is set to true. needs a</div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * newly generated Throwable instance to get the method/line from</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param t a throwable instance, generated in the calling method</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param msg a message to pring</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #DEBUG</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;  protected void trace(Throwable t, String msg) {</div>
+<div style="background-color:limegreen;">239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if ((DEBUG) && (t.getStackTrace().length > 0)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("trace: " + t.getStackTrace()[0] + ": " + msg);</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>243&emsp;&emsp;</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * generates internally a new XML document and clears also the IgnoreList and</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the mappings for the Read/Write-Methods</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;  public void clear() throws Exception {</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Document = new XMLDocument();</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Document.setValidating(true);</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Document.newDocument(DOCTYPE, ROOT_NODE);</div>
+<div>254&emsp;&emsp;</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Properties = new PropertyHandler();</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CustomMethods = new XMLSerializationMethodHandler(this);</div>
+<div>257&emsp;&emsp;</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_ClassnameOverride = new Hashtable&#60;Class&#60;?>, String>();</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // java.io.File is sometimes represented as another class:</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // - Win32: sun.awt.shell.Win32ShellFolder2</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // - Linux: sun.awt.shell.DefaultShellFolder</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // -> we set it to "java.io.File"</div>
+<div>263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_ClassnameOverride.put(java.io.File.class, java.io.File.class.getName());</div>
+<div>264&emsp;&emsp;</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    setVersion(Version.VERSION);</div>
+<div>266&emsp;&emsp;</div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = null;</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>269&emsp;&emsp;</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * sets the given version string in the XML document</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param version the new version string</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;  private void setVersion(String version) {</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Document doc;</div>
+<div>277&emsp;&emsp;</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    doc = m_Document.getDocument();</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    doc.getDocumentElement().setAttribute(ATT_VERSION, version);</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>281&emsp;&emsp;</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns the WEKA version with which the serialized object was created</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the current version</div>
+<div>286&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see Version</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>288&emsp;&emsp;&nbsp;&nbsp;  public String getVersion() {</div>
+<div>289&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Document doc;</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String result;</div>
+<div>291&emsp;&emsp;</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    doc = m_Document.getDocument();</div>
+<div>293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = doc.getDocumentElement().getAttribute(ATT_VERSION);</div>
+<div>294&emsp;&emsp;</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>296&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>297&emsp;&emsp;</div>
+<div>298&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>299&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Checks the version in the current Document with the one of the current</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * release. If the version differ, a warning is printed.</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;  private void checkVersion() {</div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (m_suppressWarnings) {</div>
+<div>304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return;</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String versionStr;</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Version version;</div>
+<div>308&emsp;&emsp;</div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    version = new Version();</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    versionStr = getVersion();</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (versionStr.equals("")) {</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("WARNING: has no version!");</div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else if (version.isOlder(versionStr)) {</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("WARNING: loading a newer version (" + versionStr</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + " > " + Version.VERSION + ")!");</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else if (version.isNewer(versionStr)) {</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("NOTE: loading an older version (" + versionStr</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + " &#60; " + Version.VERSION + ")!");</div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>321&emsp;&emsp;</div>
+<div>322&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns a hashtable with PropertyDescriptors that have "get" and "set"</div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * methods indexed by the property name.</div>
+<div>325&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see java.beans.PropertyDescriptor</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the object to retrieve the descriptors from</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the PropertyDescriptors indexed by name of the property</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the introspection fails</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;  protected Hashtable&#60;String, PropertyDescriptor> getDescriptors(Object o)</div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    BeanInfo info;</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PropertyDescriptor[] desc;</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int i;</div>
+<div>336&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Hashtable&#60;String, PropertyDescriptor> result;</div>
+<div>337&emsp;&emsp;</div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = new Hashtable&#60;String, PropertyDescriptor>();</div>
+<div>339&emsp;&emsp;</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    info = Introspector.getBeanInfo(o.getClass());</div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    desc = info.getPropertyDescriptors();</div>
+<div style="background-color:limegreen;">342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    for (i = 0; i &#60; desc.length; i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // get AND set method?</div>
+<div style="background-color:limegreen;">344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if ((desc[i].getReadMethod() != null)&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        && (desc[i].getWriteMethod() != null)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // in ignore list, i.e. a general ignore without complete path?</div>
+<div style="background-color:limegreen;">347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_Properties.isIgnored(desc[i].getDisplayName())) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          continue;</div>
+<div>349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>350&emsp;&emsp;</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // in ignore list of the class?</div>
+<div style="background-color:limegreen;">352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_Properties.isIgnored(o, desc[i].getDisplayName())) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          continue;</div>
+<div>354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>355&emsp;&emsp;</div>
+<div>356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // not an allowed property</div>
+<div style="background-color:limegreen;">357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!m_Properties.isAllowed(o, desc[i].getDisplayName())) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          continue;</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>360&emsp;&emsp;</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result.put(desc[i].getDisplayName(), desc[i]);</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>364&emsp;&emsp;</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>367&emsp;&emsp;</div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns the path of the "name" attribute from the root down to this node</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * (including it).</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param node the node to get the path for</div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the complete "name" path of this node</div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;  protected String getPath(Element node) {</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String result;</div>
+<div>377&emsp;&emsp;</div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = node.getAttribute(ATT_NAME);</div>
+<div>379&emsp;&emsp;</div>
+<div style="background-color:limegreen;">380&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    while (node.getParentNode() != node.getOwnerDocument()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      node = (Element) node.getParentNode();</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = node.getAttribute(ATT_NAME) + "." + result;</div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>384&emsp;&emsp;</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>387&emsp;&emsp;</div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>389&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns either &#60;code>VAL_YES&#60;/code> or &#60;code>VAL_NO&#60;/code> depending on the</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * value of &#60;code>b&#60;/code></div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>392&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param b the boolean to turn into a string</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the value in string representation</div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;  protected String booleanToString(boolean b) {</div>
+<div style="background-color:limegreen;">396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (b) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return VAL_YES;</div>
+<div>398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return VAL_NO;</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>401&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>402&emsp;&emsp;</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>404&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * turns the given string into a boolean, if a positive number is given, then</div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * zero is considered FALSE, every other number TRUE; the empty string is also</div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * considered being FALSE</div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param s the string to turn into a boolean</div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the string as boolean</div>
+<div>410&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;  protected boolean stringToBoolean(String s) {</div>
+<div style="background-color:limegreen;">412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (s.equals("")) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return false;</div>
+<div style="background-color:limegreen;">414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (s.equals(VAL_YES)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return true;</div>
+<div style="background-color:limegreen;">416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (s.equalsIgnoreCase("true")) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return true;</div>
+<div style="background-color:limegreen;">418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (s.replaceAll("[0-9]*", "").equals("")) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      return (Integer.parseInt(s) != 0);&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return false;</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>424&emsp;&emsp;</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>426&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * appends a new node to the parent with the given parameters (a non-array)</div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param parent the parent of this node. if it is &#60;code>null&#60;/code> the</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          document root element is used</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the node</div>
+<div>431&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classname the classname for this node</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param primitive whether it is a primitve data type or not (i.e. an object)</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the generated node</div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;  protected Element addElement(Element parent, String name, String classname,</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean primitive) {</div>
+<div>437&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return addElement(parent, name, classname, primitive, 0);</div>
+<div>438&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>439&emsp;&emsp;</div>
+<div>440&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * appends a new node to the parent with the given parameters</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param parent the parent of this node. if it is &#60;code>null&#60;/code> the</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          document root element is used</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the node</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classname the classname for this node</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param primitive whether it is a primitve data type or not (i.e. an object)</div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param array the dimensions of the array (0 if not an array)</div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the generated node</div>
+<div>450&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;  protected Element addElement(Element parent, String name, String classname,</div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean primitive, int array) {</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return addElement(parent, name, classname, primitive, array, false);</div>
+<div>454&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>455&emsp;&emsp;</div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * appends a new node to the parent with the given parameters</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>459&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param parent the parent of this node. if it is &#60;code>null&#60;/code> the</div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          document root element is used</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the node</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classname the classname for this node</div>
+<div>463&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param primitive whether it is a primitve data type or not (i.e. an object)</div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param array the dimensions of the array (0 if not an array)</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param isnull whether it is null</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the generated node</div>
+<div>467&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>468&emsp;&emsp;&nbsp;&nbsp;  protected Element addElement(Element parent, String name, String classname,</div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean primitive, int array, boolean isnull) {</div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Element result;</div>
+<div>471&emsp;&emsp;</div>
+<div style="background-color:limegreen;">472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (parent == null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = m_Document.getDocument().getDocumentElement();</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = (Element) parent.appendChild(m_Document.getDocument()</div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        .createElement(TAG_OBJECT));</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>478&emsp;&emsp;</div>
+<div>479&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // attributes</div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // mandatory attributes:</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.setAttribute(ATT_NAME, name);</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result.setAttribute(ATT_CLASS, classname);</div>
+<div>483&emsp;&emsp;</div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // add following attributes only if necessary, i.e., different from default:</div>
+<div style="background-color:limegreen;">485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!booleanToString(primitive).equals(ATT_PRIMITIVE_DEFAULT)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result.setAttribute(ATT_PRIMITIVE, booleanToString(primitive));</div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>488&emsp;&emsp;</div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // multi-dimensional array?</div>
+<div style="background-color:limegreen;">490&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (array > 1) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result.setAttribute(ATT_ARRAY, Integer.toString(array));</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // backwards compatible: 0 -> no array ("no"), 1 -> 1-dim. array ("yes")</div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    else {</div>
+<div style="background-color:limegreen;">495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!booleanToString(array == 1).equals(ATT_ARRAY_DEFAULT)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        result.setAttribute(ATT_ARRAY, booleanToString(array == 1));&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>499&emsp;&emsp;</div>
+<div style="background-color:limegreen;">500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (!booleanToString(isnull).equals(ATT_NULL_DEFAULT)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result.setAttribute(ATT_NULL, booleanToString(isnull));</div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>503&emsp;&emsp;</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>506&emsp;&emsp;</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * if the class of the given object (or one of its ancestors) is stored in the</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * classname override hashtable, then the override name is returned otherwise</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the classname of the given object.</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the object to check for overriding its classname</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return if overridden then the classname stored in the hashtable, otherwise</div>
+<div>514&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         the classname of the given object</div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #m_ClassnameOverride</div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;  protected String overrideClassname(Object o) {</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Enumeration&#60;Class&#60;?>> enm;</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String result;</div>
+<div>520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Class&#60;?> currentCls;</div>
+<div>521&emsp;&emsp;</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = o.getClass().getName();</div>
+<div>523&emsp;&emsp;</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // check overrides</div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    enm = m_ClassnameOverride.keys();</div>
+<div style="background-color:limegreen;">526&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    while (enm.hasMoreElements()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      currentCls = enm.nextElement();</div>
+<div style="background-color:limegreen;">528&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (currentCls.isInstance(o)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>529&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result = m_ClassnameOverride.get(currentCls);</div>
+<div>530&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        break;</div>
+<div>531&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>533&emsp;&emsp;</div>
+<div>534&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>535&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>536&emsp;&emsp;</div>
+<div>537&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>538&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * if the given classname is stored in the classname override hashtable, then</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the override name is returned otherwise the given classname. &#60;b>Note:&#60;/b></div>
+<div>540&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * in contrast to &#60;code>overrideClassname(Object)&#60;/code> does this method only</div>
+<div>541&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * look for exact name matches. The other method checks whether the class of</div>
+<div>542&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the given object is a subclass of any of the stored overrides.</div>
+<div>543&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param classname the classname to check for overriding</div>
+<div>545&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return if overridden then the classname stored in the hashtable, otherwise</div>
+<div>546&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         the given classname</div>
+<div>547&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #m_ClassnameOverride</div>
+<div>548&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #overrideClassname(Object)</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>550&emsp;&emsp;&nbsp;&nbsp;  protected String overrideClassname(String classname) {</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Enumeration&#60;Class&#60;?>> enm;</div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String result;</div>
+<div>553&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Class&#60;?> currentCls;</div>
+<div>554&emsp;&emsp;</div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = classname;</div>
+<div>556&emsp;&emsp;</div>
+<div>557&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // check overrides</div>
+<div>558&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    enm = m_ClassnameOverride.keys();</div>
+<div style="background-color:limegreen;">559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    while (enm.hasMoreElements()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      currentCls = enm.nextElement();</div>
+<div style="background-color:limegreen;">561&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (currentCls.getName().equals(classname)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>562&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result = m_ClassnameOverride.get(currentCls);</div>
+<div>563&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        break;</div>
+<div>564&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>566&emsp;&emsp;</div>
+<div>567&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>569&emsp;&emsp;</div>
+<div>570&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>571&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns a property descriptor if possible, otherwise &#60;code>null&#60;/code></div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>573&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param className the name of the class to get the descriptor for</div>
+<div>574&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param displayName the name of the property</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the descriptor if available, otherwise &#60;code>null&#60;/code></div>
+<div>576&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>577&emsp;&emsp;&nbsp;&nbsp;  protected PropertyDescriptor determineDescriptor(String className,</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String displayName) {</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PropertyDescriptor result;</div>
+<div>580&emsp;&emsp;</div>
+<div>581&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = null;</div>
+<div>582&emsp;&emsp;</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>584&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // result = new PropertyDescriptor(displayName, Class.forName(className));</div>
+<div>585&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = new PropertyDescriptor(displayName,</div>
+<div>586&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        WekaPackageClassLoaderManager.forName(className));</div>
+<div>587&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (Exception e) {</div>
+<div>588&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = null;</div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>590&emsp;&emsp;</div>
+<div>591&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>592&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>593&emsp;&emsp;</div>
+<div>594&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>595&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * adds the given primitive to the DOM structure.</div>
+<div>596&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param parent the parent of this object, e.g. the class this object is a</div>
+<div>598&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          member of</div>
+<div>599&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the primitive to describe in XML</div>
+<div>600&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the primitive</div>
+<div>601&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the node that was created</div>
+<div>602&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the DOM creation fails</div>
+<div>603&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>604&emsp;&emsp;&nbsp;&nbsp;  protected Element writeBooleanToXML(Element parent, boolean o, String name)</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Element node;</div>
+<div>607&emsp;&emsp;</div>
+<div>608&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>609&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>610&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), name);</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>612&emsp;&emsp;</div>
+<div>613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = parent;</div>
+<div>614&emsp;&emsp;</div>
+<div>615&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node = addElement(parent, name, Boolean.TYPE.getName(), true);</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node.appendChild(node.getOwnerDocument().createTextNode(</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new Boolean(o).toString()));</div>
+<div>618&emsp;&emsp;</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return node;</div>
+<div>620&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>621&emsp;&emsp;</div>
+<div>622&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>623&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * adds the given primitive to the DOM structure.</div>
+<div>624&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>625&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param parent the parent of this object, e.g. the class this object is a</div>
+<div>626&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          member of</div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the primitive to describe in XML</div>
+<div>628&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the primitive</div>
+<div>629&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the node that was created</div>
+<div>630&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the DOM creation fails</div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>632&emsp;&emsp;&nbsp;&nbsp;  protected Element writeByteToXML(Element parent, byte o, String name)</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>634&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Element node;</div>
+<div>635&emsp;&emsp;</div>
+<div>636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>637&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), name);</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>640&emsp;&emsp;</div>
+<div>641&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = parent;</div>
+<div>642&emsp;&emsp;</div>
+<div>643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node = addElement(parent, name, Byte.TYPE.getName(), true);</div>
+<div>644&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node.appendChild(node.getOwnerDocument().createTextNode(</div>
+<div>645&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new Byte(o).toString()));</div>
+<div>646&emsp;&emsp;</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return node;</div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>649&emsp;&emsp;</div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>651&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * adds the given primitive to the DOM structure.</div>
+<div>652&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>653&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param parent the parent of this object, e.g. the class this object is a</div>
+<div>654&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          member of</div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the primitive to describe in XML</div>
+<div>656&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the primitive</div>
+<div>657&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the node that was created</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the DOM creation fails</div>
+<div>659&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>660&emsp;&emsp;&nbsp;&nbsp;  protected Element writeCharToXML(Element parent, char o, String name)</div>
+<div>661&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>662&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Element node;</div>
+<div>663&emsp;&emsp;</div>
+<div>664&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>665&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>666&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), name);</div>
+<div>667&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>668&emsp;&emsp;</div>
+<div>669&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = parent;</div>
+<div>670&emsp;&emsp;</div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node = addElement(parent, name, Character.TYPE.getName(), true);</div>
+<div>672&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node.appendChild(node.getOwnerDocument().createTextNode(</div>
+<div>673&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new Character(o).toString()));</div>
+<div>674&emsp;&emsp;</div>
+<div>675&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return node;</div>
+<div>676&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>677&emsp;&emsp;</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>679&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * adds the given primitive to the DOM structure.</div>
+<div>680&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param parent the parent of this object, e.g. the class this object is a</div>
+<div>682&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          member of</div>
+<div>683&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the primitive to describe in XML</div>
+<div>684&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the primitive</div>
+<div>685&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the node that was created</div>
+<div>686&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the DOM creation fails</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>688&emsp;&emsp;&nbsp;&nbsp;  protected Element writeDoubleToXML(Element parent, double o, String name)</div>
+<div>689&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>690&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Element node;</div>
+<div>691&emsp;&emsp;</div>
+<div>692&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>694&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), name);</div>
+<div>695&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>696&emsp;&emsp;</div>
+<div>697&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = parent;</div>
+<div>698&emsp;&emsp;</div>
+<div>699&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node = addElement(parent, name, Double.TYPE.getName(), true);</div>
+<div>700&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node.appendChild(node.getOwnerDocument().createTextNode(</div>
+<div>701&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new Double(o).toString()));</div>
+<div>702&emsp;&emsp;</div>
+<div>703&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return node;</div>
+<div>704&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>705&emsp;&emsp;</div>
+<div>706&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>707&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * adds the given primitive to the DOM structure.</div>
+<div>708&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>709&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param parent the parent of this object, e.g. the class this object is a</div>
+<div>710&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          member of</div>
+<div>711&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the primitive to describe in XML</div>
+<div>712&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the primitive</div>
+<div>713&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the node that was created</div>
+<div>714&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the DOM creation fails</div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;  protected Element writeFloatToXML(Element parent, float o, String name)</div>
+<div>717&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>718&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Element node;</div>
+<div>719&emsp;&emsp;</div>
+<div>720&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>721&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>722&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), name);</div>
+<div>723&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>724&emsp;&emsp;</div>
+<div>725&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = parent;</div>
+<div>726&emsp;&emsp;</div>
+<div>727&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node = addElement(parent, name, Float.TYPE.getName(), true);</div>
+<div>728&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node.appendChild(node.getOwnerDocument().createTextNode(</div>
+<div>729&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new Float(o).toString()));</div>
+<div>730&emsp;&emsp;</div>
+<div>731&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return node;</div>
+<div>732&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>733&emsp;&emsp;</div>
+<div>734&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * adds the given primitive to the DOM structure.</div>
+<div>736&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param parent the parent of this object, e.g. the class this object is a</div>
+<div>738&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          member of</div>
+<div>739&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the primitive to describe in XML</div>
+<div>740&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the primitive</div>
+<div>741&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the node that was created</div>
+<div>742&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the DOM creation fails</div>
+<div>743&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>744&emsp;&emsp;&nbsp;&nbsp;  protected Element writeIntToXML(Element parent, int o, String name)</div>
+<div>745&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>746&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Element node;</div>
+<div>747&emsp;&emsp;</div>
+<div>748&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>750&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), name);</div>
+<div>751&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>752&emsp;&emsp;</div>
+<div>753&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = parent;</div>
+<div>754&emsp;&emsp;</div>
+<div>755&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node = addElement(parent, name, Integer.TYPE.getName(), true);</div>
+<div>756&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node.appendChild(node.getOwnerDocument().createTextNode(</div>
+<div>757&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new Integer(o).toString()));</div>
+<div>758&emsp;&emsp;</div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return node;</div>
+<div>760&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>761&emsp;&emsp;</div>
+<div>762&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>763&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * adds the given primitive to the DOM structure.</div>
+<div>764&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>765&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param parent the parent of this object, e.g. the class this object is a</div>
+<div>766&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          member of</div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the primitive to describe in XML</div>
+<div>768&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the primitive</div>
+<div>769&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the node that was created</div>
+<div>770&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the DOM creation fails</div>
+<div>771&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>772&emsp;&emsp;&nbsp;&nbsp;  protected Element writeLongToXML(Element parent, long o, String name)</div>
+<div>773&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>774&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Element node;</div>
+<div>775&emsp;&emsp;</div>
+<div>776&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>777&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>778&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), name);</div>
+<div>779&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>780&emsp;&emsp;</div>
+<div>781&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = parent;</div>
+<div>782&emsp;&emsp;</div>
+<div>783&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node = addElement(parent, name, Long.TYPE.getName(), true);</div>
+<div>784&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node.appendChild(node.getOwnerDocument().createTextNode(</div>
+<div>785&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new Long(o).toString()));</div>
+<div>786&emsp;&emsp;</div>
+<div>787&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return node;</div>
+<div>788&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>789&emsp;&emsp;</div>
+<div>790&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>791&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * adds the given primitive to the DOM structure.</div>
+<div>792&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>793&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param parent the parent of this object, e.g. the class this object is a</div>
+<div>794&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          member of</div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the primitive to describe in XML</div>
+<div>796&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the primitive</div>
+<div>797&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the node that was created</div>
+<div>798&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the DOM creation fails</div>
+<div>799&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>800&emsp;&emsp;&nbsp;&nbsp;  protected Element writeShortToXML(Element parent, short o, String name)</div>
+<div>801&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Element node;</div>
+<div>803&emsp;&emsp;</div>
+<div>804&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>805&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>806&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), name);</div>
+<div>807&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>808&emsp;&emsp;</div>
+<div>809&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = parent;</div>
+<div>810&emsp;&emsp;</div>
+<div>811&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node = addElement(parent, name, Short.TYPE.getName(), true);</div>
+<div>812&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node.appendChild(node.getOwnerDocument().createTextNode(</div>
+<div>813&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      new Short(o).toString()));</div>
+<div>814&emsp;&emsp;</div>
+<div>815&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return node;</div>
+<div>816&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>817&emsp;&emsp;</div>
+<div>818&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>819&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * checks whether the innermost class is a primitive class (handles</div>
+<div>820&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * multi-dimensional arrays)</div>
+<div>821&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>822&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param c the array class to inspect</div>
+<div>823&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return whether the array consists of primitive elements</div>
+<div>824&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>825&emsp;&emsp;&nbsp;&nbsp;  protected boolean isPrimitiveArray(Class&#60;?> c) {</div>
+<div style="background-color:limegreen;">826&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (c.getComponentType().isArray()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>827&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return isPrimitiveArray(c.getComponentType());</div>
+<div>828&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return c.getComponentType().isPrimitive();</div>
+<div>830&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>831&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>832&emsp;&emsp;</div>
+<div>833&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>834&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * adds the given Object to a DOM structure. (only public due to reflection).&#60;br></div>
+<div>835&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;b>Note:&#60;/b> &#60;code>overrideClassname(Object)&#60;/code> is not invoked in case</div>
+<div>836&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * of arrays, since the array class could be a superclass, whereas the</div>
+<div>837&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * elements of the array can be specialized subclasses. In case of an array</div>
+<div>838&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the method &#60;code>overrideClassname(String)&#60;/code> is invoked, which</div>
+<div>839&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * searches for an exact match of the classname in the override hashtable.</div>
+<div>840&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param parent the parent of this object, e.g. the class this object is a</div>
+<div>842&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          member of</div>
+<div>843&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the Object to describe in XML</div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the object</div>
+<div>845&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the node that was created</div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the DOM creation fails</div>
+<div>847&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #overrideClassname(Object)</div>
+<div>848&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #overrideClassname(String)</div>
+<div>849&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @see #m_ClassnameOverride</div>
+<div>850&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>851&emsp;&emsp;&nbsp;&nbsp;  public Element writeToXML(Element parent, Object o, String name)</div>
+<div>852&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>853&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String classname;</div>
+<div>854&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Element node;</div>
+<div>855&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Hashtable&#60;String, PropertyDescriptor> memberlist;</div>
+<div>856&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Enumeration&#60;String> enm;</div>
+<div>857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Object member;</div>
+<div>858&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String memberName;</div>
+<div>859&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Method method;</div>
+<div>860&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PropertyDescriptor desc;</div>
+<div>861&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean primitive;</div>
+<div>862&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int array;</div>
+<div>863&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int i;</div>
+<div>864&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Object obj;</div>
+<div>865&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String tmpStr;</div>
+<div>866&emsp;&emsp;</div>
+<div>867&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node = null;</div>
+<div>868&emsp;&emsp;</div>
+<div>869&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div style="background-color:limegreen;">870&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (DEBUG) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>871&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), name);</div>
+<div>872&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>873&emsp;&emsp;</div>
+<div>874&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // special handling of null-objects</div>
+<div style="background-color:limegreen;">875&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (o == null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      node = addElement(parent, name, "" + null, false, 0, true);</div>
+<div>877&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return node;</div>
+<div>878&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>879&emsp;&emsp;</div>
+<div>880&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // used for overriding the classname</div>
+<div>881&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    obj = null;</div>
+<div>882&emsp;&emsp;</div>
+<div>883&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // get information about object</div>
+<div>884&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    array = 0;</div>
+<div style="background-color:limegreen;">885&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (o.getClass().isArray()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>886&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      array = Utils.getArrayDimensions(o);</div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div style="background-color:limegreen;">888&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (array > 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>889&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      classname = Utils.getArrayClass(o.getClass()).getName();</div>
+<div>890&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      primitive = isPrimitiveArray(o.getClass());</div>
+<div>891&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>892&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // try to get property descriptor to determine real class</div>
+<div>893&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // (for primitives the getClass() method returns the corresponding</div>
+<div>894&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Object-Class!)</div>
+<div>895&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      desc = null;</div>
+<div style="background-color:limegreen;">896&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (parent != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>897&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        desc = determineDescriptor(parent.getAttribute(ATT_CLASS), name);</div>
+<div>898&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>899&emsp;&emsp;</div>
+<div style="background-color:limegreen;">900&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (desc != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>901&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        primitive = desc.getPropertyType().isPrimitive();</div>
+<div>902&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        primitive = o.getClass().isPrimitive();</div>
+<div>904&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>905&emsp;&emsp;</div>
+<div>906&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // for primitives: retrieve primitive type, otherwise the object's real</div>
+<div>907&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // class. For non-primitives we can't use the descriptor, since that</div>
+<div>908&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // might only return an interface as class!</div>
+<div style="background-color:limegreen;">909&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (primitive) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>910&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        classname = desc.getPropertyType().getName();</div>
+<div>911&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>912&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        obj = o;</div>
+<div>913&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        classname = o.getClass().getName();</div>
+<div>914&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>915&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>916&emsp;&emsp;</div>
+<div>917&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // fix class/primitive if parent is array of primitives, thanks to</div>
+<div>918&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // reflection the elements of the array are objects and not primitives!</div>
+<div style="background-color:limegreen;">919&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if ((parent != null) && (!parent.getAttribute(ATT_ARRAY).equals(""))&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">920&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      && (!parent.getAttribute(ATT_ARRAY).equals(VAL_NO))&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">921&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      && (stringToBoolean(parent.getAttribute(ATT_PRIMITIVE)))) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>922&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      primitive = true;</div>
+<div>923&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      classname = parent.getAttribute(ATT_CLASS);</div>
+<div>924&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      obj = null;</div>
+<div>925&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>926&emsp;&emsp;</div>
+<div>927&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // perhaps we need to override the classname</div>
+<div style="background-color:limegreen;">928&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (obj != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>929&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      classname = overrideClassname(obj); // for non-arrays</div>
+<div>930&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>931&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      classname = overrideClassname(classname); // for arrays</div>
+<div>932&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>933&emsp;&emsp;</div>
+<div>934&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // create node for current object</div>
+<div>935&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node = addElement(parent, name, classname, primitive, array);</div>
+<div>936&emsp;&emsp;</div>
+<div>937&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // array? -> save as child with 'name="&#60;index>"'</div>
+<div style="background-color:limegreen;">938&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (array > 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">939&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (i = 0; i &#60; Array.getLength(o); i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>940&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        invokeWriteToXML(node, Array.get(o, i), Integer.toString(i));</div>
+<div>941&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>942&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>943&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // non-array</div>
+<div>944&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    else {</div>
+<div>945&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // primitive? -> only toString()</div>
+<div style="background-color:limegreen;">946&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (primitive) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>947&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        node.appendChild(node.getOwnerDocument().createTextNode(o.toString()));</div>
+<div>948&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>949&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // object</div>
+<div>950&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      else {</div>
+<div>951&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // process recursively members of this object</div>
+<div>952&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        memberlist = getDescriptors(o);</div>
+<div>953&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // if no get/set methods -> we assume it has String-Constructor</div>
+<div style="background-color:limegreen;">954&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (memberlist.size() == 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">955&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (!o.toString().equals("")) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>956&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            tmpStr = o.toString();</div>
+<div>957&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // these five entities are recognized by every XML processor</div>
+<div>958&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // see http://www.xml.com/pub/a/2001/03/14/trxml10.html</div>
+<div>959&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            tmpStr = tmpStr.replaceAll("&", "&amp;").replaceAll("\"", "&quot;")</div>
+<div>960&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              .replaceAll("'", "&apos;").replaceAll("&#60;", "&lt;")</div>
+<div>961&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              .replaceAll(">", "&gt;");</div>
+<div>962&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // in addition, replace some other entities as well</div>
+<div>963&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            tmpStr = tmpStr.replaceAll("\n", "&#10;").replaceAll("\r", "&#13;")</div>
+<div>964&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              .replaceAll("\t", "&#9;");</div>
+<div>965&emsp;&emsp;</div>
+<div style="background-color:limegreen;">966&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (o instanceof java.io.File) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>967&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              // hack to force separators to be always saved as /</div>
+<div>968&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              tmpStr = tmpStr.replace('\\', '/');</div>
+<div>969&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>970&emsp;&emsp;</div>
+<div>971&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            node.appendChild(node.getOwnerDocument().createTextNode(tmpStr));</div>
+<div>972&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>973&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>974&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          enm = memberlist.keys();</div>
+<div style="background-color:limegreen;">975&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          while (enm.hasMoreElements()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>976&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            memberName = enm.nextElement().toString();</div>
+<div>977&emsp;&emsp;</div>
+<div>978&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // in ignore list?</div>
+<div style="background-color:limegreen;">979&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if ((m_Properties.isIgnored(memberName))&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">980&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>              || (m_Properties.isIgnored(getPath(node) + "." + memberName))&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">981&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>              || (m_Properties.isIgnored(o, getPath(node) + "." + memberName))) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>982&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              continue;</div>
+<div>983&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>984&emsp;&emsp;</div>
+<div>985&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // is it allowed?</div>
+<div style="background-color:limegreen;">986&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (!m_Properties.isAllowed(o, memberName)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>987&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              continue;</div>
+<div>988&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>989&emsp;&emsp;</div>
+<div>990&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            desc = memberlist.get(memberName);</div>
+<div>991&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            method = desc.getReadMethod();</div>
+<div>992&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            member = method.invoke(o, (Object[]) null);</div>
+<div>993&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            invokeWriteToXML(node, member, memberName);</div>
+<div>994&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>995&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>996&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>997&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>998&emsp;&emsp;</div>
+<div>999&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return node;</div>
+<div>1000&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1001&emsp;&emsp;</div>
+<div>1002&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1003&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * either invokes a custom method to write a specific property/class or the</div>
+<div>1004&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * standard method &#60;code>writeToXML(Element,Object,String)&#60;/code></div>
+<div>1005&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1006&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param parent the parent XML node</div>
+<div>1007&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the object's content will be added as children to the given parent</div>
+<div>1008&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          node</div>
+<div>1009&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the object</div>
+<div>1010&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the node that was created</div>
+<div>1011&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if invocation or turning into XML fails</div>
+<div>1012&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1013&emsp;&emsp;&nbsp;&nbsp;  protected Element invokeWriteToXML(Element parent, Object o, String name)</div>
+<div>1014&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>1015&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Method method;</div>
+<div>1016&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Class&#60;?>[] methodClasses;</div>
+<div>1017&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Object[] methodArgs;</div>
+<div>1018&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean array;</div>
+<div>1019&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Element node;</div>
+<div>1020&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean useDefault;</div>
+<div>1021&emsp;&emsp;</div>
+<div>1022&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    node = null;</div>
+<div>1023&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    method = null;</div>
+<div>1024&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    useDefault = false;</div>
+<div>1025&emsp;&emsp;</div>
+<div>1026&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = parent;</div>
+<div>1027&emsp;&emsp;</div>
+<div>1028&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // default, if null</div>
+<div style="background-color:limegreen;">1029&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (o == null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1030&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      useDefault = true;</div>
+<div>1031&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1032&emsp;&emsp;</div>
+<div>1033&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div style="background-color:limegreen;">1034&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!useDefault) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1035&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        array = o.getClass().isArray();</div>
+<div>1036&emsp;&emsp;</div>
+<div>1037&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // display name?</div>
+<div style="background-color:limegreen;">1038&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_CustomMethods.write().contains(name)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1039&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          method = m_CustomMethods.write().get(o.getClass());</div>
+<div>1040&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else</div>
+<div>1041&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // class?</div>
+<div style="background-color:limegreen;">1042&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if ((!array) && (m_CustomMethods.write().contains(o.getClass()))) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1043&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          method = m_CustomMethods.write().get(o.getClass());</div>
+<div>1044&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1045&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          method = null;</div>
+<div>1046&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1047&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1048&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        useDefault = (method == null);&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1049&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1050&emsp;&emsp;</div>
+<div>1051&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // custom</div>
+<div style="background-color:limegreen;">1052&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!useDefault) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1053&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        methodClasses = new Class[3];</div>
+<div>1054&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        methodClasses[0] = Element.class;</div>
+<div>1055&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        methodClasses[1] = Object.class;</div>
+<div>1056&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        methodClasses[2] = String.class;</div>
+<div>1057&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        methodArgs = new Object[3];</div>
+<div>1058&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        methodArgs[0] = parent;</div>
+<div>1059&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        methodArgs[1] = o;</div>
+<div>1060&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        methodArgs[2] = name;</div>
+<div>1061&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        node = (Element) method.invoke(this, methodArgs);</div>
+<div>1062&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1063&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // standard</div>
+<div>1064&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      else {</div>
+<div>1065&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        node = writeToXML(parent, o, name);</div>
+<div>1066&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1067&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (Exception e) {</div>
+<div style="background-color:limegreen;">1068&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (DEBUG) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1069&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        e.printStackTrace();</div>
+<div>1070&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1071&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1072&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_CurrentNode != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1073&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println("Happened near: " + getPath(m_CurrentNode));</div>
+<div>1074&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // print it only once!</div>
+<div>1075&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_CurrentNode = null;</div>
+<div>1076&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1077&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("PROBLEM (write): " + name);</div>
+<div>1078&emsp;&emsp;</div>
+<div>1079&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw (Exception) e.fillInStackTrace();</div>
+<div>1080&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1081&emsp;&emsp;</div>
+<div>1082&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return node;</div>
+<div>1083&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1084&emsp;&emsp;</div>
+<div>1085&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1086&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * enables derived classes to due some pre-processing on the objects, that's</div>
+<div>1087&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * about to be serialized. Right now it only returns the object.</div>
+<div>1088&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1089&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the object that is serialized into XML</div>
+<div>1090&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the possibly altered object</div>
+<div>1091&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if post-processing fails</div>
+<div>1092&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1093&emsp;&emsp;&nbsp;&nbsp;  protected Object writePreProcess(Object o) throws Exception {</div>
+<div>1094&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return o;</div>
+<div>1095&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1096&emsp;&emsp;</div>
+<div>1097&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1098&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * enables derived classes to add other properties to the DOM tree, e.g. ones</div>
+<div>1099&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * that do not apply to the get/set convention of beans. only implemented with</div>
+<div>1100&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * empty method body.</div>
+<div>1101&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1102&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the object that is serialized into XML</div>
+<div>1103&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if post-processing fails</div>
+<div>1104&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1105&emsp;&emsp;&nbsp;&nbsp;  protected void writePostProcess(Object o) throws Exception {</div>
+<div>1106&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1107&emsp;&emsp;</div>
+<div>1108&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1109&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * extracts all accesible properties from the given object</div>
+<div>1110&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1111&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the object to turn into an XML representation</div>
+<div>1112&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the generated DOM document</div>
+<div>1113&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if XML generation fails</div>
+<div>1114&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1115&emsp;&emsp;&nbsp;&nbsp;  public XMLDocument toXML(Object o) throws Exception {</div>
+<div>1116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    clear();</div>
+<div>1117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    invokeWriteToXML(null, writePreProcess(o), VAL_ROOT);</div>
+<div>1118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    writePostProcess(o);</div>
+<div>1119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_Document;</div>
+<div>1120&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1121&emsp;&emsp;</div>
+<div>1122&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1123&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns a descriptor for a given objet by providing the name</div>
+<div>1124&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1125&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the object the get the descriptor for</div>
+<div>1126&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the display name of the descriptor</div>
+<div>1127&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the Descriptor, if found, otherwise &#60;code>null&#60;/code></div>
+<div>1128&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if introsepction fails</div>
+<div>1129&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1130&emsp;&emsp;&nbsp;&nbsp;  protected PropertyDescriptor getDescriptorByName(Object o, String name)</div>
+<div>1131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>1132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PropertyDescriptor result;</div>
+<div>1133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PropertyDescriptor[] desc;</div>
+<div>1134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int i;</div>
+<div>1135&emsp;&emsp;</div>
+<div>1136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = null;</div>
+<div>1137&emsp;&emsp;</div>
+<div>1138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    desc = Introspector.getBeanInfo(o.getClass()).getPropertyDescriptors();</div>
+<div>1139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    for (i = 0; i &#60; desc.length; i++) {</div>
+<div>1140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (desc[i].getDisplayName().equals(name)) {</div>
+<div>1141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result = desc[i];</div>
+<div>1142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        break;</div>
+<div>1143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1145&emsp;&emsp;</div>
+<div>1146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>1147&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1148&emsp;&emsp;</div>
+<div>1149&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1150&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns the associated class for the given name</div>
+<div>1151&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1152&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the class to return a Class object for</div>
+<div>1153&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the class if it could be retrieved</div>
+<div>1154&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if it class retrieval fails</div>
+<div>1155&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1156&emsp;&emsp;&nbsp;&nbsp;  protected Class&#60;?> determineClass(String name) throws Exception {</div>
+<div>1157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Class&#60;?> result;</div>
+<div>1158&emsp;&emsp;</div>
+<div>1159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (name.equals(Boolean.TYPE.getName())) {</div>
+<div>1160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = Boolean.TYPE;</div>
+<div>1161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else if (name.equals(Byte.TYPE.getName())) {</div>
+<div>1162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = Byte.TYPE;</div>
+<div>1163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else if (name.equals(Character.TYPE.getName())) {</div>
+<div>1164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = Character.TYPE;</div>
+<div>1165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else if (name.equals(Double.TYPE.getName())) {</div>
+<div>1166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = Double.TYPE;</div>
+<div>1167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else if (name.equals(Float.TYPE.getName())) {</div>
+<div>1168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = Float.TYPE;</div>
+<div>1169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else if (name.equals(Integer.TYPE.getName())) {</div>
+<div>1170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = Integer.TYPE;</div>
+<div>1171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else if (name.equals(Long.TYPE.getName())) {</div>
+<div>1172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = Long.TYPE;</div>
+<div>1173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else if (name.equals(Short.TYPE.getName())) {</div>
+<div>1174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = Short.TYPE;</div>
+<div>1175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>1176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // result = Class.forName(name);</div>
+<div>1177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = WekaPackageClassLoaderManager.forName(name);</div>
+<div>1178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1179&emsp;&emsp;</div>
+<div>1180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>1181&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1182&emsp;&emsp;</div>
+<div>1183&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1184&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns an Object representing the primitive described by the given node.</div>
+<div>1185&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Here we use a trick to return an object even though its a primitive: by</div>
+<div>1186&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * creating a primitive array with reflection of length 1, setting the</div>
+<div>1187&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * primtive value as real object and then returning the "object" at position 1</div>
+<div>1188&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * of the array.</div>
+<div>1189&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1190&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param node the node to return the value as "primitive" object</div>
+<div>1191&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the primitive as "pseudo" object</div>
+<div>1192&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if the instantiation of the array fails or any of the</div>
+<div>1193&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *           String conversions fails</div>
+<div>1194&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1195&emsp;&emsp;&nbsp;&nbsp;  protected Object getPrimitive(Element node) throws Exception {</div>
+<div>1196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Object result;</div>
+<div>1197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Object tmpResult;</div>
+<div>1198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Class&#60;?> cls;</div>
+<div>1199&emsp;&emsp;</div>
+<div>1200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    cls = determineClass(node.getAttribute(ATT_CLASS));</div>
+<div>1201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    tmpResult = Array.newInstance(cls, 1);</div>
+<div>1202&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (cls == Boolean.TYPE) {&nbsp;&#8594; [DONOTMAKESPLITPOINTACTUALVALUE, SEED]</b></div>
+<div>1204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Array.set(tmpResult, 0, new Boolean(XMLDocument.getContent(node)));</div>
+<div style="background-color:limegreen;">1205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (cls == Byte.TYPE) {&nbsp;&#8594; [DONOTMAKESPLITPOINTACTUALVALUE]</b></div>
+<div>1206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Array.set(tmpResult, 0, new Byte(XMLDocument.getContent(node)));</div>
+<div style="background-color:limegreen;">1207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (cls == Character.TYPE) {&nbsp;&#8594; [DONOTMAKESPLITPOINTACTUALVALUE]</b></div>
+<div>1208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Array.set(tmpResult, 0, new Character(XMLDocument.getContent(node)</div>
+<div>1209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        .charAt(0)));</div>
+<div style="background-color:limegreen;">1210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (cls == Double.TYPE) {&nbsp;&#8594; [DONOTMAKESPLITPOINTACTUALVALUE]</b></div>
+<div>1211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Array.set(tmpResult, 0, new Double(XMLDocument.getContent(node)));</div>
+<div style="background-color:limegreen;">1212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (cls == Float.TYPE) {&nbsp;&#8594; [DONOTMAKESPLITPOINTACTUALVALUE]</b></div>
+<div>1213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Array.set(tmpResult, 0, new Float(XMLDocument.getContent(node)));</div>
+<div style="background-color:limegreen;">1214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (cls == Integer.TYPE) {&nbsp;&#8594; [DONOTMAKESPLITPOINTACTUALVALUE]</b></div>
+<div>1215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Array.set(tmpResult, 0, new Integer(XMLDocument.getContent(node)));</div>
+<div style="background-color:limegreen;">1216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (cls == Long.TYPE) {&nbsp;&#8594; [DONOTMAKESPLITPOINTACTUALVALUE]</b></div>
+<div>1217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Array.set(tmpResult, 0, new Long(XMLDocument.getContent(node)));</div>
+<div style="background-color:limegreen;">1218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (cls == Short.TYPE) {&nbsp;&#8594; [DONOTMAKESPLITPOINTACTUALVALUE]</b></div>
+<div>1219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Array.set(tmpResult, 0, new Short(XMLDocument.getContent(node)));</div>
+<div>1220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>1221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("Cannot get primitive for class '" + cls.getName()</div>
+<div>1222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "'!");</div>
+<div>1223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1224&emsp;&emsp;</div>
+<div>1225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = Array.get(tmpResult, 0);</div>
+<div>1226&emsp;&emsp;</div>
+<div>1227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>1228&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1229&emsp;&emsp;</div>
+<div>1230&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1231&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * builds the primitive from the given DOM node.</div>
+<div>1232&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1233&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param node the associated XML node</div>
+<div>1234&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the primitive created from the XML description</div>
+<div>1235&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if instantiation fails</div>
+<div>1236&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1237&emsp;&emsp;&nbsp;&nbsp;  public boolean readBooleanFromXML(Element node) throws Exception {</div>
+<div>1238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>1239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>1240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), node.getAttribute(ATT_NAME));</div>
+<div>1241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1242&emsp;&emsp;</div>
+<div>1243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = node;</div>
+<div>1244&emsp;&emsp;</div>
+<div>1245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return ((Boolean) getPrimitive(node)).booleanValue();</div>
+<div>1246&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1247&emsp;&emsp;</div>
+<div>1248&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1249&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * builds the primitive from the given DOM node.</div>
+<div>1250&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1251&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param node the associated XML node</div>
+<div>1252&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the primitive created from the XML description</div>
+<div>1253&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if instantiation fails</div>
+<div>1254&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1255&emsp;&emsp;&nbsp;&nbsp;  public byte readByteFromXML(Element node) throws Exception {</div>
+<div>1256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>1257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>1258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), node.getAttribute(ATT_NAME));</div>
+<div>1259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1260&emsp;&emsp;</div>
+<div>1261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = node;</div>
+<div>1262&emsp;&emsp;</div>
+<div>1263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return ((Byte) getPrimitive(node)).byteValue();</div>
+<div>1264&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1265&emsp;&emsp;</div>
+<div>1266&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1267&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * builds the primitive from the given DOM node.</div>
+<div>1268&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1269&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param node the associated XML node</div>
+<div>1270&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the primitive created from the XML description</div>
+<div>1271&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if instantiation fails</div>
+<div>1272&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1273&emsp;&emsp;&nbsp;&nbsp;  public char readCharFromXML(Element node) throws Exception {</div>
+<div>1274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>1275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>1276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), node.getAttribute(ATT_NAME));</div>
+<div>1277&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1278&emsp;&emsp;</div>
+<div>1279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = node;</div>
+<div>1280&emsp;&emsp;</div>
+<div>1281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return ((Character) getPrimitive(node)).charValue();</div>
+<div>1282&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1283&emsp;&emsp;</div>
+<div>1284&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1285&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * builds the primitive from the given DOM node.</div>
+<div>1286&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1287&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param node the associated XML node</div>
+<div>1288&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the primitive created from the XML description</div>
+<div>1289&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if instantiation fails</div>
+<div>1290&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1291&emsp;&emsp;&nbsp;&nbsp;  public double readDoubleFromXML(Element node) throws Exception {</div>
+<div>1292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>1293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>1294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), node.getAttribute(ATT_NAME));</div>
+<div>1295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1296&emsp;&emsp;</div>
+<div>1297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = node;</div>
+<div>1298&emsp;&emsp;</div>
+<div>1299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return ((Double) getPrimitive(node)).doubleValue();</div>
+<div>1300&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1301&emsp;&emsp;</div>
+<div>1302&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1303&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * builds the primitive from the given DOM node.</div>
+<div>1304&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1305&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param node the associated XML node</div>
+<div>1306&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the primitive created from the XML description</div>
+<div>1307&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if instantiation fails</div>
+<div>1308&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1309&emsp;&emsp;&nbsp;&nbsp;  public float readFloatFromXML(Element node) throws Exception {</div>
+<div>1310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>1311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>1312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), node.getAttribute(ATT_NAME));</div>
+<div>1313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1314&emsp;&emsp;</div>
+<div>1315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = node;</div>
+<div>1316&emsp;&emsp;</div>
+<div>1317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return ((Float) getPrimitive(node)).floatValue();</div>
+<div>1318&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1319&emsp;&emsp;</div>
+<div>1320&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1321&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * builds the primitive from the given DOM node.</div>
+<div>1322&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1323&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param node the associated XML node</div>
+<div>1324&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the primitive created from the XML description</div>
+<div>1325&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if instantiation fails</div>
+<div>1326&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1327&emsp;&emsp;&nbsp;&nbsp;  public int readIntFromXML(Element node) throws Exception {</div>
+<div>1328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>1329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>1330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), node.getAttribute(ATT_NAME));</div>
+<div>1331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1332&emsp;&emsp;</div>
+<div>1333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = node;</div>
+<div>1334&emsp;&emsp;</div>
+<div>1335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return ((Integer) getPrimitive(node)).intValue();</div>
+<div>1336&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1337&emsp;&emsp;</div>
+<div>1338&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1339&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * builds the primitive from the given DOM node.</div>
+<div>1340&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1341&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param node the associated XML node</div>
+<div>1342&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the primitive created from the XML description</div>
+<div>1343&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if instantiation fails</div>
+<div>1344&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1345&emsp;&emsp;&nbsp;&nbsp;  public long readLongFromXML(Element node) throws Exception {</div>
+<div>1346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>1347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>1348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), node.getAttribute(ATT_NAME));</div>
+<div>1349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1350&emsp;&emsp;</div>
+<div>1351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = node;</div>
+<div>1352&emsp;&emsp;</div>
+<div>1353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return ((Long) getPrimitive(node)).longValue();</div>
+<div>1354&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1355&emsp;&emsp;</div>
+<div>1356&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1357&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * builds the primitive from the given DOM node.</div>
+<div>1358&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1359&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param node the associated XML node</div>
+<div>1360&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the primitive created from the XML description</div>
+<div>1361&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if instantiation fails</div>
+<div>1362&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1363&emsp;&emsp;&nbsp;&nbsp;  public short readShortFromXML(Element node) throws Exception {</div>
+<div>1364&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>1365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>1366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), node.getAttribute(ATT_NAME));</div>
+<div>1367&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1368&emsp;&emsp;</div>
+<div>1369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = node;</div>
+<div>1370&emsp;&emsp;</div>
+<div>1371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return ((Short) getPrimitive(node)).shortValue();</div>
+<div>1372&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1373&emsp;&emsp;</div>
+<div>1374&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1375&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * adds the specific node to the object via a set method</div>
+<div>1376&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1377&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the object to set a property</div>
+<div>1378&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param name the name of the object for which to set a property (only for</div>
+<div>1379&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          information reasons)</div>
+<div>1380&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param child the value of the property to add</div>
+<div>1381&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the provided object, but augmented by the child</div>
+<div>1382&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong</div>
+<div>1383&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1384&emsp;&emsp;&nbsp;&nbsp;  public Object readFromXML(Object o, String name, Element child)</div>
+<div>1385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    throws Exception {</div>
+<div>1386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Object result;</div>
+<div>1387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Hashtable&#60;String, PropertyDescriptor> descriptors;</div>
+<div>1388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    PropertyDescriptor descriptor;</div>
+<div>1389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String methodName;</div>
+<div>1390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Method method;</div>
+<div>1391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Object[] methodArgs;</div>
+<div>1392&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Object tmpResult;</div>
+<div>1393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Class&#60;?> paramClass;</div>
+<div>1394&emsp;&emsp;</div>
+<div>1395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = o;</div>
+<div>1396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    descriptors = getDescriptors(result);</div>
+<div>1397&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    methodName = child.getAttribute(ATT_NAME);</div>
+<div>1398&emsp;&emsp;</div>
+<div>1399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // in ignore list?</div>
+<div>1400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (m_Properties.isIgnored(getPath(child))) {</div>
+<div>1401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>1402&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1403&emsp;&emsp;</div>
+<div>1404&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // in ignore list of class?</div>
+<div>1405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (m_Properties.isIgnored(result, getPath(child))) {</div>
+<div>1406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>1407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1408&emsp;&emsp;</div>
+<div>1409&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // is it allowed?</div>
+<div>1410&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!m_Properties.isAllowed(result, methodName)) {</div>
+<div>1411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>1412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1413&emsp;&emsp;</div>
+<div>1414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    descriptor = descriptors.get(methodName);</div>
+<div>1415&emsp;&emsp;</div>
+<div>1416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // unknown property?</div>
+<div>1417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (descriptor == null) {</div>
+<div>1418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!m_CustomMethods.read().contains(methodName)</div>
+<div>1419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        && !SUPPRESS_PROPERTY_WARNINGS.contains(name + "." + methodName)) {</div>
+<div>1420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println("WARNING: unknown property '" + name + "."</div>
+<div>1421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + methodName + "'!");</div>
+<div>1422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>1424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1425&emsp;&emsp;</div>
+<div>1426&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    method = descriptor.getWriteMethod();</div>
+<div>1427&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    methodArgs = new Object[1];</div>
+<div>1428&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    tmpResult = invokeReadFromXML(child);</div>
+<div>1429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    paramClass = method.getParameterTypes()[0];</div>
+<div>1430&emsp;&emsp;</div>
+<div>1431&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // array?</div>
+<div>1432&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (paramClass.isArray()) {</div>
+<div>1433&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // no data?</div>
+<div>1434&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (Array.getLength(tmpResult) == 0) {</div>
+<div>1435&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return result;</div>
+<div>1436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1437&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      methodArgs[0] = tmpResult;</div>
+<div>1438&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // non-array</div>
+<div>1440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    else {</div>
+<div>1441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      methodArgs[0] = tmpResult;</div>
+<div>1442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1443&emsp;&emsp;</div>
+<div>1444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>1445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      method.invoke(result, methodArgs);</div>
+<div>1446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (Exception ex) {</div>
+<div>1447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.err.println("Warning: error invoking method: " + methodName + " ("</div>
+<div>1448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + ex.getCause().getMessage() + ")");</div>
+<div>1449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1450&emsp;&emsp;</div>
+<div>1451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>1452&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1453&emsp;&emsp;</div>
+<div>1454&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1455&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns an array with the dimensions of the array stored in XML</div>
+<div>1456&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1457&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param node the node to determine the dimensions for</div>
+<div>1458&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the dimensions of the array</div>
+<div>1459&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1460&emsp;&emsp;&nbsp;&nbsp;  protected int[] getArrayDimensions(Element node) {</div>
+<div>1461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Vector&#60;Element> children;</div>
+<div>1462&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Vector&#60;Integer> tmpVector;</div>
+<div>1463&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int[] tmp;</div>
+<div>1464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int[] result;</div>
+<div>1465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int i;</div>
+<div>1466&emsp;&emsp;</div>
+<div>1467&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // have we reached the innermost dimension?</div>
+<div>1468&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (stringToBoolean(node.getAttribute(ATT_ARRAY))) {</div>
+<div>1469&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      children = XMLDocument.getChildTags(node);</div>
+<div>1470&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>1471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      children = null;</div>
+<div>1472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1473&emsp;&emsp;</div>
+<div>1474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (children != null) {</div>
+<div>1475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      tmpVector = new Vector&#60;Integer>();</div>
+<div>1476&emsp;&emsp;</div>
+<div>1477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (children.size() > 0) {</div>
+<div>1478&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // are children also arrays?</div>
+<div>1479&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        tmp = getArrayDimensions(children.get(0));</div>
+<div>1480&emsp;&emsp;</div>
+<div>1481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // further dimensions</div>
+<div>1482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (tmp != null) {</div>
+<div>1483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          for (i = tmp.length - 1; i >= 0; i--) {</div>
+<div>1484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            tmpVector.add(new Integer(tmp[i]));</div>
+<div>1485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1487&emsp;&emsp;</div>
+<div>1488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // add current dimension</div>
+<div>1489&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        tmpVector.add(0, new Integer(children.size()));</div>
+<div>1490&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>1491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        tmpVector.add(new Integer(0));</div>
+<div>1492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1493&emsp;&emsp;</div>
+<div>1494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // generate result</div>
+<div>1495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = new int[tmpVector.size()];</div>
+<div>1496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (i = 0; i &#60; result.length; i++) {</div>
+<div>1497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result[i] = tmpVector.get(tmpVector.size() - i - 1).intValue();</div>
+<div>1498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } else {</div>
+<div>1500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = null;</div>
+<div>1501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1502&emsp;&emsp;</div>
+<div>1503&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>1504&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1505&emsp;&emsp;</div>
+<div>1506&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1507&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * builds the object from the given DOM node. (only public due to reflection)</div>
+<div>1508&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1509&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param node the associated XML node</div>
+<div>1510&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the instance created from the XML description</div>
+<div>1511&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if instantiation fails</div>
+<div>1512&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1513&emsp;&emsp;&nbsp;&nbsp;  public Object readFromXML(Element node) throws Exception {</div>
+<div>1514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String classname;</div>
+<div>1515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    String name;</div>
+<div>1516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean primitive;</div>
+<div>1517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean array;</div>
+<div>1518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean isnull;</div>
+<div>1519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Class&#60;?> cls;</div>
+<div>1520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Vector&#60;Element> children;</div>
+<div>1521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Object result;</div>
+<div>1522&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    int i;</div>
+<div>1523&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Constructor&#60;?> constructor;</div>
+<div>1524&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Class&#60;?>[] methodClasses;</div>
+<div>1525&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Object[] methodArgs;</div>
+<div>1526&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Element child;</div>
+<div>1527&emsp;&emsp;</div>
+<div>1528&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // for debugging only</div>
+<div>1529&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (DEBUG) {</div>
+<div>1530&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      trace(new Throwable(), node.getAttribute(ATT_NAME));</div>
+<div>1531&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1532&emsp;&emsp;</div>
+<div>1533&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = node;</div>
+<div>1534&emsp;&emsp;</div>
+<div>1535&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    result = null;</div>
+<div>1536&emsp;&emsp;</div>
+<div>1537&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    name = node.getAttribute(ATT_NAME);</div>
+<div>1538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    classname = node.getAttribute(ATT_CLASS);</div>
+<div>1539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    primitive = stringToBoolean(node.getAttribute(ATT_PRIMITIVE));</div>
+<div>1540&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    array = stringToBoolean(node.getAttribute(ATT_ARRAY));</div>
+<div>1541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    isnull = stringToBoolean(node.getAttribute(ATT_NULL));</div>
+<div>1542&emsp;&emsp;</div>
+<div>1543&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // special handling of null</div>
+<div>1544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (isnull) {</div>
+<div>1545&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return result;</div>
+<div>1546&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1547&emsp;&emsp;</div>
+<div>1548&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    children = XMLDocument.getChildTags(node);</div>
+<div>1549&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    cls = determineClass(classname);</div>
+<div>1550&emsp;&emsp;</div>
+<div>1551&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // array</div>
+<div>1552&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (array) {</div>
+<div>1553&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      result = Array.newInstance(cls, getArrayDimensions(node));</div>
+<div>1554&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      for (i = 0; i &#60; children.size(); i++) {</div>
+<div>1555&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        child = children.get(i);</div>
+<div>1556&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Array.set(result, Integer.parseInt(child.getAttribute(ATT_NAME)),</div>
+<div>1557&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          invokeReadFromXML(child));</div>
+<div>1558&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // non-array</div>
+<div>1561&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    else {</div>
+<div>1562&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // primitive/String-constructor</div>
+<div>1563&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (children.size() == 0) {</div>
+<div>1564&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // primitive</div>
+<div>1565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (primitive) {</div>
+<div>1566&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          result = getPrimitive(node);</div>
+<div>1567&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1568&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // assumed String-constructor</div>
+<div>1569&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>1570&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          methodClasses = new Class[1];</div>
+<div>1571&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          methodClasses[0] = String.class;</div>
+<div>1572&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          methodArgs = new Object[1];</div>
+<div>1573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          methodArgs[0] = XMLDocument.getContent(node);</div>
+<div>1574&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          try {</div>
+<div>1575&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            constructor = cls.getConstructor(methodClasses);</div>
+<div>1576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            result = constructor.newInstance(methodArgs);</div>
+<div>1577&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } catch (Exception e) {</div>
+<div>1578&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // if it's not a class with String constructor, let's try standard</div>
+<div>1579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // constructor</div>
+<div>1580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            try {</div>
+<div>1581&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              result = cls.newInstance();</div>
+<div>1582&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } catch (Exception e2) {</div>
+<div>1583&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              // sorry, can't instantiate!</div>
+<div>1584&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              result = null;</div>
+<div>1585&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              System.out.println("ERROR: Can't instantiate '" + classname</div>
+<div>1586&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                + "'!");</div>
+<div>1587&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1588&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>1589&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1590&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1591&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // normal get/set methods</div>
+<div>1592&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      else {</div>
+<div>1593&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        result = cls.newInstance();</div>
+<div>1594&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        for (i = 0; i &#60; children.size(); i++) {</div>
+<div>1595&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          result = readFromXML(result, name, children.get(i));</div>
+<div>1596&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1597&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1598&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1599&emsp;&emsp;</div>
+<div>1600&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return result;</div>
+<div>1601&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1602&emsp;&emsp;</div>
+<div>1603&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1604&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * either invokes a custom method to read a specific property/class or the</div>
+<div>1605&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * standard method &#60;code>readFromXML(Element)&#60;/code></div>
+<div>1606&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1607&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param node the associated XML node</div>
+<div>1608&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the instance created from the XML description</div>
+<div>1609&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if instantiation fails</div>
+<div>1610&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1611&emsp;&emsp;&nbsp;&nbsp;  protected Object invokeReadFromXML(Element node) throws Exception {</div>
+<div>1612&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Method method;</div>
+<div>1613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Class&#60;?>[] methodClasses;</div>
+<div>1614&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Object[] methodArgs;</div>
+<div>1615&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean array;</div>
+<div>1616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    boolean useDefault;</div>
+<div>1617&emsp;&emsp;</div>
+<div>1618&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    useDefault = false;</div>
+<div>1619&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    method = null;</div>
+<div>1620&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_CurrentNode = node;</div>
+<div>1621&emsp;&emsp;</div>
+<div>1622&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div>1623&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // special handling of null values</div>
+<div>1624&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (stringToBoolean(node.getAttribute(ATT_NULL))) {</div>
+<div>1625&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        useDefault = true;</div>
+<div>1626&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1627&emsp;&emsp;</div>
+<div>1628&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!useDefault) {</div>
+<div>1629&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        array = stringToBoolean(node.getAttribute(ATT_ARRAY));</div>
+<div>1630&emsp;&emsp;</div>
+<div>1631&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // display name?</div>
+<div>1632&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (m_CustomMethods.read().contains(node.getAttribute(ATT_NAME))) {</div>
+<div>1633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          method = m_CustomMethods.read().get(node.getAttribute(ATT_NAME));</div>
+<div>1634&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else</div>
+<div>1635&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // class name?</div>
+<div>1636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if ((!array)</div>
+<div>1637&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          && (m_CustomMethods.read().contains(determineClass(node</div>
+<div>1638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            .getAttribute(ATT_CLASS))))) {</div>
+<div>1639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          method = m_CustomMethods.read().get(</div>
+<div>1640&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            determineClass(node.getAttribute(ATT_CLASS)));</div>
+<div>1641&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>1642&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          method = null;</div>
+<div>1643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1644&emsp;&emsp;</div>
+<div>1645&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        useDefault = (method == null);</div>
+<div>1646&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1647&emsp;&emsp;</div>
+<div>1648&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // custom method</div>
+<div>1649&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (!useDefault) {</div>
+<div>1650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        methodClasses = new Class[1];</div>
+<div>1651&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        methodClasses[0] = Element.class;</div>
+<div>1652&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        methodArgs = new Object[1];</div>
+<div>1653&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        methodArgs[0] = node;</div>
+<div>1654&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return method.invoke(this, methodArgs);</div>
+<div>1655&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1656&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // standard</div>
+<div>1657&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      else {</div>
+<div>1658&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return readFromXML(node);</div>
+<div>1659&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1660&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } catch (Exception e) {</div>
+<div>1661&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (DEBUG) {</div>
+<div>1662&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        e.printStackTrace();</div>
+<div>1663&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1664&emsp;&emsp;</div>
+<div>1665&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (m_CurrentNode != null) {</div>
+<div>1666&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println("Happened near: " + getPath(m_CurrentNode));</div>
+<div>1667&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // print it only once!</div>
+<div>1668&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_CurrentNode = null;</div>
+<div>1669&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1670&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.out.println("PROBLEM (read): " + node.getAttribute("name"));</div>
+<div>1671&emsp;&emsp;</div>
+<div>1672&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw (Exception) e.fillInStackTrace();</div>
+<div>1673&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1674&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1675&emsp;&emsp;</div>
+<div>1676&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1677&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * additional pre-processing can happen in derived classes before the actual</div>
+<div>1678&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * reading from XML (working on the raw XML). right now it does nothing with</div>
+<div>1679&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the document.</div>
+<div>1680&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1681&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param document the document to pre-process</div>
+<div>1682&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the processed object</div>
+<div>1683&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if post-processing fails</div>
+<div>1684&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1685&emsp;&emsp;&nbsp;&nbsp;  protected Document readPreProcess(Document document) throws Exception {</div>
+<div>1686&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return document;</div>
+<div>1687&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1688&emsp;&emsp;</div>
+<div>1689&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1690&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * additional post-processing can happen in derived classes after reading from</div>
+<div>1691&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * XML. right now it only returns the object as it is.</div>
+<div>1692&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1693&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the object to perform some additional processing on</div>
+<div>1694&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the processed object</div>
+<div>1695&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if post-processing fails</div>
+<div>1696&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1697&emsp;&emsp;&nbsp;&nbsp;  protected Object readPostProcess(Object o) throws Exception {</div>
+<div>1698&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return o;</div>
+<div>1699&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1700&emsp;&emsp;</div>
+<div>1701&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1702&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns the given DOM document as an instance of the specified class</div>
+<div>1703&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1704&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param document the parsed DOM document representing the object</div>
+<div>1705&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the XML as object</div>
+<div>1706&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if object instantiation fails</div>
+<div>1707&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1708&emsp;&emsp;&nbsp;&nbsp;  public Object fromXML(Document document) throws Exception {</div>
+<div>1709&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (!document.getDocumentElement().getNodeName().equals(ROOT_NODE)) {</div>
+<div>1710&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new Exception("Expected '" + ROOT_NODE</div>
+<div>1711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + "' as root element, but found '"</div>
+<div>1712&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        + document.getDocumentElement().getNodeName() + "'!");</div>
+<div>1713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1714&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_Document.setDocument(readPreProcess(document));</div>
+<div>1715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    checkVersion();</div>
+<div>1716&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return readPostProcess(invokeReadFromXML(m_Document.getDocument()</div>
+<div>1717&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      .getDocumentElement()));</div>
+<div>1718&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1719&emsp;&emsp;</div>
+<div>1720&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1721&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * parses the given XML string (can be XML or a filename) and returns an</div>
+<div>1722&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Object generated from the representation</div>
+<div>1723&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1724&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param xml the xml to parse (if "&#60;?xml" is not found then it is considered</div>
+<div>1725&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          a file)</div>
+<div>1726&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the generated instance</div>
+<div>1727&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong with the parsing</div>
+<div>1728&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1729&emsp;&emsp;&nbsp;&nbsp;  public Object read(String xml) throws Exception {</div>
+<div>1730&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return fromXML(m_Document.read(xml));</div>
+<div>1731&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1732&emsp;&emsp;</div>
+<div>1733&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1734&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * parses the given file and returns a DOM document</div>
+<div>1735&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1736&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param file the XML file to parse</div>
+<div>1737&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the parsed DOM document</div>
+<div>1738&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong with the parsing</div>
+<div>1739&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1740&emsp;&emsp;&nbsp;&nbsp;  public Object read(File file) throws Exception {</div>
+<div>1741&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return fromXML(m_Document.read(file));</div>
+<div>1742&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1743&emsp;&emsp;</div>
+<div>1744&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1745&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * parses the given stream and returns a DOM document</div>
+<div>1746&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1747&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param stream the XML stream to parse</div>
+<div>1748&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the parsed DOM document</div>
+<div>1749&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong with the parsing</div>
+<div>1750&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1751&emsp;&emsp;&nbsp;&nbsp;  public Object read(InputStream stream) throws Exception {</div>
+<div>1752&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return fromXML(m_Document.read(stream));</div>
+<div>1753&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1754&emsp;&emsp;</div>
+<div>1755&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1756&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * parses the given reader and returns a DOM document</div>
+<div>1757&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1758&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param reader the XML reader to parse</div>
+<div>1759&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the parsed DOM document</div>
+<div>1760&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong with the parsing</div>
+<div>1761&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1762&emsp;&emsp;&nbsp;&nbsp;  public Object read(Reader reader) throws Exception {</div>
+<div>1763&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return fromXML(m_Document.read(reader));</div>
+<div>1764&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1765&emsp;&emsp;</div>
+<div>1766&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1767&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * writes the given object into the file</div>
+<div>1768&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1769&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param file the filename to write to</div>
+<div>1770&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the object to serialize as XML</div>
+<div>1771&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong with the parsing</div>
+<div>1772&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1773&emsp;&emsp;&nbsp;&nbsp;  public void write(String file, Object o) throws Exception {</div>
+<div>1774&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    toXML(o).write(file);</div>
+<div>1775&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1776&emsp;&emsp;</div>
+<div>1777&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1778&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * writes the given object into the file</div>
+<div>1779&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1780&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param file the filename to write to</div>
+<div>1781&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the object to serialize as XML</div>
+<div>1782&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong with the parsing</div>
+<div>1783&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1784&emsp;&emsp;&nbsp;&nbsp;  public void write(File file, Object o) throws Exception {</div>
+<div>1785&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    toXML(o).write(file);</div>
+<div>1786&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1787&emsp;&emsp;</div>
+<div>1788&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1789&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * writes the given object into the stream</div>
+<div>1790&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1791&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param stream the filename to write to</div>
+<div>1792&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the object to serialize as XML</div>
+<div>1793&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong with the parsing</div>
+<div>1794&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1795&emsp;&emsp;&nbsp;&nbsp;  public void write(OutputStream stream, Object o) throws Exception {</div>
+<div>1796&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    toXML(o).write(stream);</div>
+<div>1797&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1798&emsp;&emsp;</div>
+<div>1799&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1800&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * writes the given object into the writer</div>
+<div>1801&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1802&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param writer the filename to write to</div>
+<div>1803&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param o the object to serialize as XML</div>
+<div>1804&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws Exception if something goes wrong with the parsing</div>
+<div>1805&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1806&emsp;&emsp;&nbsp;&nbsp;  public void write(Writer writer, Object o) throws Exception {</div>
+<div>1807&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    toXML(o).write(writer);</div>
+<div>1808&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1809&emsp;&emsp;</div>
+<div>1810&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1811&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * for testing only. if the first argument is a filename with ".xml" as</div>
+<div>1812&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * extension it tries to generate an instance from the XML description and</div>
+<div>1813&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * does a &#60;code>toString()&#60;/code> of the generated object.</div>
+<div>1814&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1815&emsp;&emsp;&nbsp;&nbsp;  public static void main(String[] args) throws Exception {</div>
+<div>1816&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    if (args.length > 0) {</div>
+<div>1817&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // read xml and print</div>
+<div>1818&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      if (args[0].toLowerCase().endsWith(".xml")) {</div>
+<div>1819&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println(new XMLSerialization().read(args[0]).toString());</div>
+<div>1820&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1821&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // read binary and print generated XML</div>
+<div>1822&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      else {</div>
+<div>1823&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // read</div>
+<div>1824&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        FileInputStream fi = new FileInputStream(args[0]);</div>
+<div>1825&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ObjectInputStream oi = new ObjectInputStream(</div>
+<div>1826&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          new BufferedInputStream(fi));</div>
+<div>1827&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        Object o = oi.readObject();</div>
+<div>1828&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        oi.close();</div>
+<div>1829&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // print to stdout</div>
+<div>1830&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // new XMLSerialization().write(System.out, o);</div>
+<div>1831&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new XMLSerialization().write(new BufferedOutputStream(</div>
+<div>1832&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          new FileOutputStream(args[0] + ".xml")), o);</div>
+<div>1833&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // print to binary file</div>
+<div>1834&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        FileOutputStream fo = new FileOutputStream(args[0] + ".exp");</div>
+<div>1835&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ObjectOutputStream oo = new ObjectOutputStream(</div>
+<div>1836&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          new BufferedOutputStream(fo));</div>
+<div>1837&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        oo.writeObject(o);</div>
+<div>1838&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        oo.close();</div>
+<div>1839&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1840&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1841&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1842&emsp;&emsp;</div>
+<div>1843&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1844&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the revision string.</div>
+<div>1845&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1846&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the revision</div>
+<div>1847&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1848&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1849&emsp;&emsp;&nbsp;&nbsp;  public String getRevision() {</div>
+<div>1850&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return RevisionUtils.extract("$Revision: 13476 $");</div>
+<div>1851&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1852&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

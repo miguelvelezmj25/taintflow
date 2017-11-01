@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Statistics.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;package weka.core;</div>
+<div>2&emsp;&emsp;</div>
+<div>3&emsp;&emsp;/**</div>
+<div>4&emsp;&emsp;&nbsp; * Class implementing some distributions, tests, etc. The code is mostly adapted</div>
+<div>5&emsp;&emsp;&nbsp; * from the CERN Jet Java libraries:</div>
+<div>6&emsp;&emsp;&nbsp; * &#60;p></div>
+<div>7&emsp;&emsp;&nbsp; * Copyright 2001 University of Waikato Copyright 1999 CERN - European</div>
+<div>8&emsp;&emsp;&nbsp; * Organization for Nuclear Research. Permission to use, copy, modify,</div>
+<div>9&emsp;&emsp;&nbsp; * distribute and sell this software and its documentation for any purpose is</div>
+<div>10&emsp;&emsp;&nbsp; * hereby granted without fee, provided that the above copyright notice appear</div>
+<div>11&emsp;&emsp;&nbsp; * in all copies and that both that copyright notice and this permission notice</div>
+<div>12&emsp;&emsp;&nbsp; * appear in supporting documentation. CERN and the University of Waikato make</div>
+<div>13&emsp;&emsp;&nbsp; * no representations about the suitability of this software for any purpose. It</div>
+<div>14&emsp;&emsp;&nbsp; * is provided "as is" without expressed or implied warranty.</div>
+<div>15&emsp;&emsp;&nbsp; *</div>
+<div>16&emsp;&emsp;&nbsp; * @author peter.gedeck@pharma.Novartis.com</div>
+<div>17&emsp;&emsp;&nbsp; * @author wolfgang.hoschek@cern.ch</div>
+<div>18&emsp;&emsp;&nbsp; * @author Eibe Frank (eibe@cs.waikato.ac.nz)</div>
+<div>19&emsp;&emsp;&nbsp; * @author Richard Kirkby (rkirkby@cs.waikato.ac.nz)</div>
+<div>20&emsp;&emsp;&nbsp; * @version $Revision: 10203 $</div>
+<div>21&emsp;&emsp;&nbsp; */</div>
+<div>22&emsp;&emsp;public class Statistics implements RevisionHandler {</div>
+<div>23&emsp;&emsp;</div>
+<div>24&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>25&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Some constants</div>
+<div>26&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>27&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double MACHEP = 1.11022302462515654042E-16;</div>
+<div>28&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double MAXLOG = 7.09782712893383996732E2;</div>
+<div>29&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double MINLOG = -7.451332191019412076235E2;</div>
+<div>30&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double MAXGAM = 171.624376956302725;</div>
+<div>31&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double SQTPI = 2.50662827463100050242E0;</div>
+<div>32&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double SQRTH = 7.07106781186547524401E-1;</div>
+<div>33&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double LOGPI = 1.14472988584940017414;</div>
+<div>34&emsp;&emsp;</div>
+<div>35&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double big = 4.503599627370496e15;</div>
+<div>36&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double biginv = 2.22044604925031308085e-16;</div>
+<div>37&emsp;&emsp;</div>
+<div>38&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*************************************************</div>
+<div>39&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * COEFFICIENTS FOR METHOD normalInverse() *</div>
+<div>40&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *************************************************/</div>
+<div>41&emsp;&emsp;&nbsp;&nbsp;  /* approximation for 0 &#60;= |y - 0.5| &#60;= 3/8 */</div>
+<div>42&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double P0[] = {-5.99633501014107895267E1,</div>
+<div>43&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            9.80010754185999661536E1, -5.66762857469070293439E1,</div>
+<div>44&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            1.39312609387279679503E1, -1.23916583867381258016E0,};</div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double Q0[] = {</div>
+<div>46&emsp;&emsp;&nbsp;&nbsp;  /* 1.00000000000000000000E0, */</div>
+<div>47&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            1.95448858338141759834E0, 4.67627912898881538453E0, 8.63602421390890590575E1,</div>
+<div>48&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            -2.25462687854119370527E2, 2.00260212380060660359E2,</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            -8.20372256168333339912E1, 1.59056225126211695515E1,</div>
+<div>50&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            -1.18331621121330003142E0,};</div>
+<div>51&emsp;&emsp;</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Approximation for interval z = sqrt(-2 log y ) between 2 and 8 i.e., y</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * between exp(-2) = .135 and exp(-32) = 1.27e-14.</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double P1[] = {4.05544892305962419923E0,</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            3.15251094599893866154E1, 5.71628192246421288162E1,</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            4.40805073893200834700E1, 1.46849561928858024014E1,</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            2.18663306850790267539E0, -1.40256079171354495875E-1,</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            -3.50424626827848203418E-2, -8.57456785154685413611E-4,};</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double Q1[] = {</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;  /* 1.00000000000000000000E0, */</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            1.57799883256466749731E1, 4.53907635128879210584E1, 4.13172038254672030440E1,</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            1.50425385692907503408E1, 2.50464946208309415979E0,</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            -1.42182922854787788574E-1, -3.80806407691578277194E-2,</div>
+<div>66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            -9.33259480895457427372E-4,};</div>
+<div>67&emsp;&emsp;</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>69&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Approximation for interval z = sqrt(-2 log y ) between 8 and 64 i.e., y</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * between exp(-32) = 1.27e-14 and exp(-2048) = 3.67e-890.</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double P2[] = {3.23774891776946035970E0,</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            6.91522889068984211695E0, 3.93881025292474443415E0,</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            1.33303460815807542389E0, 2.01485389549179081538E-1,</div>
+<div>75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            1.23716634817820021358E-2, 3.01581553508235416007E-4,</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            2.65806974686737550832E-6, 6.23974539184983293730E-9,};</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected static final double Q2[] = {</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;  /* 1.00000000000000000000E0, */</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            6.02427039364742014255E0, 3.67983563856160859403E0, 1.37702099489081330271E0,</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            2.16236993594496635890E-1, 1.34204006088543189037E-2,</div>
+<div>81&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            3.28014464682127739104E-4, 2.89247864745380683936E-6,</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            6.79019408009981274425E-9,};</div>
+<div>83&emsp;&emsp;</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Computes standard error for observed values of a binomial random variable.</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param p the probability of success</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param n the size of the sample</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the standard error</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double binomialStandardError(double p, int n) {</div>
+<div>92&emsp;&emsp;</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(n == 0) {</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return 0;</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return Math.sqrt((p * (1 - p)) / n);</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>98&emsp;&emsp;</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns chi-squared probability for given value and degrees of freedom.</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * (The probability that the chi-squared variate will be greater than x for</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the given degrees of freedom.)</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x the value</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param v the number of degrees of freedom</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the chi-squared probability</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double chiSquaredProbability(double x, double v) {</div>
+<div>109&emsp;&emsp;</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(x &#60; 0.0 || v &#60; 1.0) {</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return 0.0;</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return incompleteGammaComplement(v / 2.0, x / 2.0);</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>115&emsp;&emsp;</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Computes probability of F-ratio.</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param F   the F-ratio</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param df1 the first number of degrees of freedom</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param df2 the second number of degrees of freedom</div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the probability of the F-ratio.</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double FProbability(double F, int df1, int df2) {</div>
+<div>125&emsp;&emsp;</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return incompleteBeta(df2 / 2.0, df1 / 2.0, df2 / (df2 + df1 * F));</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>128&emsp;&emsp;</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>130&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the area under the Normal (Gaussian) probability density function,</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * integrated from minus infinity to &#60;tt>x&#60;/tt> (assumes mean is zero,</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * variance is one).</div>
+<div>133&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;pre></div>
+<div>135&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                            x</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                             -</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                   1        | |          2</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *  normal(x)  = ---------    |    exp( - t /2 ) dt</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *               sqrt(2pi)  | |</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                           -</div>
+<div>141&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                          -inf.</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *             =  ( 1 + erf(z) ) / 2</div>
+<div>144&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *             =  erfc(z) / 2</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;/pre></div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>147&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * where &#60;tt>z = x/sqrt(2)&#60;/tt>. Computation is via the functions</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;tt>errorFunction&#60;/tt> and &#60;tt>errorFunctionComplement&#60;/tt>.</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param a the z-value</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the probability of the z value according to the normal pdf</div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double normalProbability(double a) {</div>
+<div>154&emsp;&emsp;</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double x, y, z;</div>
+<div>156&emsp;&emsp;</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        x = a * SQRTH;</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        z = Math.abs(x);</div>
+<div>159&emsp;&emsp;</div>
+<div style="background-color:limegreen;">160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(z &#60; SQRTH) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            y = 0.5 + 0.5 * errorFunction(x);</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            y = 0.5 * errorFunctionComplemented(z);</div>
+<div style="background-color:limegreen;">165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(x > 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                y = 1.0 - y;</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return y;</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>171&emsp;&emsp;</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the value, &#60;tt>x&#60;/tt>, for which the area under the Normal</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * (Gaussian) probability density function (integrated from minus infinity to</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;tt>x&#60;/tt>) is equal to the argument &#60;tt>y&#60;/tt> (assumes mean is zero,</div>
+<div>176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * variance is one).</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * For small arguments &#60;tt>0 &#60; y &#60; exp(-2)&#60;/tt>, the program computes</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;tt>z = sqrt( -2.0 * log(y) )&#60;/tt>; then the approximation is</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;tt>x = z - log(z)/z  - (1/z) P(1/z) / Q(1/z)&#60;/tt>. There are two rational</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * functions P/Q, one for &#60;tt>0 &#60; y &#60; exp(-32)&#60;/tt> and the other for</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;tt>y&#60;/tt> up to &#60;tt>exp(-2)&#60;/tt>. For larger arguments,</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;tt>w = y - 0.5&#60;/tt>, and &#60;tt>x/sqrt(2pi) = w + w**3 R(w**2)/S(w**2))&#60;/tt>.</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param y0 the area under the normal pdf</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the z-value</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double normalInverse(double y0) {</div>
+<div>189&emsp;&emsp;</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double x, y, z, y2, x0, x1;</div>
+<div>191&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int code;</div>
+<div>192&emsp;&emsp;</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final double s2pi = Math.sqrt(2.0 * Math.PI);</div>
+<div>194&emsp;&emsp;</div>
+<div style="background-color:limegreen;">195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(y0 &#60;= 0.0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new IllegalArgumentException();</div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div style="background-color:limegreen;">198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(y0 >= 1.0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new IllegalArgumentException();</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        code = 1;</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        y = y0;</div>
+<div style="background-color:limegreen;">203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(y > (1.0 - 0.13533528323661269189)) { /* 0.135... = exp(-2) */&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            y = 1.0 - y;</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            code = 0;</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>207&emsp;&emsp;</div>
+<div style="background-color:limegreen;">208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(y > 0.13533528323661269189) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            y = y - 0.5;</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            y2 = y * y;</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            x = y + y * (y2 * polevl(y2, P0, 4) / p1evl(y2, Q0, 8));</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            x = x * s2pi;</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return (x);</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>215&emsp;&emsp;</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        x = Math.sqrt(-2.0 * Math.log(y));</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        x0 = x - Math.log(x) / x;</div>
+<div>218&emsp;&emsp;</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        z = 1.0 / x;</div>
+<div style="background-color:limegreen;">220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(x &#60; 8.0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            x1 = z * polevl(z, P1, 8) / p1evl(z, Q1, 8);</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            x1 = z * polevl(z, P2, 8) / p1evl(z, Q2, 8);</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        x = x0 - x1;</div>
+<div style="background-color:limegreen;">227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(code != 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            x = -x;</div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (x);</div>
+<div>231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>232&emsp;&emsp;</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns natural logarithm of gamma function.</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x the value</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return natural logarithm of gamma function</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double lnGamma(double x) {</div>
+<div>240&emsp;&emsp;</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double p, q, w, z;</div>
+<div>242&emsp;&emsp;</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double A[] = {8.11614167470508450300E-4, -5.95061904284301438324E-4,</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                7.93650340457716943945E-4, -2.77777777730099687205E-3,</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                8.33333333333331927722E-2};</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double B[] = {-1.37825152569120859100E3, -3.88016315134637840924E4,</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                -3.31612992738871184744E5, -1.16237097492762307383E6,</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                -1.72173700820839662146E6, -8.53555664245765465627E5};</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double C[] = {</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* 1.00000000000000000000E0, */</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                -3.51815701436523470549E2, -1.70642106651881159223E4,</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                -2.20528590553854454839E5, -1.13933444367982507207E6,</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                -2.53252307177582951285E6, -2.01889141433532773231E6};</div>
+<div>254&emsp;&emsp;</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(x &#60; -34.0) {</div>
+<div>256&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            q = -x;</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            w = lnGamma(q);</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            p = Math.floor(q);</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(p == q) {</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw new ArithmeticException("lnGamma: Overflow");</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            z = q - p;</div>
+<div>263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(z > 0.5) {</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                p += 1.0;</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                z = p - q;</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            z = q * Math.sin(Math.PI * z);</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(z == 0.0) {</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw new ArithmeticException("lnGamma: Overflow");</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            z = LOGPI - Math.log(z) - w;</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return z;</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>274&emsp;&emsp;</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(x &#60; 13.0) {</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            z = 1.0;</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            while(x >= 3.0) {</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                x -= 1.0;</div>
+<div>279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                z *= x;</div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            while(x &#60; 2.0) {</div>
+<div>282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if(x == 0.0) {</div>
+<div>283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    throw new ArithmeticException("lnGamma: Overflow");</div>
+<div>284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>285&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                z /= x;</div>
+<div>286&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                x += 1.0;</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>288&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(z &#60; 0.0) {</div>
+<div>289&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                z = -z;</div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(x == 2.0) {</div>
+<div>292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return Math.log(z);</div>
+<div>293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            x -= 2.0;</div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            p = x * polevl(x, B, 5) / p1evl(x, C, 6);</div>
+<div>296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return (Math.log(z) + p);</div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>298&emsp;&emsp;</div>
+<div>299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(x > 2.556348e305) {</div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new ArithmeticException("lnGamma: Overflow");</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>302&emsp;&emsp;</div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        q = (x - 0.5) * Math.log(x) - x + 0.91893853320467274178;</div>
+<div>304&emsp;&emsp;</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(x > 1.0e8) {</div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return (q);</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>308&emsp;&emsp;</div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        p = 1.0 / (x * x);</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(x >= 1000.0) {</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            q += ((7.9365079365079365079365e-4 * p - 2.7777777777777777777778e-3) * p + 0.0833333333333333333333)</div>
+<div>312&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    / x;</div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            q += polevl(p, A, 4) / x;</div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return q;</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>319&emsp;&emsp;</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the error function of the normal distribution. The integral is</div>
+<div>322&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;pre></div>
+<div>324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                           x</div>
+<div>325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                            -</div>
+<div>326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                 2         | |          2</div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *   erf(x)  =  --------     |    exp( - t  ) dt.</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *              sqrt(pi)   | |</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                          -</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                           0</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;/pre></div>
+<div>332&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;b>Implementation:&#60;/b> For</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;tt>0 &#60;= |x| &#60; 1, erf(x) = x * P4(x**2)/Q5(x**2)&#60;/tt>; otherwise</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;tt>erf(x) = 1 - erfc(x)&#60;/tt>.</div>
+<div>336&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Code adapted from the &#60;A</div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * HREF="http://www.sci.usq.edu.au/staff/leighb/graph/Top.html"> Java 2D Graph</div>
+<div>339&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Package 2.4&#60;/A>, which in turn is a port from the &#60;A</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * HREF="http://people.ne.mediaone.net/moshier/index.html#Cephes">Cephes</div>
+<div>341&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * 2.2&#60;/A> Math Library (C).</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param a the argument to the function.</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double errorFunction(double x) {</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double y, z;</div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final double T[] = {9.60497373987051638749E0, 9.00260197203842689217E1,</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                2.23200534594684319226E3, 7.00332514112805075473E3,</div>
+<div>349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                5.55923013010394962768E4};</div>
+<div>350&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        final double U[] = {</div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                // 1.00000000000000000000E0,</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                3.35617141647503099647E1, 5.21357949780152679795E2,</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                4.59432382970980127987E3, 2.26290000613890934246E4,</div>
+<div>354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                4.92673942608635921086E4};</div>
+<div>355&emsp;&emsp;</div>
+<div style="background-color:limegreen;">356&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(Math.abs(x) > 1.0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return (1.0 - errorFunctionComplemented(x));</div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        z = x * x;</div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        y = x * polevl(z, T, 4) / p1evl(z, U, 5);</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return y;</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>363&emsp;&emsp;</div>
+<div>364&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>365&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the complementary Error function of the normal distribution.</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>367&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;pre></div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *  1 - erf(x) =</div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                           inf.</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                             -</div>
+<div>372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                  2         | |          2</div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *   erfc(x)  =  --------     |    exp( - t  ) dt</div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *               sqrt(pi)   | |</div>
+<div>375&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                           -</div>
+<div>376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                            x</div>
+<div>377&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;/pre></div>
+<div>378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;b>Implementation:&#60;/b> For small x, &#60;tt>erfc(x) = 1 - erf(x)&#60;/tt>;</div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * otherwise rational approximations are computed.</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Code adapted from the &#60;A</div>
+<div>383&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * HREF="http://www.sci.usq.edu.au/staff/leighb/graph/Top.html"> Java 2D Graph</div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Package 2.4&#60;/A>, which in turn is a port from the &#60;A</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * HREF="http://people.ne.mediaone.net/moshier/index.html#Cephes">Cephes</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * 2.2&#60;/A> Math Library (C).</div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param a the argument to the function.</div>
+<div>389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double errorFunctionComplemented(double a) {</div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double x, y, z, p, q;</div>
+<div>392&emsp;&emsp;</div>
+<div>393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double P[] = {2.46196981473530512524E-10, 5.64189564831068821977E-1,</div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                7.46321056442269912687E0, 4.86371970985681366614E1,</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                1.96520832956077098242E2, 5.26445194995477358631E2,</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                9.34528527171957607540E2, 1.02755188689515710272E3,</div>
+<div>397&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                5.57535335369399327526E2};</div>
+<div>398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double Q[] = {</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                // 1.0</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                1.32281951154744992508E1, 8.67072140885989742329E1,</div>
+<div>401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                3.54937778887819891062E2, 9.75708501743205489753E2,</div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                1.82390916687909736289E3, 2.24633760818710981792E3,</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                1.65666309194161350182E3, 5.57535340817727675546E2};</div>
+<div>404&emsp;&emsp;</div>
+<div>405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double R[] = {5.64189583547755073984E-1, 1.27536670759978104416E0,</div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                5.01905042251180477414E0, 6.16021097993053585195E0,</div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                7.40974269950448939160E0, 2.97886665372100240670E0};</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double S[] = {</div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                // 1.00000000000000000000E0,</div>
+<div>410&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                2.26052863220117276590E0, 9.39603524938001434673E0,</div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                1.20489539808096656605E1, 1.70814450747565897222E1,</div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                9.60896809063285878198E0, 3.36907645100081516050E0};</div>
+<div>413&emsp;&emsp;</div>
+<div style="background-color:limegreen;">414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(a &#60; 0.0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            x = -a;</div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            x = a;</div>
+<div>419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>420&emsp;&emsp;</div>
+<div style="background-color:limegreen;">421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(x &#60; 1.0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return 1.0 - errorFunction(a);</div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>424&emsp;&emsp;</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        z = -a * a;</div>
+<div>426&emsp;&emsp;</div>
+<div style="background-color:limegreen;">427&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(z &#60; -MAXLOG) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">428&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(a &#60; 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return (2.0);</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>431&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            else {</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return (0.0);</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>435&emsp;&emsp;</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        z = Math.exp(z);</div>
+<div>437&emsp;&emsp;</div>
+<div style="background-color:limegreen;">438&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(x &#60; 8.0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            p = polevl(x, P, 8);</div>
+<div>440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            q = p1evl(x, Q, 8);</div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            p = polevl(x, R, 5);</div>
+<div>444&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            q = p1evl(x, S, 6);</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>446&emsp;&emsp;</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        y = (z * p) / q;</div>
+<div>448&emsp;&emsp;</div>
+<div style="background-color:limegreen;">449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(a &#60; 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>450&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            y = 2.0 - y;</div>
+<div>451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>452&emsp;&emsp;</div>
+<div style="background-color:limegreen;">453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if(y == 0.0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if(a &#60; 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return 2.0;</div>
+<div>456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            else {</div>
+<div>458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return (0.0);</div>
+<div>459&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return y;</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>463&emsp;&emsp;</div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Evaluates the given polynomial of degree &#60;tt>N&#60;/tt> at &#60;tt>x&#60;/tt>.</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Evaluates polynomial when coefficient of N is 1.0. Otherwise same as</div>
+<div>467&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;tt>polevl()&#60;/tt>.</div>
+<div>468&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;pre></div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                     2          N</div>
+<div>471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * y  =  C  + C x + C x  +...+ C x</div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *        0    1     2          N</div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Coefficients are stored in reverse order:</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * coef[0] = C  , ..., coef[N] = C  .</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *            N                   0</div>
+<div>478&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;/pre></div>
+<div>479&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * The function &#60;tt>p1evl()&#60;/tt> assumes that &#60;tt>coef[N] = 1.0&#60;/tt> and is</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * omitted from the array. Its calling arguments are otherwise the same as</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;tt>polevl()&#60;/tt>.</div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * In the interest of speed, there are no checks for out of bounds arithmetic.</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x    argument to the polynomial.</div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param coef the coefficients of the polynomial.</div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param N    the degree of the polynomial.</div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>490&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double p1evl(double x, double coef[], int N) {</div>
+<div>491&emsp;&emsp;</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double ans;</div>
+<div>493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ans = x + coef[0];</div>
+<div>494&emsp;&emsp;</div>
+<div style="background-color:limegreen;">495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for(int i = 1; i &#60; N; i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ans = ans * x + coef[i];</div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>498&emsp;&emsp;</div>
+<div>499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ans;</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>501&emsp;&emsp;</div>
+<div>502&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>503&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Evaluates the given polynomial of degree &#60;tt>N&#60;/tt> at &#60;tt>x&#60;/tt>.</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;pre></div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *                     2          N</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * y  =  C  + C x + C x  +...+ C x</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *        0    1     2          N</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Coefficients are stored in reverse order:</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * coef[0] = C  , ..., coef[N] = C  .</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *            N                   0</div>
+<div>514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;/pre></div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;p></div>
+<div>516&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * In the interest of speed, there are no checks for out of bounds arithmetic.</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x    argument to the polynomial.</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param coef the coefficients of the polynomial.</div>
+<div>520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param N    the degree of the polynomial.</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double polevl(double x, double coef[], int N) {</div>
+<div>523&emsp;&emsp;</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double ans;</div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ans = coef[0];</div>
+<div>526&emsp;&emsp;</div>
+<div style="background-color:limegreen;">527&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for(int i = 1; i &#60;= N; i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>528&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ans = ans * x + coef[i];</div>
+<div>529&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>530&emsp;&emsp;</div>
+<div>531&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ans;</div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>533&emsp;&emsp;</div>
+<div>534&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>535&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the Incomplete Gamma function.</div>
+<div>536&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>537&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param a the parameter of the gamma distribution.</div>
+<div>538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x the integration end point.</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>540&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double incompleteGamma(double a, double x) {</div>
+<div>541&emsp;&emsp;</div>
+<div>542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double ans, ax, c, r;</div>
+<div>543&emsp;&emsp;</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(x &#60;= 0 || a &#60;= 0) {</div>
+<div>545&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return 0.0;</div>
+<div>546&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>547&emsp;&emsp;</div>
+<div>548&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(x > 1.0 && x > a) {</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return 1.0 - incompleteGammaComplement(a, x);</div>
+<div>550&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>551&emsp;&emsp;</div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Compute x**a * exp(-x) / gamma(a) */</div>
+<div>553&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ax = a * Math.log(x) - x - lnGamma(a);</div>
+<div>554&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(ax &#60; -MAXLOG) {</div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return (0.0);</div>
+<div>556&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>557&emsp;&emsp;</div>
+<div>558&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ax = Math.exp(ax);</div>
+<div>559&emsp;&emsp;</div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* power series */</div>
+<div>561&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        r = a;</div>
+<div>562&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        c = 1.0;</div>
+<div>563&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ans = 1.0;</div>
+<div>564&emsp;&emsp;</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        do {</div>
+<div>566&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            r += 1.0;</div>
+<div>567&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            c *= x / r;</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            ans += c;</div>
+<div>569&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } while(c / ans > MACHEP);</div>
+<div>570&emsp;&emsp;</div>
+<div>571&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return (ans * ax / a);</div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>573&emsp;&emsp;</div>
+<div>574&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the Complemented Incomplete Gamma function.</div>
+<div>576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>577&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param a the parameter of the gamma distribution.</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param x the integration start point.</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double incompleteGammaComplement(double a, double x) {</div>
+<div>581&emsp;&emsp;</div>
+<div>582&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double ans, ax, c, yc, r, t, y, z;</div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double pk, pkm1, pkm2, qk, qkm1, qkm2;</div>
+<div>584&emsp;&emsp;</div>
+<div>585&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(x &#60;= 0 || a &#60;= 0) {</div>
+<div>586&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return 1.0;</div>
+<div>587&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>588&emsp;&emsp;</div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(x &#60; 1.0 || x &#60; a) {</div>
+<div>590&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return 1.0 - incompleteGamma(a, x);</div>
+<div>591&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>592&emsp;&emsp;</div>
+<div>593&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ax = a * Math.log(x) - x - lnGamma(a);</div>
+<div>594&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(ax &#60; -MAXLOG) {</div>
+<div>595&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return 0.0;</div>
+<div>596&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>597&emsp;&emsp;</div>
+<div>598&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ax = Math.exp(ax);</div>
+<div>599&emsp;&emsp;</div>
+<div>600&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* continued fraction */</div>
+<div>601&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        y = 1.0 - a;</div>
+<div>602&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        z = x + y + 1.0;</div>
+<div>603&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        c = 0.0;</div>
+<div>604&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        pkm2 = 1.0;</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        qkm2 = x;</div>
+<div>606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        pkm1 = x + 1.0;</div>
+<div>607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        qkm1 = z * x;</div>
+<div>608&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ans = pkm1 / qkm1;</div>
+<div>609&emsp;&emsp;</div>
+<div>610&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        do {</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            c += 1.0;</div>
+<div>612&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            y += 1.0;</div>
+<div>613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            z += 2.0;</div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            yc = y * c;</div>
+<div>615&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pk = pkm1 * z - pkm2 * yc;</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qk = qkm1 * z - qkm2 * yc;</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(qk != 0) {</div>
+<div>618&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                r = pk / qk;</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                t = Math.abs((ans - r) / r);</div>
+<div>620&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                ans = r;</div>
+<div>621&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>622&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            else {</div>
+<div>623&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                t = 1.0;</div>
+<div>624&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>625&emsp;&emsp;</div>
+<div>626&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pkm2 = pkm1;</div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pkm1 = pk;</div>
+<div>628&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qkm2 = qkm1;</div>
+<div>629&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qkm1 = qk;</div>
+<div>630&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(Math.abs(pk) > big) {</div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                pkm2 *= biginv;</div>
+<div>632&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                pkm1 *= biginv;</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                qkm2 *= biginv;</div>
+<div>634&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                qkm1 *= biginv;</div>
+<div>635&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } while(t > MACHEP);</div>
+<div>637&emsp;&emsp;</div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ans * ax;</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>640&emsp;&emsp;</div>
+<div>641&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>642&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the Gamma function of the argument.</div>
+<div>643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>644&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double gamma(double x) {</div>
+<div>645&emsp;&emsp;</div>
+<div>646&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double P[] = {1.60119522476751861407E-4, 1.19135147006586384913E-3,</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                1.04213797561761569935E-2, 4.76367800457137231464E-2,</div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                2.07448227648435975150E-1, 4.94214826801497100753E-1,</div>
+<div>649&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                9.99999999999999996796E-1};</div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double Q[] = {-2.31581873324120129819E-5, 5.39605580493303397842E-4,</div>
+<div>651&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                -4.45641913851797240494E-3, 1.18139785222060435552E-2,</div>
+<div>652&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                3.58236398605498653373E-2, -2.34591795718243348568E-1,</div>
+<div>653&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                7.14304917030273074085E-2, 1.00000000000000000320E0};</div>
+<div>654&emsp;&emsp;</div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double p, z;</div>
+<div>656&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double q = Math.abs(x);</div>
+<div>657&emsp;&emsp;</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(q > 33.0) {</div>
+<div>659&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(x &#60; 0.0) {</div>
+<div>660&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                p = Math.floor(q);</div>
+<div>661&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if(p == q) {</div>
+<div>662&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    throw new ArithmeticException("gamma: overflow");</div>
+<div>663&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>664&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                z = q - p;</div>
+<div>665&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if(z > 0.5) {</div>
+<div>666&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    p += 1.0;</div>
+<div>667&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    z = q - p;</div>
+<div>668&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>669&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                z = q * Math.sin(Math.PI * z);</div>
+<div>670&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if(z == 0.0) {</div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    throw new ArithmeticException("gamma: overflow");</div>
+<div>672&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>673&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                z = Math.abs(z);</div>
+<div>674&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                z = Math.PI / (z * stirlingFormula(q));</div>
+<div>675&emsp;&emsp;</div>
+<div>676&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return -z;</div>
+<div>677&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            else {</div>
+<div>679&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return stirlingFormula(x);</div>
+<div>680&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>682&emsp;&emsp;</div>
+<div>683&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        z = 1.0;</div>
+<div>684&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        while(x >= 3.0) {</div>
+<div>685&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            x -= 1.0;</div>
+<div>686&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            z *= x;</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>688&emsp;&emsp;</div>
+<div>689&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        while(x &#60; 0.0) {</div>
+<div>690&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(x == 0.0) {</div>
+<div>691&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw new ArithmeticException("gamma: singular");</div>
+<div>692&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            else if(x > -1.E-9) {</div>
+<div>694&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return (z / ((1.0 + 0.5772156649015329 * x) * x));</div>
+<div>695&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>696&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            z /= x;</div>
+<div>697&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            x += 1.0;</div>
+<div>698&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>699&emsp;&emsp;</div>
+<div>700&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        while(x &#60; 2.0) {</div>
+<div>701&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(x == 0.0) {</div>
+<div>702&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                throw new ArithmeticException("gamma: singular");</div>
+<div>703&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>704&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            else if(x &#60; 1.e-9) {</div>
+<div>705&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return (z / ((1.0 + 0.5772156649015329 * x) * x));</div>
+<div>706&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>707&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            z /= x;</div>
+<div>708&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            x += 1.0;</div>
+<div>709&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>710&emsp;&emsp;</div>
+<div>711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if((x == 2.0) || (x == 3.0)) {</div>
+<div>712&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return z;</div>
+<div>713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>714&emsp;&emsp;</div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        x -= 2.0;</div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        p = polevl(x, P, 6);</div>
+<div>717&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        q = polevl(x, Q, 7);</div>
+<div>718&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return z * p / q;</div>
+<div>719&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>720&emsp;&emsp;</div>
+<div>721&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>722&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the Gamma function computed by Stirling's formula. The polynomial</div>
+<div>723&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * STIR is valid for 33 &#60;= x &#60;= 172.</div>
+<div>724&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>725&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double stirlingFormula(double x) {</div>
+<div>726&emsp;&emsp;</div>
+<div>727&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double STIR[] = {7.87311395793093628397E-4, -2.29549961613378126380E-4,</div>
+<div>728&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                -2.68132617805781232825E-3, 3.47222221605458667310E-3,</div>
+<div>729&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                8.33333333333482257126E-2,};</div>
+<div>730&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double MAXSTIR = 143.01608;</div>
+<div>731&emsp;&emsp;</div>
+<div>732&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double w = 1.0 / x;</div>
+<div>733&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double y = Math.exp(x);</div>
+<div>734&emsp;&emsp;</div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        w = 1.0 + w * polevl(w, STIR, 4);</div>
+<div>736&emsp;&emsp;</div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(x > MAXSTIR) {</div>
+<div>738&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      /* Avoid overflow in Math.pow() */</div>
+<div>739&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            double v = Math.pow(x, 0.5 * x - 0.25);</div>
+<div>740&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            y = v * (v / y);</div>
+<div>741&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>742&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>743&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            y = Math.pow(x, x - 0.5) / y;</div>
+<div>744&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>745&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        y = SQTPI * y * w;</div>
+<div>746&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return y;</div>
+<div>747&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>748&emsp;&emsp;</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>750&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the Incomplete Beta Function evaluated from zero to &#60;tt>xx&#60;/tt>.</div>
+<div>751&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>752&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param aa the alpha parameter of the beta distribution.</div>
+<div>753&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param bb the beta parameter of the beta distribution.</div>
+<div>754&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param xx the integration end point.</div>
+<div>755&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>756&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double incompleteBeta(double aa, double bb, double xx) {</div>
+<div>757&emsp;&emsp;</div>
+<div>758&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double a, b, t, x, xc, w, y;</div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        boolean flag;</div>
+<div>760&emsp;&emsp;</div>
+<div>761&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(aa &#60;= 0.0 || bb &#60;= 0.0) {</div>
+<div>762&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new ArithmeticException("ibeta: Domain error!");</div>
+<div>763&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>764&emsp;&emsp;</div>
+<div>765&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if((xx &#60;= 0.0) || (xx >= 1.0)) {</div>
+<div>766&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(xx == 0.0) {</div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return 0.0;</div>
+<div>768&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>769&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(xx == 1.0) {</div>
+<div>770&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return 1.0;</div>
+<div>771&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>772&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            throw new ArithmeticException("ibeta: Domain error!");</div>
+<div>773&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>774&emsp;&emsp;</div>
+<div>775&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        flag = false;</div>
+<div>776&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if((bb * xx) &#60;= 1.0 && xx &#60;= 0.95) {</div>
+<div>777&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            t = powerSeries(aa, bb, xx);</div>
+<div>778&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return t;</div>
+<div>779&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>780&emsp;&emsp;</div>
+<div>781&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        w = 1.0 - xx;</div>
+<div>782&emsp;&emsp;</div>
+<div>783&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Reverse a and b if x is greater than the mean. */</div>
+<div>784&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(xx > (aa / (aa + bb))) {</div>
+<div>785&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            flag = true;</div>
+<div>786&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            a = bb;</div>
+<div>787&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            b = aa;</div>
+<div>788&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            xc = xx;</div>
+<div>789&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            x = w;</div>
+<div>790&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>791&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>792&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            a = aa;</div>
+<div>793&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            b = bb;</div>
+<div>794&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            xc = w;</div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            x = xx;</div>
+<div>796&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>797&emsp;&emsp;</div>
+<div>798&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(flag && (b * x) &#60;= 1.0 && x &#60;= 0.95) {</div>
+<div>799&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            t = powerSeries(a, b, x);</div>
+<div>800&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(t &#60;= MACHEP) {</div>
+<div>801&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                t = 1.0 - MACHEP;</div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>803&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            else {</div>
+<div>804&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                t = 1.0 - t;</div>
+<div>805&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>806&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return t;</div>
+<div>807&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>808&emsp;&emsp;</div>
+<div>809&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Choose expansion for better convergence. */</div>
+<div>810&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        y = x * (a + b - 2.0) - (a - 1.0);</div>
+<div>811&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(y &#60; 0.0) {</div>
+<div>812&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            w = incompleteBetaFraction1(a, b, x);</div>
+<div>813&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>814&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>815&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            w = incompleteBetaFraction2(a, b, x) / xc;</div>
+<div>816&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>817&emsp;&emsp;</div>
+<div>818&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /*</div>
+<div>819&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Multiply w by the factor a b _ _ _ x (1-x) | (a+b) / ( a | (a) | (b) ) .</div>
+<div>820&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>821&emsp;&emsp;</div>
+<div>822&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        y = a * Math.log(x);</div>
+<div>823&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        t = b * Math.log(xc);</div>
+<div>824&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if((a + b) &#60; MAXGAM && Math.abs(y) &#60; MAXLOG && Math.abs(t) &#60; MAXLOG) {</div>
+<div>825&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            t = Math.pow(xc, b);</div>
+<div>826&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            t *= Math.pow(x, a);</div>
+<div>827&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            t /= a;</div>
+<div>828&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            t *= w;</div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            t *= gamma(a + b) / (gamma(a) * gamma(b));</div>
+<div>830&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(flag) {</div>
+<div>831&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                if(t &#60;= MACHEP) {</div>
+<div>832&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    t = 1.0 - MACHEP;</div>
+<div>833&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>834&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                else {</div>
+<div>835&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    t = 1.0 - t;</div>
+<div>836&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>837&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>838&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            return t;</div>
+<div>839&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>840&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /* Resort to logarithms. */</div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        y += t + lnGamma(a + b) - lnGamma(a) - lnGamma(b);</div>
+<div>842&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        y += Math.log(w / a);</div>
+<div>843&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(y &#60; MINLOG) {</div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            t = 0.0;</div>
+<div>845&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>847&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            t = Math.exp(y);</div>
+<div>848&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>849&emsp;&emsp;</div>
+<div>850&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if(flag) {</div>
+<div>851&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(t &#60;= MACHEP) {</div>
+<div>852&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                t = 1.0 - MACHEP;</div>
+<div>853&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>854&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            else {</div>
+<div>855&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                t = 1.0 - t;</div>
+<div>856&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>858&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return t;</div>
+<div>859&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>860&emsp;&emsp;</div>
+<div>861&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>862&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Continued fraction expansion #1 for incomplete beta integral.</div>
+<div>863&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>864&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double incompleteBetaFraction1(double a, double b, double x) {</div>
+<div>865&emsp;&emsp;</div>
+<div>866&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double xk, pk, pkm1, pkm2, qk, qkm1, qkm2;</div>
+<div>867&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double k1, k2, k3, k4, k5, k6, k7, k8;</div>
+<div>868&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double r, t, ans, thresh;</div>
+<div>869&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int n;</div>
+<div>870&emsp;&emsp;</div>
+<div>871&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k1 = a;</div>
+<div>872&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k2 = a + b;</div>
+<div>873&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k3 = a;</div>
+<div>874&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k4 = a + 1.0;</div>
+<div>875&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k5 = 1.0;</div>
+<div>876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k6 = b - 1.0;</div>
+<div>877&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k7 = k4;</div>
+<div>878&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k8 = a + 2.0;</div>
+<div>879&emsp;&emsp;</div>
+<div>880&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        pkm2 = 0.0;</div>
+<div>881&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        qkm2 = 1.0;</div>
+<div>882&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        pkm1 = 1.0;</div>
+<div>883&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        qkm1 = 1.0;</div>
+<div>884&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ans = 1.0;</div>
+<div>885&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        r = 1.0;</div>
+<div>886&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        n = 0;</div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        thresh = 3.0 * MACHEP;</div>
+<div>888&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        do {</div>
+<div>889&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            xk = -(x * k1 * k2) / (k3 * k4);</div>
+<div>890&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pk = pkm1 + pkm2 * xk;</div>
+<div>891&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qk = qkm1 + qkm2 * xk;</div>
+<div>892&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pkm2 = pkm1;</div>
+<div>893&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pkm1 = pk;</div>
+<div>894&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qkm2 = qkm1;</div>
+<div>895&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qkm1 = qk;</div>
+<div>896&emsp;&emsp;</div>
+<div>897&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            xk = (x * k5 * k6) / (k7 * k8);</div>
+<div>898&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pk = pkm1 + pkm2 * xk;</div>
+<div>899&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qk = qkm1 + qkm2 * xk;</div>
+<div>900&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pkm2 = pkm1;</div>
+<div>901&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pkm1 = pk;</div>
+<div>902&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qkm2 = qkm1;</div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qkm1 = qk;</div>
+<div>904&emsp;&emsp;</div>
+<div>905&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(qk != 0) {</div>
+<div>906&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                r = pk / qk;</div>
+<div>907&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>908&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(r != 0) {</div>
+<div>909&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                t = Math.abs((ans - r) / r);</div>
+<div>910&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                ans = r;</div>
+<div>911&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>912&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            else {</div>
+<div>913&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                t = 1.0;</div>
+<div>914&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>915&emsp;&emsp;</div>
+<div>916&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(t &#60; thresh) {</div>
+<div>917&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return ans;</div>
+<div>918&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>919&emsp;&emsp;</div>
+<div>920&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k1 += 1.0;</div>
+<div>921&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k2 += 1.0;</div>
+<div>922&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k3 += 2.0;</div>
+<div>923&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k4 += 2.0;</div>
+<div>924&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k5 += 1.0;</div>
+<div>925&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k6 -= 1.0;</div>
+<div>926&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k7 += 2.0;</div>
+<div>927&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k8 += 2.0;</div>
+<div>928&emsp;&emsp;</div>
+<div>929&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if((Math.abs(qk) + Math.abs(pk)) > big) {</div>
+<div>930&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                pkm2 *= biginv;</div>
+<div>931&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                pkm1 *= biginv;</div>
+<div>932&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                qkm2 *= biginv;</div>
+<div>933&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                qkm1 *= biginv;</div>
+<div>934&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>935&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if((Math.abs(qk) &#60; biginv) || (Math.abs(pk) &#60; biginv)) {</div>
+<div>936&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                pkm2 *= big;</div>
+<div>937&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                pkm1 *= big;</div>
+<div>938&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                qkm2 *= big;</div>
+<div>939&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                qkm1 *= big;</div>
+<div>940&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>941&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } while(++n &#60; 300);</div>
+<div>942&emsp;&emsp;</div>
+<div>943&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ans;</div>
+<div>944&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>945&emsp;&emsp;</div>
+<div>946&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>947&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Continued fraction expansion #2 for incomplete beta integral.</div>
+<div>948&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>949&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double incompleteBetaFraction2(double a, double b, double x) {</div>
+<div>950&emsp;&emsp;</div>
+<div>951&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double xk, pk, pkm1, pkm2, qk, qkm1, qkm2;</div>
+<div>952&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double k1, k2, k3, k4, k5, k6, k7, k8;</div>
+<div>953&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double r, t, ans, z, thresh;</div>
+<div>954&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int n;</div>
+<div>955&emsp;&emsp;</div>
+<div>956&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k1 = a;</div>
+<div>957&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k2 = b - 1.0;</div>
+<div>958&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k3 = a;</div>
+<div>959&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k4 = a + 1.0;</div>
+<div>960&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k5 = 1.0;</div>
+<div>961&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k6 = a + b;</div>
+<div>962&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k7 = a + 1.0;</div>
+<div>963&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ;</div>
+<div>964&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        k8 = a + 2.0;</div>
+<div>965&emsp;&emsp;</div>
+<div>966&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        pkm2 = 0.0;</div>
+<div>967&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        qkm2 = 1.0;</div>
+<div>968&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        pkm1 = 1.0;</div>
+<div>969&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        qkm1 = 1.0;</div>
+<div>970&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        z = x / (1.0 - x);</div>
+<div>971&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ans = 1.0;</div>
+<div>972&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        r = 1.0;</div>
+<div>973&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        n = 0;</div>
+<div>974&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        thresh = 3.0 * MACHEP;</div>
+<div>975&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        do {</div>
+<div>976&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            xk = -(z * k1 * k2) / (k3 * k4);</div>
+<div>977&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pk = pkm1 + pkm2 * xk;</div>
+<div>978&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qk = qkm1 + qkm2 * xk;</div>
+<div>979&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pkm2 = pkm1;</div>
+<div>980&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pkm1 = pk;</div>
+<div>981&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qkm2 = qkm1;</div>
+<div>982&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qkm1 = qk;</div>
+<div>983&emsp;&emsp;</div>
+<div>984&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            xk = (z * k5 * k6) / (k7 * k8);</div>
+<div>985&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pk = pkm1 + pkm2 * xk;</div>
+<div>986&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qk = qkm1 + qkm2 * xk;</div>
+<div>987&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pkm2 = pkm1;</div>
+<div>988&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            pkm1 = pk;</div>
+<div>989&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qkm2 = qkm1;</div>
+<div>990&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            qkm1 = qk;</div>
+<div>991&emsp;&emsp;</div>
+<div>992&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(qk != 0) {</div>
+<div>993&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                r = pk / qk;</div>
+<div>994&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>995&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(r != 0) {</div>
+<div>996&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                t = Math.abs((ans - r) / r);</div>
+<div>997&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                ans = r;</div>
+<div>998&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>999&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            else {</div>
+<div>1000&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                t = 1.0;</div>
+<div>1001&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1002&emsp;&emsp;</div>
+<div>1003&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(t &#60; thresh) {</div>
+<div>1004&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                return ans;</div>
+<div>1005&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1006&emsp;&emsp;</div>
+<div>1007&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k1 += 1.0;</div>
+<div>1008&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k2 -= 1.0;</div>
+<div>1009&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k3 += 2.0;</div>
+<div>1010&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k4 += 2.0;</div>
+<div>1011&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k5 += 1.0;</div>
+<div>1012&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k6 += 1.0;</div>
+<div>1013&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k7 += 2.0;</div>
+<div>1014&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            k8 += 2.0;</div>
+<div>1015&emsp;&emsp;</div>
+<div>1016&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if((Math.abs(qk) + Math.abs(pk)) > big) {</div>
+<div>1017&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                pkm2 *= biginv;</div>
+<div>1018&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                pkm1 *= biginv;</div>
+<div>1019&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                qkm2 *= biginv;</div>
+<div>1020&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                qkm1 *= biginv;</div>
+<div>1021&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1022&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if((Math.abs(qk) &#60; biginv) || (Math.abs(pk) &#60; biginv)) {</div>
+<div>1023&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                pkm2 *= big;</div>
+<div>1024&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                pkm1 *= big;</div>
+<div>1025&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                qkm2 *= big;</div>
+<div>1026&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                qkm1 *= big;</div>
+<div>1027&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1028&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } while(++n &#60; 300);</div>
+<div>1029&emsp;&emsp;</div>
+<div>1030&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return ans;</div>
+<div>1031&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1032&emsp;&emsp;</div>
+<div>1033&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1034&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Power series for incomplete beta integral. Use when b*x is small and x not</div>
+<div>1035&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * too close to 1.</div>
+<div>1036&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1037&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static double powerSeries(double a, double b, double x) {</div>
+<div>1038&emsp;&emsp;</div>
+<div>1039&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        double s, t, u, v, n, t1, z, ai;</div>
+<div>1040&emsp;&emsp;</div>
+<div>1041&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ai = 1.0 / a;</div>
+<div>1042&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        u = (1.0 - b) * x;</div>
+<div>1043&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        v = u / (a + 1.0);</div>
+<div>1044&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        t1 = v;</div>
+<div>1045&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        t = u;</div>
+<div>1046&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        n = 2.0;</div>
+<div>1047&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        s = 0.0;</div>
+<div>1048&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        z = MACHEP * ai;</div>
+<div>1049&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        while(Math.abs(v) > z) {</div>
+<div>1050&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            u = (n - b) * x / n;</div>
+<div>1051&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            t *= u;</div>
+<div>1052&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            v = t / (a + n);</div>
+<div>1053&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            s += v;</div>
+<div>1054&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            n += 1.0;</div>
+<div>1055&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1056&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        s += t1;</div>
+<div>1057&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        s += ai;</div>
+<div>1058&emsp;&emsp;</div>
+<div>1059&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        u = a * Math.log(x);</div>
+<div>1060&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if((a + b) &#60; MAXGAM && Math.abs(u) &#60; MAXLOG) {</div>
+<div>1061&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            t = gamma(a + b) / (gamma(a) * gamma(b));</div>
+<div>1062&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            s = s * t * Math.pow(x, a);</div>
+<div>1063&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1064&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        else {</div>
+<div>1065&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            t = lnGamma(a + b) - lnGamma(a) - lnGamma(b) + u + Math.log(s);</div>
+<div>1066&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            if(t &#60; MINLOG) {</div>
+<div>1067&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                s = 0.0;</div>
+<div>1068&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1069&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            else {</div>
+<div>1070&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                s = Math.exp(t);</div>
+<div>1071&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>1072&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>1073&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return s;</div>
+<div>1074&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1075&emsp;&emsp;</div>
+<div>1076&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1077&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Main method for testing this class.</div>
+<div>1078&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1079&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public static void main(String[] ops) {</div>
+<div>1080&emsp;&emsp;</div>
+<div>1081&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println("Binomial standard error (0.5, 100): "</div>
+<div>1082&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                + Statistics.binomialStandardError(0.5, 100));</div>
+<div>1083&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println("Chi-squared probability (2.558, 10): "</div>
+<div>1084&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                + Statistics.chiSquaredProbability(2.558, 10));</div>
+<div>1085&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println("Normal probability (0.2): "</div>
+<div>1086&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                + Statistics.normalProbability(0.2));</div>
+<div>1087&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println("F probability (5.1922, 4, 5): "</div>
+<div>1088&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                + Statistics.FProbability(5.1922, 4, 5));</div>
+<div>1089&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.out.println("lnGamma(6): " + Statistics.lnGamma(6));</div>
+<div>1090&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1091&emsp;&emsp;</div>
+<div>1092&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1093&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the revision string.</div>
+<div>1094&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>1095&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the revision</div>
+<div>1096&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1097&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>1098&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String getRevision() {</div>
+<div>1099&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return RevisionUtils.extract("$Revision: 10203 $");</div>
+<div>1100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1101&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>

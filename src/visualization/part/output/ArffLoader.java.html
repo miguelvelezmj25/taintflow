@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ArffLoader.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *   This program is free software: you can redistribute it and/or modify</div>
+<div>3&emsp;&emsp;&nbsp; *   it under the terms of the GNU General Public License as published by</div>
+<div>4&emsp;&emsp;&nbsp; *   the Free Software Foundation, either version 3 of the License, or</div>
+<div>5&emsp;&emsp;&nbsp; *   (at your option) any later version.</div>
+<div>6&emsp;&emsp;&nbsp; *</div>
+<div>7&emsp;&emsp;&nbsp; *   This program is distributed in the hope that it will be useful,</div>
+<div>8&emsp;&emsp;&nbsp; *   but WITHOUT ANY WARRANTY; without even the implied warranty of</div>
+<div>9&emsp;&emsp;&nbsp; *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the</div>
+<div>10&emsp;&emsp;&nbsp; *   GNU General Public License for more details.</div>
+<div>11&emsp;&emsp;&nbsp; *</div>
+<div>12&emsp;&emsp;&nbsp; *   You should have received a copy of the GNU General Public License</div>
+<div>13&emsp;&emsp;&nbsp; *   along with this program.  If not, see &#60;http://www.gnu.org/licenses/>.</div>
+<div>14&emsp;&emsp;&nbsp; */</div>
+<div>15&emsp;&emsp;</div>
+<div>16&emsp;&emsp;/*</div>
+<div>17&emsp;&emsp;&nbsp; *    ArffLoader.java</div>
+<div>18&emsp;&emsp;&nbsp; *    Copyright (C) 2000-2012 University of Waikato, Hamilton, New Zealand</div>
+<div>19&emsp;&emsp;&nbsp; *</div>
+<div>20&emsp;&emsp;&nbsp; */</div>
+<div>21&emsp;&emsp;</div>
+<div>22&emsp;&emsp;package weka.core.converters;</div>
+<div>23&emsp;&emsp;</div>
+<div>24&emsp;&emsp;import java.io.BufferedReader;</div>
+<div>25&emsp;&emsp;import java.io.File;</div>
+<div>26&emsp;&emsp;import java.io.IOException;</div>
+<div>27&emsp;&emsp;import java.io.InputStream;</div>
+<div>28&emsp;&emsp;import java.io.InputStreamReader;</div>
+<div>29&emsp;&emsp;import java.io.Reader;</div>
+<div>30&emsp;&emsp;import java.io.StreamTokenizer;</div>
+<div>31&emsp;&emsp;import java.io.StringReader;</div>
+<div>32&emsp;&emsp;import java.net.URL;</div>
+<div>33&emsp;&emsp;import java.text.ParseException;</div>
+<div>34&emsp;&emsp;import java.util.ArrayList;</div>
+<div>35&emsp;&emsp;import java.util.List;</div>
+<div>36&emsp;&emsp;</div>
+<div>37&emsp;&emsp;import weka.core.Attribute;</div>
+<div>38&emsp;&emsp;import weka.core.DenseInstance;</div>
+<div>39&emsp;&emsp;import weka.core.Instance;</div>
+<div>40&emsp;&emsp;import weka.core.Instances;</div>
+<div>41&emsp;&emsp;import weka.core.RevisionHandler;</div>
+<div>42&emsp;&emsp;import weka.core.RevisionUtils;</div>
+<div>43&emsp;&emsp;import weka.core.SparseInstance;</div>
+<div>44&emsp;&emsp;import weka.core.Utils;</div>
+<div>45&emsp;&emsp;</div>
+<div>46&emsp;&emsp;/**</div>
+<div>47&emsp;&emsp;&nbsp; * &#60;!-- globalinfo-start --> Reads a source that is in arff (attribute relation</div>
+<div>48&emsp;&emsp;&nbsp; * file format) format.</div>
+<div>49&emsp;&emsp;&nbsp; * &#60;p/></div>
+<div>50&emsp;&emsp;&nbsp; * &#60;!-- globalinfo-end --></div>
+<div>51&emsp;&emsp;&nbsp; * </div>
+<div>52&emsp;&emsp;&nbsp; * @author Mark Hall (mhall@cs.waikato.ac.nz)</div>
+<div>53&emsp;&emsp;&nbsp; * @author FracPete (fracpete at waikato dot ac dot nz)</div>
+<div>54&emsp;&emsp;&nbsp; * @version $Revision: 11506 $</div>
+<div>55&emsp;&emsp;&nbsp; * @see Loader</div>
+<div>56&emsp;&emsp;&nbsp; */</div>
+<div>57&emsp;&emsp;public class ArffLoader extends AbstractFileLoader implements BatchConverter,</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;  IncrementalConverter, URLSourcedLoader {</div>
+<div>59&emsp;&emsp;</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;  /** for serialization */</div>
+<div>61&emsp;&emsp;&nbsp;&nbsp;  static final long serialVersionUID = 2726929550544048587L;</div>
+<div>62&emsp;&emsp;</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;  /** the file extension */</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;  public static String FILE_EXTENSION = Instances.FILE_EXTENSION;</div>
+<div>65&emsp;&emsp;&nbsp;&nbsp;  public static String FILE_EXTENSION_COMPRESSED = FILE_EXTENSION + ".gz";</div>
+<div>66&emsp;&emsp;</div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;  /** the url */</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;  protected String m_URL = "http://";</div>
+<div>69&emsp;&emsp;</div>
+<div>70&emsp;&emsp;&nbsp;&nbsp;  /** The reader for the source file. */</div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;  protected transient Reader m_sourceReader = null;</div>
+<div>72&emsp;&emsp;</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;  /** The parser for the ARFF file */</div>
+<div>74&emsp;&emsp;&nbsp;&nbsp;  protected transient ArffReader m_ArffReader = null;</div>
+<div>75&emsp;&emsp;</div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>77&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Whether the values of string attributes should be retained in memory when</div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * reading incrementally</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;  protected boolean m_retainStringVals;</div>
+<div>81&emsp;&emsp;</div>
+<div>82&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Reads data from an ARFF file, either in incremental or batch mode.</div>
+<div>84&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;p/></div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Typical code for batch usage:</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;pre></div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * BufferedReader reader =</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *   new BufferedReader(new FileReader(&quot;/some/where/file.arff&quot;));</div>
+<div>91&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * ArffReader arff = new ArffReader(reader);</div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Instances data = arff.getData();</div>
+<div>93&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * data.setClassIndex(data.numAttributes() - 1);</div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;/pre></div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Typical code for incremental usage:</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;pre></div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * BufferedReader reader =</div>
+<div>100&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *   new BufferedReader(new FileReader(&quot;/some/where/file.arff&quot;));</div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * ArffReader arff = new ArffReader(reader, 1000);</div>
+<div>102&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Instances data = arff.getStructure();</div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * data.setClassIndex(data.numAttributes() - 1);</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Instance inst;</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * while ((inst = arff.readInstance(data)) != null) {</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *   data.add(inst);</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * }</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * &#60;/pre></div>
+<div>109&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @author Eibe Frank (eibe@cs.waikato.ac.nz)</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @author Len Trigg (trigg@cs.waikato.ac.nz)</div>
+<div>112&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @author fracpete (fracpete at waikato dot ac dot nz)</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @version $Revision: 11506 $</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>115&emsp;&emsp;&nbsp;&nbsp;  public static class ArffReader implements RevisionHandler {</div>
+<div>116&emsp;&emsp;</div>
+<div>117&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the tokenizer for reading the stream */</div>
+<div>118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected StreamTokenizer m_Tokenizer;</div>
+<div>119&emsp;&emsp;</div>
+<div>120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** Buffer of values for sparse instance */</div>
+<div>121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double[] m_ValueBuffer;</div>
+<div>122&emsp;&emsp;</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** Buffer of indices for sparse instance */</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected int[] m_IndicesBuffer;</div>
+<div>125&emsp;&emsp;</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected List&#60;Integer> m_stringAttIndices;</div>
+<div>127&emsp;&emsp;</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the actual data */</div>
+<div>129&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Instances m_Data;</div>
+<div>130&emsp;&emsp;</div>
+<div>131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** the number of lines read so far */</div>
+<div>132&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected int m_Lines;</div>
+<div>133&emsp;&emsp;</div>
+<div>134&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected boolean m_batchMode = true;</div>
+<div>135&emsp;&emsp;</div>
+<div>136&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>137&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Whether the values for string attributes will accumulate in the header</div>
+<div>138&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * when reading incrementally</div>
+<div>139&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>140&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected boolean m_retainStringValues = false;</div>
+<div>141&emsp;&emsp;</div>
+<div>142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** Field separator (single character string) to use instead of the defaults */</div>
+<div>143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected String m_fieldSeparator;</div>
+<div>144&emsp;&emsp;</div>
+<div>145&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /** List of (single character) enclosures to use instead of the defaults */</div>
+<div>146&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected List&#60;String> m_enclosures;</div>
+<div>147&emsp;&emsp;</div>
+<div>148&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>149&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Reads the data completely from the reader. The data can be accessed via</div>
+<div>150&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * the &#60;code>getData()&#60;/code> method.</div>
+<div>151&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>152&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param reader the reader to use</div>
+<div>153&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if something goes wrong</div>
+<div>154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @see #getData()</div>
+<div>155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>156&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public ArffReader(Reader reader) throws IOException {</div>
+<div>157&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_retainStringValues = true;</div>
+<div>158&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_batchMode = true;</div>
+<div>159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Tokenizer = new StreamTokenizer(reader);</div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      initTokenizer();</div>
+<div>161&emsp;&emsp;</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      readHeader(1000);</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      initBuffers();</div>
+<div>164&emsp;&emsp;</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instance inst;</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      while ((inst = readInstance(m_Data)) != null) {</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Data.add(inst);</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>169&emsp;&emsp;</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      compactify();</div>
+<div>171&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>172&emsp;&emsp;</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public ArffReader(Reader reader, int capacity) throws IOException {</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      this(reader, capacity, true);</div>
+<div>175&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>176&emsp;&emsp;</div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Reads only the header and reserves the specified space for instances.</div>
+<div>179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Further instances can be read via &#60;code>readInstance()&#60;/code>.</div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param reader the reader to use</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param capacity the capacity of the new dataset</div>
+<div>183&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param batch true if reading in batch mode</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if something goes wrong</div>
+<div>185&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if a problem occurs</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @see #getStructure()</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @see #readInstance(Instances)</div>
+<div>188&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public ArffReader(Reader reader, int capacity, boolean batch)</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws IOException {</div>
+<div>191&emsp;&emsp;</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_batchMode = batch;</div>
+<div style="background-color:limegreen;">193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (batch) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_retainStringValues = true;</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>196&emsp;&emsp;</div>
+<div style="background-color:limegreen;">197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (capacity &#60; 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new IllegalArgumentException("Capacity has to be positive!");</div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>200&emsp;&emsp;</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Tokenizer = new StreamTokenizer(reader);</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      initTokenizer();</div>
+<div>203&emsp;&emsp;</div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      readHeader(capacity);</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      initBuffers();</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>207&emsp;&emsp;</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Reads the data without header according to the specified template. The</div>
+<div>210&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * data can be accessed via the &#60;code>getData()&#60;/code> method.</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param reader the reader to use</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param template the template header</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param lines the lines read so far</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param fieldSepAndEnclosures an optional array of Strings containing the</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          field separator and enclosures to use instead of the defaults.</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          The first entry in the array is expected to be the single</div>
+<div>218&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          character field separator to use; the remaining entries (if any)</div>
+<div>219&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          are enclosure characters to use.</div>
+<div>220&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if something goes wrong</div>
+<div>221&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @see #getData()</div>
+<div>222&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public ArffReader(Reader reader, Instances template, int lines,</div>
+<div>224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String... fieldSepAndEnclosures) throws IOException {</div>
+<div>225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      this(reader, template, lines, 100, true, fieldSepAndEnclosures);</div>
+<div>226&emsp;&emsp;</div>
+<div>227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instance inst;</div>
+<div style="background-color:limegreen;">228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      while ((inst = readInstance(m_Data)) != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Data.add(inst);</div>
+<div>230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>231&emsp;&emsp;</div>
+<div>232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      compactify();</div>
+<div>233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>234&emsp;&emsp;</div>
+<div>235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>236&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Initializes the reader without reading the header according to the</div>
+<div>237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * specified template. The data must be read via the</div>
+<div>238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;code>readInstance()&#60;/code> method.</div>
+<div>239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param reader the reader to use</div>
+<div>241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param template the template header</div>
+<div>242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param lines the lines read so far</div>
+<div>243&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param capacity the capacity of the new dataset</div>
+<div>244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param fieldSepAndEnclosures an optional array of Strings containing the</div>
+<div>245&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          field separator and enclosures to use instead of the defaults.</div>
+<div>246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          The first entry in the array is expected to be the single</div>
+<div>247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          character field separator to use; the remaining entries (if any)</div>
+<div>248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          are enclosure characters to use.</div>
+<div>249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if something goes wrong</div>
+<div>250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @see #getData()</div>
+<div>251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>252&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public ArffReader(Reader reader, Instances template, int lines,</div>
+<div>253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int capacity, String... fieldSepAndEnclosures) throws IOException {</div>
+<div>254&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      this(reader, template, lines, capacity, false, fieldSepAndEnclosures);</div>
+<div>255&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>256&emsp;&emsp;</div>
+<div>257&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>258&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Initializes the reader without reading the header according to the</div>
+<div>259&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * specified template. The data must be read via the</div>
+<div>260&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * &#60;code>readInstance()&#60;/code> method.</div>
+<div>261&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>262&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param reader the reader to use</div>
+<div>263&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param template the template header</div>
+<div>264&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param lines the lines read so far</div>
+<div>265&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param capacity the capacity of the new dataset</div>
+<div>266&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param batch true if the data is going to be read in batch mode</div>
+<div>267&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param fieldSepAndEnclosures an optional array of Strings containing the</div>
+<div>268&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          field separator and enclosures to use instead of the defaults.</div>
+<div>269&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          The first entry in the array is expected to be the single</div>
+<div>270&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          character field separator to use; the remaining entries (if any)</div>
+<div>271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          are enclosure characters to use.</div>
+<div>272&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if something goes wrong</div>
+<div>273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @see #getData()</div>
+<div>274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public ArffReader(Reader reader, Instances template, int lines,</div>
+<div>276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int capacity, boolean batch, String... fieldSepAndEnclosures)</div>
+<div>277&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws IOException {</div>
+<div>278&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_batchMode = batch;</div>
+<div style="background-color:limegreen;">279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (batch) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_retainStringValues = true;</div>
+<div>281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>282&emsp;&emsp;</div>
+<div style="background-color:limegreen;">283&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (fieldSepAndEnclosures != null && fieldSepAndEnclosures.length > 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (fieldSepAndEnclosures[0] != null&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">285&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          && fieldSepAndEnclosures[0].length() > 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>286&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_fieldSeparator = fieldSepAndEnclosures[0];</div>
+<div>287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>288&emsp;&emsp;</div>
+<div style="background-color:limegreen;">289&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (fieldSepAndEnclosures.length > 1) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // the rest are assumed to be enclosure characters</div>
+<div>291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_enclosures = new ArrayList&#60;String>();</div>
+<div style="background-color:limegreen;">292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          for (int i = 1; i &#60; fieldSepAndEnclosures.length; i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (fieldSepAndEnclosures[i] != null&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>              && fieldSepAndEnclosures[i].length() > 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>295&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              m_enclosures.add(fieldSepAndEnclosures[i]);</div>
+<div>296&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>297&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>298&emsp;&emsp;</div>
+<div style="background-color:limegreen;">299&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (m_enclosures.size() == 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>300&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_enclosures = null;</div>
+<div>301&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>302&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>303&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>304&emsp;&emsp;</div>
+<div>305&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Lines = lines;</div>
+<div>306&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Tokenizer = new StreamTokenizer(reader);</div>
+<div>307&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      initTokenizer();</div>
+<div>308&emsp;&emsp;</div>
+<div>309&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Data = new Instances(template, capacity);</div>
+<div>310&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      initBuffers();</div>
+<div>311&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>312&emsp;&emsp;</div>
+<div>313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>314&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * initializes the buffers for sparse instances to be read</div>
+<div>315&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>316&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @see #m_ValueBuffer</div>
+<div>317&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @see #m_IndicesBuffer</div>
+<div>318&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>319&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void initBuffers() {</div>
+<div>320&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_ValueBuffer = new double[m_Data.numAttributes()];</div>
+<div>321&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_IndicesBuffer = new int[m_Data.numAttributes()];</div>
+<div>322&emsp;&emsp;</div>
+<div>323&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_stringAttIndices = new ArrayList&#60;Integer>();</div>
+<div style="background-color:limegreen;">324&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Data.checkForStringAttributes()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">325&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for (int i = 0; i &#60; m_Data.numAttributes(); i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">326&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (m_Data.attribute(i).isString()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>327&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_stringAttIndices.add(i);</div>
+<div>328&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>329&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>330&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>331&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>332&emsp;&emsp;</div>
+<div>333&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>334&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * compactifies the data</div>
+<div>335&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>336&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void compactify() {</div>
+<div style="background-color:limegreen;">337&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Data != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>338&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Data.compactify();</div>
+<div>339&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>340&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>341&emsp;&emsp;</div>
+<div>342&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>343&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Throws error message with line number and last token read.</div>
+<div>344&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>345&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param msg the error message to be thrown</div>
+<div>346&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException containing the error message</div>
+<div>347&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>348&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void errorMessage(String msg) throws IOException {</div>
+<div>349&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String str = msg + ", read " + m_Tokenizer.toString();</div>
+<div style="background-color:limegreen;">350&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Lines > 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>351&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        int line = Integer.parseInt(str.replaceAll(".* line ", ""));</div>
+<div>352&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        str = str.replaceAll(" line .*", " line " + (m_Lines + line - 1));</div>
+<div>353&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>354&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new IOException(str);</div>
+<div>355&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>356&emsp;&emsp;</div>
+<div>357&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>358&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * returns the current line number</div>
+<div>359&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>360&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the current line number</div>
+<div>361&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>362&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public int getLineNo() {</div>
+<div>363&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_Lines + m_Tokenizer.lineno();</div>
+<div>364&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>365&emsp;&emsp;</div>
+<div>366&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>367&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Gets next token, skipping empty lines.</div>
+<div>368&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>369&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if reading the next token fails</div>
+<div>370&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>371&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void getFirstToken() throws IOException {</div>
+<div style="background-color:limegreen;">372&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      while (m_Tokenizer.nextToken() == StreamTokenizer.TT_EOL) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>373&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>374&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ;</div>
+<div>375&emsp;&emsp;</div>
+<div style="background-color:limegreen;">376&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if ((m_Tokenizer.ttype == '\'') || (m_Tokenizer.ttype == '"')) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>377&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Tokenizer.ttype = StreamTokenizer.TT_WORD;</div>
+<div style="background-color:limegreen;">378&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      } else if ((m_Tokenizer.ttype == StreamTokenizer.TT_WORD)&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">379&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        && (m_Tokenizer.sval.equals("?"))) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>380&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Tokenizer.ttype = '?';</div>
+<div>381&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>382&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>383&emsp;&emsp;</div>
+<div>384&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>385&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Gets index, checking for a premature and of line.</div>
+<div>386&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>387&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if it finds a premature end of line</div>
+<div>388&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>389&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void getIndex() throws IOException {</div>
+<div style="background-color:limegreen;">390&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Tokenizer.nextToken() == StreamTokenizer.TT_EOL) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>391&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        errorMessage("premature end of line");</div>
+<div>392&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div style="background-color:limegreen;">393&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Tokenizer.ttype == StreamTokenizer.TT_EOF) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>394&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        errorMessage("premature end of file");</div>
+<div>395&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>396&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>397&emsp;&emsp;</div>
+<div>398&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>399&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Gets token and checks if its end of line.</div>
+<div>400&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>401&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param endOfFileOk whether EOF is OK</div>
+<div>402&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if it doesn't find an end of line</div>
+<div>403&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>404&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void getLastToken(boolean endOfFileOk) throws IOException {</div>
+<div style="background-color:limegreen;">405&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if ((m_Tokenizer.nextToken() != StreamTokenizer.TT_EOL)&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>406&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        && ((m_Tokenizer.ttype != StreamTokenizer.TT_EOF) || !endOfFileOk)) {</div>
+<div>407&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        errorMessage("end of line expected");</div>
+<div>408&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>409&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>410&emsp;&emsp;</div>
+<div>411&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>412&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Gets the value of an instance's weight (if one exists)</div>
+<div>413&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>414&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the value of the instance's weight, or NaN if no weight has been</div>
+<div>415&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *         supplied in the file</div>
+<div>416&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>417&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected double getInstanceWeight() throws IOException {</div>
+<div>418&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double weight = Double.NaN;</div>
+<div>419&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Tokenizer.nextToken();</div>
+<div style="background-color:limegreen;">420&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Tokenizer.ttype == StreamTokenizer.TT_EOL&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>421&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        || m_Tokenizer.ttype == StreamTokenizer.TT_EOF) {</div>
+<div>422&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return weight;</div>
+<div>423&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>424&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // see if we can read an instance weight</div>
+<div>425&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // m_Tokenizer.pushBack();</div>
+<div style="background-color:limegreen;">426&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Tokenizer.ttype == '{') {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>427&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Tokenizer.nextToken();</div>
+<div>428&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String weightS = m_Tokenizer.sval;</div>
+<div>429&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // try to parse weight as a double</div>
+<div>430&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>431&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          weight = Double.parseDouble(weightS);</div>
+<div>432&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (NumberFormatException e) {</div>
+<div>433&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // quietly ignore</div>
+<div>434&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          return weight;</div>
+<div>435&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>436&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // see if we have the closing brace</div>
+<div>437&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Tokenizer.nextToken();</div>
+<div style="background-color:limegreen;">438&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_Tokenizer.ttype != '}') {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>439&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          errorMessage("Problem reading instance weight");</div>
+<div>440&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>441&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>442&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return weight;</div>
+<div>443&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>444&emsp;&emsp;</div>
+<div>445&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>446&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Gets next token, checking for a premature and of line.</div>
+<div>447&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>448&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if it finds a premature end of line</div>
+<div>449&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>450&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void getNextToken() throws IOException {</div>
+<div style="background-color:limegreen;">451&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Tokenizer.nextToken() == StreamTokenizer.TT_EOL) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>452&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        errorMessage("premature end of line");</div>
+<div>453&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div style="background-color:limegreen;">454&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Tokenizer.ttype == StreamTokenizer.TT_EOF) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>455&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        errorMessage("premature end of file");</div>
+<div style="background-color:limegreen;">456&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      } else if ((m_Tokenizer.ttype == '\'') || (m_Tokenizer.ttype == '"')) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>457&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Tokenizer.ttype = StreamTokenizer.TT_WORD;</div>
+<div style="background-color:limegreen;">458&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      } else if ((m_Tokenizer.ttype == StreamTokenizer.TT_WORD)&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">459&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        && (m_Tokenizer.sval.equals("?"))) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>460&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Tokenizer.ttype = '?';</div>
+<div>461&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>462&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>463&emsp;&emsp;</div>
+<div>464&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>465&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Initializes the StreamTokenizer used for reading the ARFF file.</div>
+<div>466&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>467&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void initTokenizer() {</div>
+<div>468&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Tokenizer.resetSyntax();</div>
+<div>469&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Tokenizer.whitespaceChars(0, ' ');</div>
+<div>470&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Tokenizer.wordChars(' ' + 1, '\u00FF');</div>
+<div style="background-color:limegreen;">471&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_fieldSeparator != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>472&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Tokenizer.whitespaceChars(m_fieldSeparator.charAt(0),</div>
+<div>473&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_fieldSeparator.charAt(0));</div>
+<div>474&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>475&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Tokenizer.whitespaceChars(',', ',');</div>
+<div>476&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>477&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Tokenizer.commentChar('%');</div>
+<div style="background-color:limegreen;">478&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_enclosures != null && m_enclosures.size() > 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">479&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for (String e : m_enclosures) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>480&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_Tokenizer.quoteChar(e.charAt(0));</div>
+<div>481&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>482&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>483&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Tokenizer.quoteChar('"');</div>
+<div>484&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Tokenizer.quoteChar('\'');</div>
+<div>485&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>486&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Tokenizer.ordinaryChar('{');</div>
+<div>487&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Tokenizer.ordinaryChar('}');</div>
+<div>488&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Tokenizer.eolIsSignificant(true);</div>
+<div>489&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>490&emsp;&emsp;</div>
+<div>491&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>492&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Reads a single instance using the tokenizer and returns it.</div>
+<div>493&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>494&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param structure the dataset header information, will get updated in case</div>
+<div>495&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          of string or relational attributes</div>
+<div>496&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return null if end of file has been reached</div>
+<div>497&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if the information is not read successfully</div>
+<div>498&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>499&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Instance readInstance(Instances structure) throws IOException {</div>
+<div>500&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return readInstance(structure, true);</div>
+<div>501&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>502&emsp;&emsp;</div>
+<div>503&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>504&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Reads a single instance using the tokenizer and returns it.</div>
+<div>505&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>506&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param structure the dataset header information, will get updated in case</div>
+<div>507&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          of string or relational attributes</div>
+<div>508&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param flag if method should test for carriage return after each instance</div>
+<div>509&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return null if end of file has been reached</div>
+<div>510&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if the information is not read successfully</div>
+<div>511&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>512&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Instance readInstance(Instances structure, boolean flag)</div>
+<div>513&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws IOException {</div>
+<div>514&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return getInstance(structure, flag);</div>
+<div>515&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>516&emsp;&emsp;</div>
+<div>517&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>518&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Reads a single instance using the tokenizer and returns it.</div>
+<div>519&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>520&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param structure the dataset header information, will get updated in case</div>
+<div>521&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          of string or relational attributes</div>
+<div>522&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param flag if method should test for carriage return after each instance</div>
+<div>523&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return null if end of file has been reached</div>
+<div>524&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if the information is not read successfully</div>
+<div>525&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>526&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Instance getInstance(Instances structure, boolean flag)</div>
+<div>527&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throws IOException {</div>
+<div>528&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Data = structure;</div>
+<div>529&emsp;&emsp;</div>
+<div>530&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Check if any attributes have been declared.</div>
+<div style="background-color:limegreen;">531&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Data.numAttributes() == 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>532&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        errorMessage("no header information available");</div>
+<div>533&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>534&emsp;&emsp;</div>
+<div>535&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Check if end of file reached.</div>
+<div>536&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getFirstToken();</div>
+<div style="background-color:limegreen;">537&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Tokenizer.ttype == StreamTokenizer.TT_EOF) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>538&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return null;</div>
+<div>539&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>540&emsp;&emsp;</div>
+<div>541&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Parse instance</div>
+<div style="background-color:limegreen;">542&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Tokenizer.ttype == '{') {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>543&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return getInstanceSparse(flag);</div>
+<div>544&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>545&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return getInstanceFull(flag);</div>
+<div>546&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>547&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>548&emsp;&emsp;</div>
+<div>549&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>550&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Reads a single instance using the tokenizer and returns it.</div>
+<div>551&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>552&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param flag if method should test for carriage return after each instance</div>
+<div>553&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return null if end of file has been reached</div>
+<div>554&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if the information is not read successfully</div>
+<div>555&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>556&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Instance getInstanceSparse(boolean flag) throws IOException {</div>
+<div>557&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int valIndex, numValues = 0, maxIndex = -1;</div>
+<div>558&emsp;&emsp;</div>
+<div>559&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // if reading incrementally, and we have string values, make sure that all</div>
+<div>560&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // string attributes are initialized</div>
+<div style="background-color:limegreen;">561&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!m_batchMode && !m_retainStringValues && m_stringAttIndices != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">562&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for (int i = 0; i &#60; m_stringAttIndices.size(); i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>563&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_Data.attribute(m_stringAttIndices.get(i)).setStringValue(null);</div>
+<div>564&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>565&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>566&emsp;&emsp;</div>
+<div>567&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Get values</div>
+<div>568&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      do {</div>
+<div>569&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Get index</div>
+<div>570&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getIndex();</div>
+<div style="background-color:limegreen;">571&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_Tokenizer.ttype == '}') {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>572&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          break;</div>
+<div>573&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>574&emsp;&emsp;</div>
+<div>575&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Is index valid?</div>
+<div>576&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        try {</div>
+<div>577&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_IndicesBuffer[numValues] =</div>
+<div>578&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Integer.valueOf(m_Tokenizer.sval).intValue();</div>
+<div>579&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } catch (NumberFormatException e) {</div>
+<div>580&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          errorMessage("index number expected");</div>
+<div>581&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div style="background-color:limegreen;">582&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_IndicesBuffer[numValues] &#60;= maxIndex) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>583&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          errorMessage("indices have to be ordered");</div>
+<div>584&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div style="background-color:limegreen;">585&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if ((m_IndicesBuffer[numValues] &#60; 0)&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">586&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          || (m_IndicesBuffer[numValues] >= m_Data.numAttributes())) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>587&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          errorMessage("index out of bounds");</div>
+<div>588&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>589&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        maxIndex = m_IndicesBuffer[numValues];</div>
+<div>590&emsp;&emsp;</div>
+<div>591&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Get value;</div>
+<div>592&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getNextToken();</div>
+<div>593&emsp;&emsp;</div>
+<div>594&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Check if value is missing.</div>
+<div style="background-color:limegreen;">595&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_Tokenizer.ttype == '?') {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>596&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_ValueBuffer[numValues] = Utils.missingValue();</div>
+<div>597&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>598&emsp;&emsp;</div>
+<div>599&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // Check if token is valid.</div>
+<div style="background-color:limegreen;">600&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (m_Tokenizer.ttype != StreamTokenizer.TT_WORD) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>601&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            errorMessage("not a valid value");</div>
+<div>602&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div style="background-color:limegreen;">603&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          switch (m_Data.attribute(m_IndicesBuffer[numValues]).type()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>604&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          case Attribute.NOMINAL:</div>
+<div>605&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // Check if value appears in header.</div>
+<div>606&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            valIndex =</div>
+<div>607&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              m_Data.attribute(m_IndicesBuffer[numValues]).indexOfValue(</div>
+<div>608&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                m_Tokenizer.sval);</div>
+<div style="background-color:limegreen;">609&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (valIndex == -1) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>610&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              errorMessage("nominal value not declared in header");</div>
+<div>611&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>612&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_ValueBuffer[numValues] = valIndex;</div>
+<div>613&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>614&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          case Attribute.NUMERIC:</div>
+<div>615&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // Check if value is really a number.</div>
+<div>616&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            try {</div>
+<div>617&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              m_ValueBuffer[numValues] =</div>
+<div>618&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                Double.valueOf(m_Tokenizer.sval).doubleValue();</div>
+<div>619&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } catch (NumberFormatException e) {</div>
+<div>620&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              errorMessage("number expected");</div>
+<div>621&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>622&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>623&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          case Attribute.STRING:</div>
+<div style="background-color:limegreen;">624&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (m_batchMode || m_retainStringValues) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>625&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              m_ValueBuffer[numValues] =</div>
+<div>626&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                m_Data.attribute(m_IndicesBuffer[numValues]).addStringValue(</div>
+<div>627&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  m_Tokenizer.sval);</div>
+<div>628&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } else {</div>
+<div>629&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              m_ValueBuffer[numValues] = 0;</div>
+<div>630&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              m_Data.attribute(m_IndicesBuffer[numValues]).addStringValue(</div>
+<div>631&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                m_Tokenizer.sval);</div>
+<div>632&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>633&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>634&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          case Attribute.DATE:</div>
+<div>635&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            try {</div>
+<div>636&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              m_ValueBuffer[numValues] =</div>
+<div>637&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                m_Data.attribute(m_IndicesBuffer[numValues]).parseDate(</div>
+<div>638&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  m_Tokenizer.sval);</div>
+<div>639&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } catch (ParseException e) {</div>
+<div>640&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              errorMessage("unparseable date: " + m_Tokenizer.sval);</div>
+<div>641&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>642&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>643&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          case Attribute.RELATIONAL:</div>
+<div>644&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            try {</div>
+<div>645&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              ArffReader arff =</div>
+<div>646&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                new ArffReader(new StringReader(m_Tokenizer.sval), m_Data</div>
+<div>647&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  .attribute(m_IndicesBuffer[numValues]).relation(), 0);</div>
+<div>648&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              Instances data = arff.getData();</div>
+<div>649&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              m_ValueBuffer[numValues] =</div>
+<div>650&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                m_Data.attribute(m_IndicesBuffer[numValues]).addRelation(data);</div>
+<div>651&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } catch (Exception e) {</div>
+<div>652&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              throw new IOException(e.toString() + " of line " + getLineNo());</div>
+<div>653&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>654&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>655&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          default:</div>
+<div>656&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            errorMessage("unknown attribute type in column "</div>
+<div>657&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              + m_IndicesBuffer[numValues]);</div>
+<div>658&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>659&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>660&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        numValues++;</div>
+<div>661&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } while (true);</div>
+<div>662&emsp;&emsp;</div>
+<div>663&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double weight = 1.0;</div>
+<div style="background-color:limegreen;">664&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (flag) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>665&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // check for an instance weight</div>
+<div>666&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        weight = getInstanceWeight();</div>
+<div style="background-color:limegreen;">667&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!Double.isNaN(weight)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>668&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          getLastToken(true);</div>
+<div>669&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>670&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          weight = 1.0;</div>
+<div>671&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>672&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>673&emsp;&emsp;</div>
+<div>674&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Add instance to dataset</div>
+<div>675&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] tempValues = new double[numValues];</div>
+<div>676&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int[] tempIndices = new int[numValues];</div>
+<div>677&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.arraycopy(m_ValueBuffer, 0, tempValues, 0, numValues);</div>
+<div>678&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      System.arraycopy(m_IndicesBuffer, 0, tempIndices, 0, numValues);</div>
+<div>679&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instance inst =</div>
+<div>680&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        new SparseInstance(weight, tempValues, tempIndices,</div>
+<div>681&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          m_Data.numAttributes());</div>
+<div>682&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      inst.setDataset(m_Data);</div>
+<div>683&emsp;&emsp;</div>
+<div>684&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return inst;</div>
+<div>685&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>686&emsp;&emsp;</div>
+<div>687&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>688&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Reads a single instance using the tokenizer and returns it.</div>
+<div>689&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>690&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param flag if method should test for carriage return after each instance</div>
+<div>691&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return null if end of file has been reached</div>
+<div>692&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if the information is not read successfully</div>
+<div>693&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>694&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected Instance getInstanceFull(boolean flag) throws IOException {</div>
+<div>695&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double[] instance = new double[m_Data.numAttributes()];</div>
+<div>696&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      int index;</div>
+<div>697&emsp;&emsp;</div>
+<div>698&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Get values for all attributes.</div>
+<div style="background-color:limegreen;">699&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      for (int i = 0; i &#60; m_Data.numAttributes(); i++) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>700&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Get next token</div>
+<div style="background-color:limegreen;">701&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (i > 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>702&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          getNextToken();</div>
+<div>703&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>704&emsp;&emsp;</div>
+<div>705&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Check if value is missing.</div>
+<div style="background-color:limegreen;">706&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_Tokenizer.ttype == '?') {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>707&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          instance[i] = Utils.missingValue();</div>
+<div>708&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>709&emsp;&emsp;</div>
+<div>710&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // Check if token is valid.</div>
+<div style="background-color:limegreen;">711&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (m_Tokenizer.ttype != StreamTokenizer.TT_WORD) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>712&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            errorMessage("not a valid value");</div>
+<div>713&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div style="background-color:limegreen;">714&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          switch (m_Data.attribute(i).type()) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>715&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          case Attribute.NOMINAL:</div>
+<div>716&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // Check if value appears in header.</div>
+<div>717&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            index = m_Data.attribute(i).indexOfValue(m_Tokenizer.sval);</div>
+<div style="background-color:limegreen;">718&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (index == -1) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>719&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              errorMessage("nominal value not declared in header");</div>
+<div>720&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>721&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            instance[i] = index;</div>
+<div>722&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>723&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          case Attribute.NUMERIC:</div>
+<div>724&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            // Check if value is really a number.</div>
+<div>725&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            try {</div>
+<div>726&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              instance[i] = Double.valueOf(m_Tokenizer.sval).doubleValue();</div>
+<div>727&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } catch (NumberFormatException e) {</div>
+<div>728&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              errorMessage("number expected");</div>
+<div>729&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>730&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>731&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          case Attribute.STRING:</div>
+<div style="background-color:limegreen;">732&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (m_batchMode || m_retainStringValues) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>733&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              instance[i] =</div>
+<div>734&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                m_Data.attribute(i).addStringValue(m_Tokenizer.sval);</div>
+<div>735&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } else {</div>
+<div>736&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              instance[i] = 0;</div>
+<div>737&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              m_Data.attribute(i).setStringValue(m_Tokenizer.sval);</div>
+<div>738&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>739&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>740&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          case Attribute.DATE:</div>
+<div>741&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            try {</div>
+<div>742&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              instance[i] = m_Data.attribute(i).parseDate(m_Tokenizer.sval);</div>
+<div>743&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } catch (ParseException e) {</div>
+<div>744&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              errorMessage("unparseable date: " + m_Tokenizer.sval);</div>
+<div>745&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>746&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>747&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          case Attribute.RELATIONAL:</div>
+<div>748&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            try {</div>
+<div>749&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              ArffReader arff =</div>
+<div>750&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                new ArffReader(new StringReader(m_Tokenizer.sval), m_Data</div>
+<div>751&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  .attribute(i).relation(), 0);</div>
+<div>752&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              Instances data = arff.getData();</div>
+<div>753&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              instance[i] = m_Data.attribute(i).addRelation(data);</div>
+<div>754&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } catch (Exception e) {</div>
+<div>755&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              throw new IOException(e.toString() + " of line " + getLineNo());</div>
+<div>756&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>757&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            break;</div>
+<div>758&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          default:</div>
+<div>759&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            errorMessage("unknown attribute type in column " + i);</div>
+<div>760&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>761&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>762&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>763&emsp;&emsp;</div>
+<div>764&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      double weight = 1.0;</div>
+<div style="background-color:limegreen;">765&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (flag) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>766&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // check for an instance weight</div>
+<div>767&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        weight = getInstanceWeight();</div>
+<div style="background-color:limegreen;">768&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!Double.isNaN(weight)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>769&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          getLastToken(true);</div>
+<div>770&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>771&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          weight = 1.0;</div>
+<div>772&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>773&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>774&emsp;&emsp;</div>
+<div>775&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Add instance to dataset</div>
+<div>776&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instance inst = new DenseInstance(weight, instance);</div>
+<div>777&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      inst.setDataset(m_Data);</div>
+<div>778&emsp;&emsp;</div>
+<div>779&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return inst;</div>
+<div>780&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>781&emsp;&emsp;</div>
+<div>782&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>783&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Reads and stores header of an ARFF file.</div>
+<div>784&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>785&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param capacity the number of instances to reserve in the data structure</div>
+<div>786&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if the information is not read successfully</div>
+<div>787&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>788&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void readHeader(int capacity) throws IOException {</div>
+<div>789&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Lines = 0;</div>
+<div>790&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String relationName = "";</div>
+<div>791&emsp;&emsp;</div>
+<div>792&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Get name of relation.</div>
+<div>793&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getFirstToken();</div>
+<div style="background-color:limegreen;">794&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Tokenizer.ttype == StreamTokenizer.TT_EOF) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>795&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        errorMessage("premature end of file");</div>
+<div>796&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div style="background-color:limegreen;">797&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (Instances.ARFF_RELATION.equalsIgnoreCase(m_Tokenizer.sval)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>798&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getNextToken();</div>
+<div>799&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        relationName = m_Tokenizer.sval;</div>
+<div>800&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getLastToken(false);</div>
+<div>801&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>802&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        errorMessage("keyword " + Instances.ARFF_RELATION + " expected");</div>
+<div>803&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>804&emsp;&emsp;</div>
+<div>805&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Create vectors to hold information temporarily.</div>
+<div>806&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ArrayList&#60;Attribute> attributes = new ArrayList&#60;Attribute>();</div>
+<div>807&emsp;&emsp;</div>
+<div>808&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Get attribute declarations.</div>
+<div>809&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getFirstToken();</div>
+<div style="background-color:limegreen;">810&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Tokenizer.ttype == StreamTokenizer.TT_EOF) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>811&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        errorMessage("premature end of file");</div>
+<div>812&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>813&emsp;&emsp;</div>
+<div style="background-color:limegreen;">814&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      while (Attribute.ARFF_ATTRIBUTE.equalsIgnoreCase(m_Tokenizer.sval)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>815&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        attributes = parseAttribute(attributes);</div>
+<div>816&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>817&emsp;&emsp;</div>
+<div>818&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Check if data part follows. We can't easily check for EOL.</div>
+<div style="background-color:limegreen;">819&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (!Instances.ARFF_DATA.equalsIgnoreCase(m_Tokenizer.sval)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>820&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        errorMessage("keyword " + Instances.ARFF_DATA + " expected");</div>
+<div>821&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>822&emsp;&emsp;</div>
+<div>823&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Check if any attributes have been declared.</div>
+<div style="background-color:limegreen;">824&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (attributes.size() == 0) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>825&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        errorMessage("no attributes declared");</div>
+<div>826&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>827&emsp;&emsp;</div>
+<div>828&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Data = new Instances(relationName, attributes, capacity);</div>
+<div>829&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>830&emsp;&emsp;</div>
+<div>831&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>832&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Parses the attribute declaration.</div>
+<div>833&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>834&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param attributes the current attributes vector</div>
+<div>835&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the new attributes vector</div>
+<div>836&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException if the information is not read successfully</div>
+<div>837&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>838&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected ArrayList&#60;Attribute> parseAttribute(</div>
+<div>839&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ArrayList&#60;Attribute> attributes) throws IOException {</div>
+<div>840&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      String attributeName;</div>
+<div>841&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      ArrayList&#60;String> attributeValues;</div>
+<div>842&emsp;&emsp;</div>
+<div>843&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Get attribute name.</div>
+<div>844&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getNextToken();</div>
+<div>845&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      attributeName = m_Tokenizer.sval;</div>
+<div>846&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getNextToken();</div>
+<div>847&emsp;&emsp;</div>
+<div>848&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Check if attribute is nominal.</div>
+<div style="background-color:limegreen;">849&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Tokenizer.ttype == StreamTokenizer.TT_WORD) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>850&emsp;&emsp;</div>
+<div>851&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Attribute is real, integer, or string.</div>
+<div style="background-color:limegreen;">852&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_Tokenizer.sval.equalsIgnoreCase(Attribute.ARFF_ATTRIBUTE_REAL)&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>853&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          || m_Tokenizer.sval</div>
+<div style="background-color:limegreen;">854&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            .equalsIgnoreCase(Attribute.ARFF_ATTRIBUTE_INTEGER)&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>855&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          || m_Tokenizer.sval</div>
+<div style="background-color:limegreen;">856&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            .equalsIgnoreCase(Attribute.ARFF_ATTRIBUTE_NUMERIC)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>857&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          attributes.add(new Attribute(attributeName, attributes.size()));</div>
+<div>858&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          readTillEOL();</div>
+<div>859&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else if (m_Tokenizer.sval</div>
+<div style="background-color:limegreen;">860&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          .equalsIgnoreCase(Attribute.ARFF_ATTRIBUTE_STRING)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>861&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          attributes.add(new Attribute(attributeName, (ArrayList&#60;String>) null,</div>
+<div>862&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            attributes.size()));</div>
+<div>863&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          readTillEOL();</div>
+<div>864&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else if (m_Tokenizer.sval</div>
+<div style="background-color:limegreen;">865&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          .equalsIgnoreCase(Attribute.ARFF_ATTRIBUTE_DATE)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>866&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          String format = null;</div>
+<div style="background-color:limegreen;">867&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (m_Tokenizer.nextToken() != StreamTokenizer.TT_EOL) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">868&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if ((m_Tokenizer.ttype != StreamTokenizer.TT_WORD)&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>869&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              && (m_Tokenizer.ttype != '\'') && (m_Tokenizer.ttype != '\"')) {</div>
+<div>870&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              errorMessage("not a valid date format");</div>
+<div>871&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>872&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            format = m_Tokenizer.sval;</div>
+<div>873&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            readTillEOL();</div>
+<div>874&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>875&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            m_Tokenizer.pushBack();</div>
+<div>876&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>877&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          attributes</div>
+<div>878&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            .add(new Attribute(attributeName, format, attributes.size()));</div>
+<div>879&emsp;&emsp;</div>
+<div>880&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else if (m_Tokenizer.sval</div>
+<div style="background-color:limegreen;">881&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          .equalsIgnoreCase(Attribute.ARFF_ATTRIBUTE_RELATIONAL)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>882&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          readTillEOL();</div>
+<div>883&emsp;&emsp;</div>
+<div>884&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // Read attributes for subrelation</div>
+<div>885&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // First, save current set of attributes</div>
+<div>886&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          ArrayList&#60;Attribute> atts = attributes;</div>
+<div>887&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          attributes = new ArrayList&#60;Attribute>();</div>
+<div>888&emsp;&emsp;</div>
+<div>889&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // Now, read attributes until we hit end of declaration of relational</div>
+<div>890&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // value</div>
+<div>891&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          getFirstToken();</div>
+<div style="background-color:limegreen;">892&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (m_Tokenizer.ttype == StreamTokenizer.TT_EOF) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>893&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            errorMessage("premature end of file");</div>
+<div>894&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>895&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          do {</div>
+<div style="background-color:limegreen;">896&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (Attribute.ARFF_ATTRIBUTE.equalsIgnoreCase(m_Tokenizer.sval)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>897&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              attributes = parseAttribute(attributes);</div>
+<div>898&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } else if (Attribute.ARFF_END_SUBRELATION</div>
+<div style="background-color:limegreen;">899&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>              .equalsIgnoreCase(m_Tokenizer.sval)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>900&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              getNextToken();</div>
+<div style="background-color:limegreen;">901&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>              if (!attributeName.equalsIgnoreCase(m_Tokenizer.sval)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>902&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                errorMessage("declaration of subrelation " + attributeName</div>
+<div>903&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                  + " must be terminated by " + "@end " + attributeName);</div>
+<div>904&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              }</div>
+<div>905&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              break;</div>
+<div>906&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            } else {</div>
+<div>907&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;              errorMessage("declaration of subrelation " + attributeName</div>
+<div>908&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                + " must be terminated by " + "@end " + attributeName);</div>
+<div>909&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>910&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } while (true);</div>
+<div>911&emsp;&emsp;</div>
+<div>912&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          // Make relation and restore original set of attributes</div>
+<div>913&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          Instances relation = new Instances(attributeName, attributes, 0);</div>
+<div>914&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          attributes = atts;</div>
+<div>915&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          attributes.add(new Attribute(attributeName, relation, attributes</div>
+<div>916&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            .size()));</div>
+<div>917&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>918&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          errorMessage("no valid attribute type or invalid " + "enumeration");</div>
+<div>919&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>920&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } else {</div>
+<div>921&emsp;&emsp;</div>
+<div>922&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Attribute is nominal.</div>
+<div>923&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        attributeValues = new ArrayList&#60;String>();</div>
+<div>924&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_Tokenizer.pushBack();</div>
+<div>925&emsp;&emsp;</div>
+<div>926&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // Get values for nominal attribute.</div>
+<div style="background-color:limegreen;">927&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (m_Tokenizer.nextToken() != '{') {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>928&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          errorMessage("{ expected at beginning of enumeration");</div>
+<div>929&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div style="background-color:limegreen;">930&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        while (m_Tokenizer.nextToken() != '}') {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">931&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          if (m_Tokenizer.ttype == StreamTokenizer.TT_EOL) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>932&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            errorMessage("} expected at end of enumeration");</div>
+<div>933&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          } else {</div>
+<div>934&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            attributeValues.add(m_Tokenizer.sval);</div>
+<div>935&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          }</div>
+<div>936&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>937&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        attributes.add(new Attribute(attributeName, attributeValues, attributes</div>
+<div>938&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          .size()));</div>
+<div>939&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>940&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getLastToken(false);</div>
+<div>941&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      getFirstToken();</div>
+<div style="background-color:limegreen;">942&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_Tokenizer.ttype == StreamTokenizer.TT_EOF) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>943&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        errorMessage("premature end of file");</div>
+<div>944&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>945&emsp;&emsp;</div>
+<div>946&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return attributes;</div>
+<div>947&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>948&emsp;&emsp;</div>
+<div>949&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>950&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Reads and skips all tokens before next end of line token.</div>
+<div>951&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>952&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @throws IOException in case something goes wrong</div>
+<div>953&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>954&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    protected void readTillEOL() throws IOException {</div>
+<div style="background-color:limegreen;">955&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      while (m_Tokenizer.nextToken() != StreamTokenizer.TT_EOL) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>956&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>957&emsp;&emsp;</div>
+<div>958&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_Tokenizer.pushBack();</div>
+<div>959&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>960&emsp;&emsp;</div>
+<div>961&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>962&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the header format</div>
+<div>963&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>964&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the header format</div>
+<div>965&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>966&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Instances getStructure() {</div>
+<div>967&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return new Instances(m_Data, 0);</div>
+<div>968&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>969&emsp;&emsp;</div>
+<div>970&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>971&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the data that was read</div>
+<div>972&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>973&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the data</div>
+<div>974&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>975&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public Instances getData() {</div>
+<div>976&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_Data;</div>
+<div>977&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>978&emsp;&emsp;</div>
+<div>979&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>980&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Set whether to retain the values of string attributes in memory (in the</div>
+<div>981&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * header) when reading incrementally.</div>
+<div>982&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>983&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param retain true if string values are to be retained in memory when</div>
+<div>984&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *          reading incrementally</div>
+<div>985&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>986&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void setRetainStringValues(boolean retain) {</div>
+<div>987&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      m_retainStringValues = retain;</div>
+<div>988&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>989&emsp;&emsp;</div>
+<div>990&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>991&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Get whether to retain the values of string attributes in memory (in the</div>
+<div>992&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * header) when reading incrementally.</div>
+<div>993&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>994&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return true if string values are to be retained in memory when reading</div>
+<div>995&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *         incrementally</div>
+<div>996&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>997&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public boolean getRetainStringValues() {</div>
+<div>998&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return m_retainStringValues;</div>
+<div>999&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1000&emsp;&emsp;</div>
+<div>1001&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>1002&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Returns the revision string.</div>
+<div>1003&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * </div>
+<div>1004&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @return the revision</div>
+<div>1005&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>1006&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    @Override</div>
+<div>1007&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public String getRevision() {</div>
+<div>1008&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      return RevisionUtils.extract("$Revision: 11506 $");</div>
+<div>1009&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1010&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1011&emsp;&emsp;</div>
+<div>1012&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1013&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns a string describing this Loader</div>
+<div>1014&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1015&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a description of the Loader suitable for displaying in the</div>
+<div>1016&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         explorer/experimenter gui</div>
+<div>1017&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1018&emsp;&emsp;&nbsp;&nbsp;  public String globalInfo() {</div>
+<div>1019&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return "Reads a source that is in arff (attribute relation file format) "</div>
+<div>1020&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      + "format. ";</div>
+<div>1021&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1022&emsp;&emsp;</div>
+<div>1023&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1024&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Tool tip text for this property</div>
+<div>1025&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1026&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the tool tip for this property</div>
+<div>1027&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1028&emsp;&emsp;&nbsp;&nbsp;  public String retainStringValsTipText() {</div>
+<div>1029&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return "If true then the values of string attributes are "</div>
+<div>1030&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      + "retained in memory when reading incrementally. Leave this "</div>
+<div>1031&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      + "set to false when using incremental classifiers in the "</div>
+<div>1032&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      + "Knowledge Flow.";</div>
+<div>1033&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1034&emsp;&emsp;</div>
+<div>1035&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1036&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Set whether to retain the values of string attributes in memory (in the</div>
+<div>1037&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * header) when reading incrementally.</div>
+<div>1038&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1039&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param retain true if string values are to be retained in memory when</div>
+<div>1040&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          reading incrementally</div>
+<div>1041&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1042&emsp;&emsp;&nbsp;&nbsp;  public void setRetainStringVals(boolean retain) {</div>
+<div>1043&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_retainStringVals = retain;</div>
+<div>1044&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1045&emsp;&emsp;</div>
+<div>1046&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1047&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get whether to retain the values of string attributes in memory (in the</div>
+<div>1048&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * header) when reading incrementally.</div>
+<div>1049&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1050&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return true if string values are to be retained in memory when reading</div>
+<div>1051&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         incrementally</div>
+<div>1052&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1053&emsp;&emsp;&nbsp;&nbsp;  public boolean getRetainStringVals() {</div>
+<div>1054&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_retainStringVals;</div>
+<div>1055&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1056&emsp;&emsp;</div>
+<div>1057&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1058&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Get the file extension used for arff files</div>
+<div>1059&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1060&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the file extension</div>
+<div>1061&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1062&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1063&emsp;&emsp;&nbsp;&nbsp;  public String getFileExtension() {</div>
+<div>1064&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return FILE_EXTENSION;</div>
+<div>1065&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1066&emsp;&emsp;</div>
+<div>1067&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1068&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Gets all the file extensions used for this type of file</div>
+<div>1069&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1070&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the file extensions</div>
+<div>1071&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1072&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1073&emsp;&emsp;&nbsp;&nbsp;  public String[] getFileExtensions() {</div>
+<div>1074&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return new String[] { FILE_EXTENSION, FILE_EXTENSION_COMPRESSED };</div>
+<div>1075&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1076&emsp;&emsp;</div>
+<div>1077&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1078&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns a description of the file type.</div>
+<div>1079&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1080&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return a short file description</div>
+<div>1081&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1082&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1083&emsp;&emsp;&nbsp;&nbsp;  public String getFileDescription() {</div>
+<div>1084&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return "Arff data files";</div>
+<div>1085&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1086&emsp;&emsp;</div>
+<div>1087&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1088&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Resets the Loader ready to read a new data set or the same data set again.</div>
+<div>1089&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1090&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws IOException if something goes wrong</div>
+<div>1091&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1092&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1093&emsp;&emsp;&nbsp;&nbsp;  public void reset() throws IOException {</div>
+<div>1094&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_structure = null;</div>
+<div>1095&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_ArffReader = null;</div>
+<div>1096&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    setRetrieval(NONE);</div>
+<div>1097&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1098&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_File != null && !(new File(m_File).isDirectory())) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1099&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      setFile(new File(m_File));</div>
+<div style="background-color:limegreen;">1100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    } else if (m_URL != null && !m_URL.equals("http://")) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      setURL(m_URL);</div>
+<div>1102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1103&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1104&emsp;&emsp;</div>
+<div>1105&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1106&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Resets the Loader object and sets the source of the data set to be the</div>
+<div>1107&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * supplied url.</div>
+<div>1108&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1109&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param url the source url.</div>
+<div>1110&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws IOException if an error occurs</div>
+<div>1111&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1112&emsp;&emsp;&nbsp;&nbsp;  public void setSource(URL url) throws IOException {</div>
+<div>1113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_structure = null;</div>
+<div>1114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    setRetrieval(NONE);</div>
+<div>1115&emsp;&emsp;</div>
+<div>1116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    setSource(url.openStream());</div>
+<div>1117&emsp;&emsp;</div>
+<div>1118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_URL = url.toString();</div>
+<div>1119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // make sure that the file is null so that any calls to</div>
+<div>1120&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    // reset() work properly</div>
+<div>1121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_File = null;</div>
+<div>1122&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1123&emsp;&emsp;</div>
+<div>1124&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1125&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * get the File specified as the source</div>
+<div>1126&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1127&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the source file</div>
+<div>1128&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1129&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1130&emsp;&emsp;&nbsp;&nbsp;  public File retrieveFile() {</div>
+<div>1131&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return new File(m_File);</div>
+<div>1132&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1133&emsp;&emsp;</div>
+<div>1134&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1135&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * sets the source File</div>
+<div>1136&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1137&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param file the source file</div>
+<div>1138&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws IOException if an error occurs</div>
+<div>1139&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1140&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1141&emsp;&emsp;&nbsp;&nbsp;  public void setFile(File file) throws IOException {</div>
+<div>1142&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_File = file.getPath();</div>
+<div>1143&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    setSource(file);</div>
+<div>1144&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1145&emsp;&emsp;</div>
+<div>1146&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1147&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Set the url to load from</div>
+<div>1148&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1149&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param url the url to load from</div>
+<div>1150&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws IOException if the url can't be set.</div>
+<div>1151&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1152&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1153&emsp;&emsp;&nbsp;&nbsp;  public void setURL(String url) throws IOException {</div>
+<div>1154&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_URL = url;</div>
+<div>1155&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    setSource(new URL(url));</div>
+<div>1156&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1157&emsp;&emsp;</div>
+<div>1158&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1159&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Return the current url</div>
+<div>1160&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1161&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the current url</div>
+<div>1162&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1163&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1164&emsp;&emsp;&nbsp;&nbsp;  public String retrieveURL() {</div>
+<div>1165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return m_URL;</div>
+<div>1166&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1167&emsp;&emsp;</div>
+<div>1168&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1169&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Resets the Loader object and sets the source of the data set to be the</div>
+<div>1170&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * supplied InputStream.</div>
+<div>1171&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1172&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param in the source InputStream.</div>
+<div>1173&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws IOException always thrown.</div>
+<div>1174&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1175&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1176&emsp;&emsp;&nbsp;&nbsp;  public void setSource(InputStream in) throws IOException {</div>
+<div>1177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_File = (new File(System.getProperty("user.dir"))).getAbsolutePath();</div>
+<div>1178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_URL = "http://";</div>
+<div>1179&emsp;&emsp;</div>
+<div>1180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_sourceReader = new BufferedReader(new InputStreamReader(in));</div>
+<div>1181&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1182&emsp;&emsp;</div>
+<div>1183&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1184&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Determines and returns (if possible) the structure (internally the header)</div>
+<div>1185&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * of the data set as an empty set of instances.</div>
+<div>1186&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1187&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the structure of the data set as an empty set of Instances</div>
+<div>1188&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws IOException if an error occurs</div>
+<div>1189&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1190&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1191&emsp;&emsp;&nbsp;&nbsp;  public Instances getStructure() throws IOException {</div>
+<div>1192&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_structure == null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div style="background-color:limegreen;">1194&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_sourceReader == null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new IOException("No source has been specified");</div>
+<div>1196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1197&emsp;&emsp;</div>
+<div>1198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>1199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_ArffReader =</div>
+<div style="background-color:limegreen;">1200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>          new ArffReader(m_sourceReader, 1, (getRetrieval() == BATCH));&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_ArffReader.setRetainStringValues(getRetainStringVals());</div>
+<div>1202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_structure = m_ArffReader.getStructure();</div>
+<div>1203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (Exception ex) {</div>
+<div>1204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new IOException("Unable to determine structure as arff (Reason: "</div>
+<div>1205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          + ex.toString() + ").");</div>
+<div>1206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1208&emsp;&emsp;</div>
+<div>1209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return new Instances(m_structure, 0);</div>
+<div>1210&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1211&emsp;&emsp;</div>
+<div>1212&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1213&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Return the full data set. If the structure hasn't yet been determined by a</div>
+<div>1214&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * call to getStructure then method should do so before processing the rest of</div>
+<div>1215&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * the data set.</div>
+<div>1216&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1217&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the structure of the data set as an empty set of Instances</div>
+<div>1218&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws IOException if there is no source or parsing fails</div>
+<div>1219&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1220&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1221&emsp;&emsp;&nbsp;&nbsp;  public Instances getDataSet() throws IOException {</div>
+<div>1222&emsp;&emsp;</div>
+<div>1223&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instances insts = null;</div>
+<div>1224&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    try {</div>
+<div style="background-color:limegreen;">1225&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_sourceReader == null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1226&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new IOException("No source has been specified");</div>
+<div>1227&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div style="background-color:limegreen;">1228&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (getRetrieval() == INCREMENTAL) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1229&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        throw new IOException(</div>
+<div>1230&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;          "Cannot mix getting Instances in both incremental and batch modes");</div>
+<div>1231&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1232&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      setRetrieval(BATCH);</div>
+<div style="background-color:limegreen;">1233&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_structure == null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1234&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        getStructure();</div>
+<div>1235&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1236&emsp;&emsp;</div>
+<div>1237&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Read all instances</div>
+<div>1238&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      insts = new Instances(m_structure, 0);</div>
+<div>1239&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      Instance inst;</div>
+<div style="background-color:limegreen;">1240&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      while ((inst = m_ArffReader.readInstance(m_structure)) != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1241&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        insts.add(inst);</div>
+<div>1242&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1243&emsp;&emsp;</div>
+<div>1244&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      // Instances readIn = new Instances(m_structure);</div>
+<div>1245&emsp;&emsp;</div>
+<div>1246&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    } finally {</div>
+<div style="background-color:limegreen;">1247&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>      if (m_sourceReader != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1248&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // close the stream</div>
+<div>1249&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_sourceReader.close();</div>
+<div>1250&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1251&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1252&emsp;&emsp;</div>
+<div>1253&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return insts;</div>
+<div>1254&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1255&emsp;&emsp;</div>
+<div>1256&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1257&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Read the data set incrementally---get the next instance in the data set or</div>
+<div>1258&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * returns null if there are no more instances to get. If the structure hasn't</div>
+<div>1259&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * yet been determined by a call to getStructure then method should do so</div>
+<div>1260&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * before returning the next instance in the data set.</div>
+<div>1261&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1262&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param structure the dataset header information, will get updated in case</div>
+<div>1263&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *          of string or relational attributes</div>
+<div>1264&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the next instance in the data set as an Instance object or null if</div>
+<div>1265&emsp;&emsp;&nbsp;&nbsp;&nbsp;   *         there are no more instances to be read</div>
+<div>1266&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @throws IOException if there is an error during parsing</div>
+<div>1267&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1268&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1269&emsp;&emsp;&nbsp;&nbsp;  public Instance getNextInstance(Instances structure) throws IOException {</div>
+<div>1270&emsp;&emsp;</div>
+<div>1271&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    m_structure = structure;</div>
+<div>1272&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1273&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (getRetrieval() == BATCH) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1274&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      throw new IOException(</div>
+<div>1275&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        "Cannot mix getting Instances in both incremental and batch modes");</div>
+<div>1276&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1277&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    setRetrieval(INCREMENTAL);</div>
+<div>1278&emsp;&emsp;</div>
+<div>1279&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    Instance current = null;</div>
+<div style="background-color:limegreen;">1280&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if (m_sourceReader != null) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1281&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      current = m_ArffReader.readInstance(m_structure);</div>
+<div>1282&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1283&emsp;&emsp;</div>
+<div style="background-color:limegreen;">1284&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>    if ((m_sourceReader != null) && (current == null)) {&nbsp;&#8594; [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES] & [USEMDL, CONFIDENCEFACTOR, REDUCEDERRORPRUNING, BATCHSIZE, BINARYSPLITS, DONOTMAKESPLITPOINTACTUALVALUE, NUMDECIMAL, SEED, MINNUM, UNPRUNED, FOLDS, NOCHECKCAPABILITIES]</b></div>
+<div>1285&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      try {</div>
+<div>1286&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // close the stream</div>
+<div>1287&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_sourceReader.close();</div>
+<div>1288&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        m_sourceReader = null;</div>
+<div>1289&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        // reset();</div>
+<div>1290&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      } catch (Exception ex) {</div>
+<div>1291&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        ex.printStackTrace();</div>
+<div>1292&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;      }</div>
+<div>1293&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>1294&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return current;</div>
+<div>1295&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1296&emsp;&emsp;</div>
+<div>1297&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1298&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Returns the revision string.</div>
+<div>1299&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1300&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @return the revision</div>
+<div>1301&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1302&emsp;&emsp;&nbsp;&nbsp;  @Override</div>
+<div>1303&emsp;&emsp;&nbsp;&nbsp;  public String getRevision() {</div>
+<div>1304&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    return RevisionUtils.extract("$Revision: 11506 $");</div>
+<div>1305&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1306&emsp;&emsp;</div>
+<div>1307&emsp;&emsp;&nbsp;&nbsp;  /**</div>
+<div>1308&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * Main method.</div>
+<div>1309&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * </div>
+<div>1310&emsp;&emsp;&nbsp;&nbsp;&nbsp;   * @param args should contain the name of an input file.</div>
+<div>1311&emsp;&emsp;&nbsp;&nbsp;&nbsp;   */</div>
+<div>1312&emsp;&emsp;&nbsp;&nbsp;  public static void main(String[] args) {</div>
+<div>1313&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    runFileLoader(new ArffLoader(), args);</div>
+<div>1314&emsp;&emsp;&nbsp;&nbsp;  }</div>
+<div>1315&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>
