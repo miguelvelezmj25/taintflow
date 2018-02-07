@@ -1727,13 +1727,13 @@ public class AnalysisTest {
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
         infoflow.aggregateInfoflowResults(36);
-        infoflow.saveJimpleFiles();
-        infoflow.saveDotStringFiles();
-
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-counter/src";
-
-        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
-        generator.generateHTMLPage();
+//        infoflow.saveJimpleFiles();
+//        infoflow.saveDotStringFiles();
+//
+//        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-counter/src";
+//
+//        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+//        generator.generateHTMLPage();
     }
 
     @Test
@@ -1767,14 +1767,14 @@ public class AnalysisTest {
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
         infoflow.aggregateInfoflowResults(398);
-        infoflow.saveJimpleFiles();
-        infoflow.saveDotStringFiles();
-
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-optimizer/src";
-
-        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
-        generator.generateHTMLPage();
-        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+//        infoflow.saveJimpleFiles();
+//        infoflow.saveDotStringFiles();
+//
+//        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-optimizer/src";
+//
+//        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+//        generator.generateHTMLPage();
+//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
@@ -1890,14 +1890,14 @@ public class AnalysisTest {
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
         infoflow.aggregateInfoflowResults(1);
-        infoflow.saveJimpleFiles();
-        infoflow.saveDotStringFiles();
-
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/grep/src/main/java";
-
-        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
-        generator.generateHTMLPage();
-//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+//        infoflow.saveJimpleFiles();
+//        infoflow.saveDotStringFiles();
+//
+//        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/grep/src/main/java";
+//
+//        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+//        generator.generateHTMLPage();
+////        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
@@ -1931,14 +1931,14 @@ public class AnalysisTest {
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
         infoflow.aggregateInfoflowResults(1);
-        infoflow.saveJimpleFiles();
-        infoflow.saveDotStringFiles();
-
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/sort/src/main/java";
-
-        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
-        generator.generateHTMLPage();
-//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+//        infoflow.saveJimpleFiles();
+//        infoflow.saveDotStringFiles();
+//
+//        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/sort/src/main/java";
+//
+//        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+//        generator.generateHTMLPage();
+////        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
@@ -2058,14 +2058,14 @@ public class AnalysisTest {
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
         infoflow.aggregateInfoflowResults(4);
-        infoflow.saveJimpleFiles();
-        infoflow.saveDotStringFiles();
-
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/running-example/src/main/java";
-
-        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
-        generator.generateHTMLPage();
-        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+//        infoflow.saveJimpleFiles();
+//        infoflow.saveDotStringFiles();
+//
+//        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/running-example/src/main/java";
+//
+//        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+//        generator.generateHTMLPage();
+//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
@@ -2099,14 +2099,14 @@ public class AnalysisTest {
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
         infoflow.aggregateInfoflowResults(91);
-        infoflow.saveJimpleFiles();
-        infoflow.saveDotStringFiles();
-
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/prevayler/src/main/java";
-
-        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
-        generator.generateHTMLPage();
-//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+//        infoflow.saveJimpleFiles();
+//        infoflow.saveDotStringFiles();
+//
+//        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/prevayler/src/main/java";
+//
+//        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+//        generator.generateHTMLPage();
+////        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
     @Test
@@ -2298,13 +2298,13 @@ public class AnalysisTest {
 //        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
 
         infoflow.aggregateInfoflowResults(140);
-        infoflow.saveJimpleFiles();
-        infoflow.saveDotStringFiles();
-
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/kanzi/src";
-
-        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
-        generator.generateHTMLPage();
+//        infoflow.saveJimpleFiles();
+//        infoflow.saveDotStringFiles();
+//
+//        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/kanzi/src";
+//
+//        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+//        generator.generateHTMLPage();
     }
 
     @Test
@@ -3312,6 +3312,88 @@ public class AnalysisTest {
 
         // Add entry points
         String entryPoint = "<edu.cmu.cs.mvelezce.Regions24: void main(java.lang.String[])>";
+
+        List<String> entryPoints = new ArrayList<>();
+        entryPoints.add(entryPoint);
+
+        // Run
+        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint);
+//        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+//        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
+
+        infoflow.aggregateInfoflowResults(4);
+        infoflow.saveJimpleFiles();
+        infoflow.saveDotStringFiles();
+
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/dummy/src";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+    }
+
+    @Test
+    public void regions25() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/dummy/out/production/dummy");
+        AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
+
+        String systemName = "regions25";
+        TaintInfoflow infoflow = new TaintInfoflow(systemName);
+
+        // Configure analysis
+        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
+        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, false));
+
+        // Add taint wrapper
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        // Add entry points
+        String entryPoint = "<edu.cmu.cs.mvelezce.Regions25: void main(java.lang.String[])>";
+
+        List<String> entryPoints = new ArrayList<>();
+        entryPoints.add(entryPoint);
+
+        // Run
+        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint);
+//        infoflow.computeInfoflowOneSourceAtATime(AnalysisTest.appPath, AnalysisTest.libPath, entryPoint, infoflow.getSources(), infoflow.getSinks());
+//        infoflow.computeInfoflow(AnalysisTest.appPath, AnalysisTest.libPath, entryPoints, infoflow.getSources(), infoflow.getSinks());
+
+        infoflow.aggregateInfoflowResults(4);
+        infoflow.saveJimpleFiles();
+        infoflow.saveDotStringFiles();
+
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/dummy/src";
+
+        HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
+        generator.generateHTMLPage();
+//        HTMLPathGenerator.generateHTMLForSystem(root, systemName);
+    }
+
+    @Test
+    public void regions26() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
+        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/dummy/out/production/dummy");
+        AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
+
+        String systemName = "regions26";
+        TaintInfoflow infoflow = new TaintInfoflow(systemName);
+
+        // Configure analysis
+        infoflow.setConfig(AnalysisTest.infoflowConfiguration);
+        infoflow.setSootConfig(AnalysisTest.sootConfiguration);
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextSensitive, false));
+//        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitiveSourceFinder, false));
+        infoflow.setPathBuilderFactory(new DefaultPathBuilderFactory(DefaultPathBuilderFactory.PathBuilder.ContextInsensitive, false));
+
+        // Add taint wrapper
+//        EasyTaintWrapper easyWrapper = new EasyTaintWrapper(new File("src/main/java/edu/cmu/cs/mvelezce/analysis/EasyTaintWrapperSource.txt"));
+//        infoflow.setTaintWrapper(easyWrapper);
+
+        // Add entry points
+        String entryPoint = "<edu.cmu.cs.mvelezce.Regions26: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
         entryPoints.add(entryPoint);
