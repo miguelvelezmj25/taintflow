@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>DConvert.java</title>
+    <link rel="stylesheet" type="text/css" href="../../css/style.css">
+    <link href="https://fonts.googleapis.com/css?family=Roboto+Mono:400,700" rel="stylesheet">
+</head>
+<body>
+
+<div class="container">
+    <div id="code_area" class="container_0">
+<div>1&emsp;&emsp;/*</div>
+<div>2&emsp;&emsp;&nbsp; *  Copyright 2016 Patrick Favre-Bulle</div>
+<div>3&emsp;&emsp;&nbsp; *</div>
+<div>4&emsp;&emsp;&nbsp; *  Licensed under the Apache License, Version 2.0 (the "License");</div>
+<div>5&emsp;&emsp;&nbsp; *  you may not use this file except in compliance with the License.</div>
+<div>6&emsp;&emsp;&nbsp; *  You may obtain a copy of the License at</div>
+<div>7&emsp;&emsp;&nbsp; *</div>
+<div>8&emsp;&emsp;&nbsp; *      http://www.apache.org/licenses/LICENSE-2.0</div>
+<div>9&emsp;&emsp;&nbsp; *</div>
+<div>10&emsp;&emsp;&nbsp; * Unless required by applicable law or agreed to in writing, software</div>
+<div>11&emsp;&emsp;&nbsp; * distributed under the License is distributed on an "AS IS" BASIS,</div>
+<div>12&emsp;&emsp;&nbsp; * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</div>
+<div>13&emsp;&emsp;&nbsp; * See the License for the specific language governing permissions and</div>
+<div>14&emsp;&emsp;&nbsp; * limitations under the License.</div>
+<div>15&emsp;&emsp;&nbsp; */</div>
+<div>16&emsp;&emsp;</div>
+<div>17&emsp;&emsp;package at.favre.tools.dconvert;</div>
+<div>18&emsp;&emsp;</div>
+<div>19&emsp;&emsp;import at.favre.tools.dconvert.arg.Arguments;</div>
+<div>20&emsp;&emsp;import at.favre.tools.dconvert.arg.EPlatform;</div>
+<div>21&emsp;&emsp;import at.favre.tools.dconvert.converters.IPlatformConverter;</div>
+<div>22&emsp;&emsp;import at.favre.tools.dconvert.converters.postprocessing.IPostProcessor;</div>
+<div>23&emsp;&emsp;import at.favre.tools.dconvert.converters.postprocessing.MozJpegProcessor;</div>
+<div>24&emsp;&emsp;import at.favre.tools.dconvert.converters.postprocessing.PngCrushProcessor;</div>
+<div>25&emsp;&emsp;import at.favre.tools.dconvert.converters.postprocessing.WebpProcessor;</div>
+<div>26&emsp;&emsp;import at.favre.tools.dconvert.converters.scaling.ImageHandler;</div>
+<div>27&emsp;&emsp;import at.favre.tools.dconvert.converters.scaling.ScaleAlgorithm;</div>
+<div>28&emsp;&emsp;import at.favre.tools.dconvert.util.MiscUtil;</div>
+<div>29&emsp;&emsp;</div>
+<div>30&emsp;&emsp;import javax.imageio.ImageIO;</div>
+<div>31&emsp;&emsp;import javax.imageio.ImageReader;</div>
+<div>32&emsp;&emsp;import javax.imageio.ImageWriter;</div>
+<div>33&emsp;&emsp;import java.io.File;</div>
+<div>34&emsp;&emsp;import java.util.*;</div>
+<div>35&emsp;&emsp;import java.util.concurrent.CountDownLatch;</div>
+<div>36&emsp;&emsp;import java.util.concurrent.TimeUnit;</div>
+<div>37&emsp;&emsp;</div>
+<div>38&emsp;&emsp;/**</div>
+<div>39&emsp;&emsp;&nbsp; * This is the main class handling all of the converters and post processors.</div>
+<div>40&emsp;&emsp;&nbsp; * This handles the threading and orchestration of the threads.</div>
+<div>41&emsp;&emsp;&nbsp; * &#60;p></div>
+<div>42&emsp;&emsp;&nbsp; * All user interfaces will call this class to execute.</div>
+<div>43&emsp;&emsp;&nbsp; */</div>
+<div>44&emsp;&emsp;public class DConvert {</div>
+<div>45&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private CountDownLatch mainLatch;</div>
+<div>46&emsp;&emsp;</div>
+<div>47&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private HandlerCallback handlerCallback;</div>
+<div>48&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private long beginMs;</div>
+<div>49&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private StringBuilder logStringBuilder = new StringBuilder();</div>
+<div>50&emsp;&emsp;</div>
+<div>51&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    /**</div>
+<div>52&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * Starts the execution of the dconvert</div>
+<div>53&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     *</div>
+<div>54&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param args                  from user interface</div>
+<div>55&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param blockingWaitForFinish if true will block the thread until all threads are finished</div>
+<div>56&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     * @param callback              main callback</div>
+<div>57&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;     */</div>
+<div>58&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void execute(Arguments args, boolean blockingWaitForFinish, HandlerCallback callback) {</div>
+<div>59&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        beginMs = System.currentTimeMillis();</div>
+<div>60&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        handlerCallback = callback;</div>
+<div>61&emsp;&emsp;</div>
+<div>62&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        logStringBuilder.append("registered image readers:\n").append(getRegisteredImageReadersAndWriters()).append("\n");</div>
+<div>63&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        logStringBuilder.append("begin execution using ").append(args.threadCount).append(" theads\n");</div>
+<div>64&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        logStringBuilder.append("args: ").append(args).append("\n");</div>
+<div>65&emsp;&emsp;</div>
+<div style="background-color:limegreen;">66&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        if (!args.filesToProcess.isEmpty()) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>67&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            List&#60;IPlatformConverter> converters = new ArrayList&#60;>();</div>
+<div>68&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            List&#60;IPostProcessor> postProcessors = new ArrayList&#60;>();</div>
+<div>69&emsp;&emsp;</div>
+<div style="background-color:limegreen;">70&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            for (EPlatform ePlatform : args.platform) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>71&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                logStringBuilder.append("add ").append(ePlatform.getConverter().getClass().getSimpleName()).append("\n");</div>
+<div>72&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                converters.add(ePlatform.getConverter());</div>
+<div>73&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>74&emsp;&emsp;</div>
+<div style="background-color:limegreen;">75&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (args.clearDirBeforeConvert) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>76&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                logStringBuilder.append("clear out dirs before convert\n");</div>
+<div style="background-color:limegreen;">77&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                for (IPlatformConverter converter : converters) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>78&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    converter.clean(args);</div>
+<div>79&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>80&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>81&emsp;&emsp;</div>
+<div style="background-color:limegreen;">82&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (args.enablePngCrush) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>83&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                IPostProcessor postProcessor = new PngCrushProcessor();</div>
+<div style="background-color:limegreen;">84&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (postProcessor.isSupported()) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>85&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    logStringBuilder.append("add pngcrush postprocessor\n");</div>
+<div>86&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    postProcessors.add(postProcessor);</div>
+<div>87&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                } else {</div>
+<div>88&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    logStringBuilder.append("WARNING: Tool 'pngcrush' cannot be accessed. Is it set in PATH?\n");</div>
+<div>89&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>90&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div style="background-color:limegreen;">91&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (args.postConvertWebp) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>92&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                IPostProcessor postProcessor = new WebpProcessor();</div>
+<div style="background-color:limegreen;">93&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (postProcessor.isSupported()) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>94&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    logStringBuilder.append("add cwebp postprocessor\n");</div>
+<div>95&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    postProcessors.add(postProcessor);</div>
+<div>96&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                } else {</div>
+<div>97&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    logStringBuilder.append("WARNING: Tool 'cwebp' cannot be accessed. Is it set in PATH?\n");</div>
+<div>98&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>99&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div style="background-color:limegreen;">100&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (args.enableMozJpeg) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>101&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                IPostProcessor postProcessor = new MozJpegProcessor();</div>
+<div style="background-color:limegreen;">102&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (postProcessor.isSupported()) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>103&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    logStringBuilder.append("add mozJpeg postprocessor\n");</div>
+<div>104&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    postProcessors.add(postProcessor);</div>
+<div>105&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                } else {</div>
+<div>106&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    logStringBuilder.append("WARNING: Tool 'jpegtran' cannot be accessed. Is it set in PATH?\n");</div>
+<div>107&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>108&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>109&emsp;&emsp;</div>
+<div>110&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int convertJobs = args.filesToProcess.size() * converters.size();</div>
+<div>111&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            int postProcessorJobs = convertJobs * postProcessors.size();</div>
+<div>112&emsp;&emsp;</div>
+<div>113&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            float convertPercentage = (float) convertJobs / (float) (convertJobs + postProcessorJobs);</div>
+<div>114&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            float postProcessPercentage = (float) postProcessorJobs / (float) (convertJobs + postProcessorJobs);</div>
+<div>115&emsp;&emsp;</div>
+<div>116&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            mainLatch = new CountDownLatch(1);</div>
+<div>117&emsp;&emsp;</div>
+<div style="background-color:limegreen;">118&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            for (File srcFile : args.filesToProcess) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>119&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                logStringBuilder.append("add ").append(srcFile).append(" to processing queue\n");</div>
+<div>120&emsp;&emsp;</div>
+<div style="background-color:limegreen;">121&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>                if (!srcFile.exists() || !srcFile.isFile()) {&nbsp;&#8594; [HELP, VERSION] & [HELP, VERSION]</b></div>
+<div>122&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    throw new IllegalStateException("srcFile " + srcFile + " does not exist");</div>
+<div>123&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>124&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>125&emsp;&emsp;</div>
+<div>126&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            WorkerHandler.Callback cb = new MyDCConvertCallback&#60;>(handlerCallback, convertPercentage, logStringBuilder, postProcessors, args, this, postProcessPercentage);</div>
+<div>127&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            WorkerHandler wh = new WorkerHandler&#60;>(converters, args, cb);</div>
+<div>128&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            wh.start(args.filesToProcess);</div>
+<div>129&emsp;&emsp;</div>
+<div>130&emsp;&emsp;//            new WorkerHandler&#60;>(converters, args, new WorkerHandler.Callback() {</div>
+<div>131&emsp;&emsp;//                @Override</div>
+<div>132&emsp;&emsp;//                public void onProgress(float percent) {</div>
+<div>133&emsp;&emsp;//                    handlerCallback.onProgress(convertPercentage * percent);</div>
+<div>134&emsp;&emsp;//                }</div>
+<div>135&emsp;&emsp;//</div>
+<div>136&emsp;&emsp;//                @Override</div>
+<div>137&emsp;&emsp;//                public void onFinished(final int finishedJobsConverters, List&#60;File> outFiles, final StringBuilder logConverters, final List&#60;Exception> exceptionsConverters, final boolean haltedDuringProcessConverters) {</div>
+<div>138&emsp;&emsp;//                    logStringBuilder.append(logConverters);</div>
+<div>139&emsp;&emsp;//                    if (haltedDuringProcessConverters) {</div>
+<div>140&emsp;&emsp;//                        informFinished(finishedJobsConverters, exceptionsConverters, true);</div>
+<div>141&emsp;&emsp;//                    } else {</div>
+<div>142&emsp;&emsp;//                        new WorkerHandler&#60;>(postProcessors, args, new WorkerHandler.Callback() {</div>
+<div>143&emsp;&emsp;//                            @Override</div>
+<div>144&emsp;&emsp;//                            public void onProgress(float percent) {</div>
+<div>145&emsp;&emsp;//                                handlerCallback.onProgress(convertPercentage + (postProcessPercentage * percent));</div>
+<div>146&emsp;&emsp;//                            }</div>
+<div>147&emsp;&emsp;//</div>
+<div>148&emsp;&emsp;//                            @Override</div>
+<div>149&emsp;&emsp;//                            public void onFinished(int finishedJobsPostProcessors, List&#60;File> outFiles, StringBuilder log, List&#60;Exception> exceptions, boolean haltedDuringProcess) {</div>
+<div>150&emsp;&emsp;//                                exceptionsConverters.addAll(exceptions);</div>
+<div>151&emsp;&emsp;//                                logStringBuilder.append(log);</div>
+<div>152&emsp;&emsp;//                                informFinished(finishedJobsPostProcessors + finishedJobsConverters, exceptionsConverters, haltedDuringProcess);</div>
+<div>153&emsp;&emsp;//                            }</div>
+<div>154&emsp;&emsp;//                        }).start(outFiles);</div>
+<div>155&emsp;&emsp;//                    }</div>
+<div>156&emsp;&emsp;//                }</div>
+<div>157&emsp;&emsp;//            }).start(args.filesToProcess);</div>
+<div>158&emsp;&emsp;</div>
+<div style="background-color:limegreen;">159&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (blockingWaitForFinish) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>160&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                try {</div>
+<div>161&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    mainLatch.await(60, TimeUnit.MINUTES);</div>
+<div>162&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                } catch (InterruptedException e) {</div>
+<div>163&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                    e.printStackTrace();</div>
+<div>164&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                }</div>
+<div>165&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>166&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        } else {</div>
+<div>167&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            logStringBuilder.append("no files to convert\n");</div>
+<div>168&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            informFinished(0, Collections.emptyList(), false);</div>
+<div>169&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>170&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>171&emsp;&emsp;</div>
+<div>172&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public void informFinished(int finishedJobs, List&#60;Exception> exceptions, boolean haltedDuringProcess) {</div>
+<div>173&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        System.gc();</div>
+<div>174&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        printTrace();</div>
+<div>175&emsp;&emsp;//        if (handlerCallback != null) {</div>
+<div style="background-color:limegreen;">176&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            if (mainLatch != null) {&nbsp;&#8594; [HELP, DRYRUN, VERSION, HALTONERROR]</b></div>
+<div>177&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                mainLatch.countDown();</div>
+<div>178&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div style="background-color:limegreen;">179&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            for (Exception exception : exceptions) {&nbsp;&#8594; [HELP, DRYRUN, VERSION, HALTONERROR]</b></div>
+<div>180&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                logStringBuilder.append(MiscUtil.getStackTrace(exception)).append("\n");</div>
+<div>181&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>182&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            handlerCallback.onFinished(finishedJobs, exceptions, (System.currentTimeMillis() - beginMs), haltedDuringProcess, logStringBuilder.toString().trim());</div>
+<div>183&emsp;&emsp;//        }</div>
+<div>184&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>185&emsp;&emsp;</div>
+<div>186&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    public interface HandlerCallback {</div>
+<div>187&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        void onProgress(float progress);</div>
+<div>188&emsp;&emsp;</div>
+<div>189&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        void onFinished(int finishedJobs, List&#60;Exception> exceptions, long time, boolean haltedDuringProcess, String log);</div>
+<div>190&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>191&emsp;&emsp;</div>
+<div>192&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private String getRegisteredImageReadersAndWriters() {</div>
+<div>193&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        String[] formats = new String[]{"JPEG", "PNG", "TIFF", "PSD", "SVG", "BMP"};</div>
+<div>194&emsp;&emsp;</div>
+<div>195&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        StringBuilder sb = new StringBuilder();</div>
+<div style="background-color:limegreen;">196&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>        for (String format : Arrays.asList(formats)) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>197&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Iterator&#60;ImageReader> reader = ImageIO.getImageReadersByFormatName(format);</div>
+<div style="background-color:limegreen;">198&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            while (reader.hasNext()) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>199&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                ImageReader next = reader.next();</div>
+<div>200&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                sb.append("reader: ").append(next).append("\n");</div>
+<div>201&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>202&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            Iterator&#60;ImageWriter> writer = ImageIO.getImageWritersByFormatName(format);</div>
+<div style="background-color:limegreen;">203&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<b>            while (writer.hasNext()) {&nbsp;&#8594; [HELP, VERSION]</b></div>
+<div>204&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                ImageWriter next = writer.next();</div>
+<div>205&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                sb.append("writer: ").append(next).append("\n");</div>
+<div>206&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>207&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>208&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        return sb.toString();</div>
+<div>209&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>210&emsp;&emsp;</div>
+<div>211&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    private void printTrace() {</div>
+<div>212&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        if (ImageHandler.TEST_MODE) {</div>
+<div>213&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            for (Map.Entry&#60;ScaleAlgorithm, Long> entry : ImageHandler.traceMap.entrySet()) {</div>
+<div>214&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;                System.out.println(entry.getKey() + ": " + String.format(Locale.US, "%.2f", (double) entry.getValue() / 1000000.0));</div>
+<div>215&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;            }</div>
+<div>216&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;        }</div>
+<div>217&emsp;&emsp;&nbsp;&nbsp;&nbsp;&nbsp;    }</div>
+<div>218&emsp;&emsp;}</div>
+</div>
+</div>
+</body>
+</html>
