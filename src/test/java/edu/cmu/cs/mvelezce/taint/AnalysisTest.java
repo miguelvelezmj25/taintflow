@@ -1903,8 +1903,7 @@ public class AnalysisTest {
 
     @Test
     public void densityTest() throws IOException {
-//        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/dconvert/target/classes");
-        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/convert/target/classes");
+        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/density/target/classes");
         AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
 
         String systemName = "density";
@@ -1922,7 +1921,6 @@ public class AnalysisTest {
 //        infoflow.setTaintWrapper(easyWrapper);
 
         // Add entry points
-//        String entryPoint = "<tool.dconvert.Main: void main(java.lang.String[])>";
         String entryPoint = "<at.favre.tools.dconvert.Main: void main(java.lang.String[])>";
 
         List<String> entryPoints = new ArrayList<>();
@@ -1937,7 +1935,7 @@ public class AnalysisTest {
         infoflow.saveJimpleFiles();
         infoflow.saveDotStringFiles();
 
-        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/convert/src/main/java";
+        String root = "/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/density/src/main/java";
 
         HTMLOutputGenerator generator = new HTMLOutputGenerator(root, systemName);
         generator.generateHTMLPage();
