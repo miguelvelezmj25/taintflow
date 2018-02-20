@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.cmu.cs.mvelezce.analysis.option.json.ControlFlowResult;
 import edu.cmu.cs.mvelezce.analysis.option.json.SourceToSinkPath;
 import edu.cmu.cs.mvelezce.soot.jimple.jtp.ControlFlowSink;
-import edu.cmu.cs.mvelezce.soot.jimple.jtp.Nop;
 import org.apache.commons.io.FileUtils;
 import soot.*;
 import soot.jimple.InvokeExpr;
@@ -747,6 +746,47 @@ public class TaintInfoflow extends Infoflow {
             out.close();
             out.flush();
         }
+    }
+
+    public void mergeResults() throws IOException {
+        String baseFile = OUTPUT_DIR + this.systemName + "/" + this.systemName;
+
+        File file0 = new File(baseFile + "_0.json");
+        File file1 = new File(baseFile + "_1.json");
+
+        List<ControlFlowResult> results0 = this.readFromFile(file0);
+        List<ControlFlowResult> results1 = this.readFromFile(file1);
+
+        Map<ControlFlowResult, ControlFlowResult> results = new HashMap<>();
+
+        for(ControlFlowResult result : results0) {
+            results.put(result, result);
+        }
+
+        for(ControlFlowResult result : results1) {
+            if(results.containsKey(result)) {
+                Set<String> options = new HashSet<>(result.getOptions());
+                ControlFlowResult savedRes = results.get(result);
+                options.addAll(savedRes.getOptions());
+                savedRes.setOptions(options);
+                savedRes.setOptionCount(options.size());
+            }
+            else {
+                results.put(result, result);
+            }
+        }
+
+        ObjectMapper mapper = new ObjectMapper();
+        File outputFile = new File(baseFile + ".json");
+        mapper.writeValue(outputFile, results.keySet());
+    }
+
+    public List<ControlFlowResult> readFromFile(File file) throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
+        List<ControlFlowResult> results = mapper.readValue(file, new TypeReference<List<ControlFlowResult>>() {
+        });
+
+        return results;
     }
 
 }

@@ -3661,5 +3661,12 @@ public class AnalysisTest {
         HTMLPathGenerator.generateHTMLForSystem(root, systemName);
     }
 
+    @Test
+    public void merge() throws IOException {
+        String systemName = "density";
+        TaintInfoflow infoflow = new TaintInfoflow(systemName);
+        infoflow.mergeResults();
+    }
+
 }
 
