@@ -16,6 +16,8 @@ import soot.jimple.infoflow.results.InfoflowResults;
 import soot.jimple.infoflow.results.ResultSinkInfo;
 import soot.jimple.infoflow.results.ResultSourceInfo;
 import soot.jimple.internal.JInvokeStmt;
+import soot.jimple.toolkits.callgraph.CallGraph;
+import soot.jimple.toolkits.callgraph.Edge;
 import soot.tagkit.BytecodeOffsetTag;
 import soot.tagkit.LineNumberTag;
 import soot.tagkit.Tag;
@@ -39,6 +41,8 @@ public class TaintInfoflow extends Infoflow {
     private List<String> sinks = new ArrayList<>();
     private List<String> packages = new ArrayList<>();
 
+    private int cgDepth = 10;
+
     public TaintInfoflow(String systemName) throws IOException {
         this.systemName = systemName;
 
@@ -50,6 +54,8 @@ public class TaintInfoflow extends Infoflow {
     @Override
     protected void constructCallgraph() {
         super.constructCallgraph();
+
+        this.trimCG();
 
         Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
         PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink", ControlFlowSink.v()));
@@ -70,6 +76,102 @@ public class TaintInfoflow extends Infoflow {
                 }
             }
         }
+    }
+
+    private void trimCG() {
+        if(this.cgDepth < 0) {
+            return;
+        }
+
+        System.out.println("call graph size: " + Scene.v().getCallGraph().size());
+        Set<SootMethod> methods = this.getMethodsAtDepth();
+        System.out.println("methods at depth: " + methods.size());
+        this.removeEdgesLowerInCG(methods);
+    }
+
+    private void removeEdgesLowerInCG(Set<SootMethod> methods) {
+        CallGraph cg = Scene.v().getCallGraph();
+        Queue<SootMethod> worklist = new ArrayDeque<>(methods);
+        Set<SootMethod> analyzed = new HashSet<>();
+
+        while(!worklist.isEmpty()) {
+            SootMethod curMethod = worklist.remove();
+            Set<SootMethod> targets = this.getTargetMethods(curMethod);
+
+            for(SootMethod target : targets) {
+                if(analyzed.contains(target)) {
+                    continue;
+                }
+
+                worklist.add(target);
+            }
+
+            Iterator<Edge> edges = cg.edgesOutOf(curMethod);
+
+            while(edges.hasNext()) {
+                cg.removeEdge(edges.next());
+            }
+
+            analyzed.add(curMethod);
+        }
+    }
+
+    private Set<SootMethod> getTargetMethods(SootMethod method) {
+        Set<SootMethod> targets = new HashSet<>();
+        CallGraph cg = Scene.v().getCallGraph();
+        Iterator<Edge> edges = cg.edgesOutOf(method);
+
+        while(edges.hasNext()) {
+            Edge edge = edges.next();
+            MethodOrMethodContext tgt = edge.getTgt();
+            SootMethod tgtMethod = tgt.method();
+
+            if(!tgtMethod.equals(method) && this.isMethodInPackage(tgtMethod)) {
+                targets.add(tgtMethod);
+            }
+        }
+
+        return targets;
+    }
+
+    private Set<SootMethod> getMethodsAtDepth() {
+        SootMethod mainMethod = Scene.v().getMainMethod();
+        Queue<SootMethod> worklist = new ArrayDeque<>();
+        Set<SootMethod> analyzed = new HashSet<>();
+        worklist.add(mainMethod);
+
+        for(int i = 0; i < this.cgDepth; i++) {
+            int count = worklist.size();
+
+            for(int j = 0; j < count; j++) {
+                SootMethod curMethod = worklist.remove();
+                Set<SootMethod> targets = this.getTargetMethods(curMethod);
+
+                for(SootMethod target : targets) {
+                    if(analyzed.contains(target) || worklist.contains(target)) {
+                        continue;
+                    }
+
+                    worklist.add(target);
+                }
+
+                analyzed.add(curMethod);
+            }
+        }
+
+        return new HashSet<>(worklist);
+    }
+
+    private boolean isMethodInPackage(MethodOrMethodContext method) {
+        String methodPackage = method.method().getDeclaringClass().getPackageName();
+
+        for(String packageName : this.packages) {
+            if(methodPackage.contains(packageName)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public void aggregateInfoflowResults(int count) throws IOException {
