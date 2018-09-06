@@ -1692,7 +1692,7 @@ public class AnalysisTest {
 
     @Test
     public void pngtasticColorCounterTest() throws IOException, NoSuchMethodException, IllegalAccessException, InvocationTargetException {
-        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-counter/out/production/pngtastic-counter");
+        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-counter/target/classes");
         AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
 
         String systemName = "pngtasticColorCounter";
@@ -1732,7 +1732,7 @@ public class AnalysisTest {
 
     @Test
     public void pngtasticOptimizerTest() throws IOException {
-        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-optimizer/out/production/pngtastic-optimizer");
+        File file = new File("/Users/mvelezce/Documents/Programming/Java/Projects/performance-mapper-evaluation/original/pngtastic-optimizer/target/classes");
         AnalysisTest.appPath = file + AnalysisTest.sep + AnalysisTest.appPath;
 
         String systemName = "pngtasticOptimizer";

@@ -74,41 +74,41 @@ public class TaintInfoflow extends Infoflow {
 
     this.trimCG();
 
-    Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
-
-    AssignmentInControlFlowCounter assignmentInControlFlowCounter =
-        AssignmentInControlFlowCounter.getInstance();
-
-    PackManager.v()
-        .getPack("jtp")
-        .add(new Transform("jtp.assignmentincontrolflowcounter", assignmentInControlFlowCounter));
-    //        PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink",
-    // ControlFlowSink.v()));
-    //        PackManager.v().getPack("jtp").add(new Transform("jtp.trycatchlabelnop",
-    // TryCatchLabelNop.v()));
-    //        PackManager.v().getPack("jtp").add(new Transform("jtp.nop", Nop.v()));
-
-    while (iter.hasNext()) {
-      MethodOrMethodContext m = iter.next();
-      SootMethod method = m.method();
-      //
-      String methodPackage = method.getDeclaringClass().getPackageName();
-
-      for (String packageName : this.packages) {
-        //                if((!method.getDeclaringClass().isJavaLibraryClass() ||
-        // !method.getDeclaringClass().isPhantomClass())
-        //                    /*&& methodPackage.contains(packageName)*/ && method.hasActiveBody())
-        // {
-        if (methodPackage.contains(packageName) && method.hasActiveBody()) {
-          PackManager.v().getPack("jtp").apply(method.getActiveBody());
-        }
-      }
-    }
-
-    System.out.println(
-        "Assigns in control flow: "
-            + assignmentInControlFlowCounter.getNumAssignInsideControlFlows());
-    System.out.println("Total assigns: " + assignmentInControlFlowCounter.getNumTotalAssigns());
+//    Iterator<MethodOrMethodContext> iter = Scene.v().getReachableMethods().listener();
+//
+//    AssignmentInControlFlowCounter assignmentInControlFlowCounter =
+//        AssignmentInControlFlowCounter.getInstance();
+//
+//    PackManager.v()
+//        .getPack("jtp")
+//        .add(new Transform("jtp.assignmentincontrolflowcounter", assignmentInControlFlowCounter));
+//    //        PackManager.v().getPack("jtp").add(new Transform("jtp.controlflowsink",
+//    // ControlFlowSink.v()));
+//    //        PackManager.v().getPack("jtp").add(new Transform("jtp.trycatchlabelnop",
+//    // TryCatchLabelNop.v()));
+//    //        PackManager.v().getPack("jtp").add(new Transform("jtp.nop", Nop.v()));
+//
+//    while (iter.hasNext()) {
+//      MethodOrMethodContext m = iter.next();
+//      SootMethod method = m.method();
+//      //
+//      String methodPackage = method.getDeclaringClass().getPackageName();
+//
+//      for (String packageName : this.packages) {
+//        //                if((!method.getDeclaringClass().isJavaLibraryClass() ||
+//        // !method.getDeclaringClass().isPhantomClass())
+//        //                    /*&& methodPackage.contains(packageName)*/ && method.hasActiveBody())
+//        // {
+//        if (methodPackage.contains(packageName) && method.hasActiveBody()) {
+//          PackManager.v().getPack("jtp").apply(method.getActiveBody());
+//        }
+//      }
+//    }
+//
+//    System.out.println(
+//        "Assigns in control flow: "
+//            + assignmentInControlFlowCounter.getNumAssignInsideControlFlows());
+//    System.out.println("Total assigns: " + assignmentInControlFlowCounter.getNumTotalAssigns());
   }
 
   private void trimCG() {
